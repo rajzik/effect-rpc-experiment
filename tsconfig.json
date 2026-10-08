@@ -1,0 +1,32 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/core"
+    },
+    {
+      "path": "packages/server"
+    },
+    {
+      "path": "packages/client"
+    },
+    {
+      "path": "packages/test-utils"
+    },
+    {
+      "path": "packages/tanstack-react-query"
+    },
+    {
+      "path": "packages/next"
+    },
+    {
+      "path": "packages/start"
+    },
+    {
+      "path": "packages/electron"
+    },
+    {
+      "path": "packages/e2e"
+    }
+  ]
+}

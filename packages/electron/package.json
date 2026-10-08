@@ -1,0 +1,51 @@
+{
+  "name": "@effect-trpc/electron",
+  "version": "0.0.0",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./main": {
+      "types": "./dist/main.d.mts",
+      "import": "./dist/main.mjs",
+      "default": "./dist/main.mjs"
+    },
+    "./preload": {
+      "types": "./dist/preload.d.mts",
+      "import": "./dist/preload.mjs",
+      "default": "./dist/preload.mjs"
+    },
+    "./renderer": {
+      "types": "./dist/renderer.d.mts",
+      "import": "./dist/renderer.mjs",
+      "default": "./dist/renderer.mjs"
+    }
+  },
+  "scripts": {
+    "build": "vp pack",
+    "test": "vp test"
+  },
+  "dependencies": {
+    "@effect-trpc/client": "workspace:*",
+    "@effect-trpc/core": "workspace:*",
+    "@effect-trpc/server": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect-trpc/test-utils": "workspace:*",
+    "@effect/vitest": "catalog:",
+    "electron": "catalog:"
+  },
+  "peerDependencies": {
+    "electron": ">=30.0.0"
+  }
+}
