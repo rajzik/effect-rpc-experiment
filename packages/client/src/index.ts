@@ -1,0 +1,35 @@
+export {
+  Link,
+  httpLink,
+  localLink,
+  wsLink,
+  type HeadersOption,
+  type HttpLinkOptions,
+  type LocalLinkOptions,
+  type SerializationOption,
+  type WsLinkOptions,
+} from './Link.js';
+export {
+  createClient,
+  type CallArgs,
+  type Client,
+  type ClientMethods,
+  type CreateClientOptions,
+  type EffectCallOptions,
+  type EffectClient,
+  type EffectProcedure,
+  type inferClientError,
+  type inferClientInput,
+  type inferEffectClientError,
+  type MiddlewareOption,
+  type ProcedureCallOptions,
+  type PromiseProcedure,
+  type ReservedClientKey,
+} from './Client.js';
+export {
+  RpcDefect,
+  RpcInterrupted,
+  RpcTransportError,
+  isClientInfrastructureError,
+  type ClientError,
+} from '@effect-trpc/core';

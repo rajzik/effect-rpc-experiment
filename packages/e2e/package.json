@@ -1,0 +1,30 @@
+{
+  "name": "@effect-trpc/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vp test"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@effect-trpc/client": "workspace:*",
+    "@effect-trpc/core": "workspace:*",
+    "@effect-trpc/electron": "workspace:*",
+    "@effect-trpc/next": "workspace:*",
+    "@effect-trpc/server": "workspace:*",
+    "@effect-trpc/start": "workspace:*",
+    "@effect-trpc/tanstack-react-query": "workspace:*",
+    "@effect-trpc/test-utils": "workspace:*",
+    "@effect/platform-node": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@testing-library/dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "effect": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  }
+}

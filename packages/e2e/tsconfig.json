@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "./dist-types",
+    "tsBuildInfoFile": "./dist-types/.tsbuildinfo"
+  },
+  "include": ["test/**/*"],
+  "references": [
+    { "path": "../core" },
+    { "path": "../server" },
+    { "path": "../client" },
+    { "path": "../test-utils" },
+    { "path": "../tanstack-react-query" },
+    { "path": "../next" },
+    { "path": "../start" },
+    { "path": "../electron" }
+  ]
+}
