@@ -17,6 +17,115 @@ pieces of effect-trpc:
 Servers, clients and the TanStack Query bridge live in `@effect-trpc/server`,
 `@effect-trpc/client` and `@effect-trpc/tanstack-react-query`.
 
+## For AI agents
+
+**Use this package when**
+
+- you define the API surface: procedures (`query`, `mutation`, `subscription`) and a `Router`
+  shared by server and client;
+- you need the client error model (`ClientError<E>`, `causeToClientError`) or JSON codecs
+  (`Codecs`) for a compiled rpc, without any transport.
+
+Use a sibling instead to serve a router (`@effect-trpc/server`: `Handlers.make`, `toWebHandler`,
+`createCaller`, `@effect-trpc/server/node`), to call one (`@effect-trpc/client`: `createClient`
+with `httpLink`), for React Query (`@effect-trpc/tanstack-react-query`) or for test harnesses
+(`@effect-trpc/test-utils`).
+
+**Entry points**
+
+| Import path         | Exports                                                                                                                                                              | Source                                   |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `@effect-trpc/core` | `query`, `mutation`, `subscription`, `isProcedureDef`, `ProcedureDef`, `PayloadInput`, `NormalizePayload`, `inferInput` / `inferOutput` / `inferError` / `inferKind` | `src/Procedure.ts`                       |
+| `@effect-trpc/core` | `Router` (`make`, `merge`, `getByPath`, `getRpc`, `isRouter`), `ProcedureInfo`, `inferRouterInputs` / `inferRouterOutputs` / `inferRouterErrors`                     | `src/Router.ts`                          |
+| `@effect-trpc/core` | `ProcedureKind` (annotation key + `"query" \| "mutation" \| "subscription"` type)                                                                                    | `src/ProcedureKind.ts`                   |
+| `@effect-trpc/core` | `ClientError`, `ClientInfrastructureError`, `RpcDefect`, `RpcTransportError`, `RpcInterrupted`, `causeToClientError`, `exitToClientError`, guards                    | `src/ClientError.ts`                     |
+| `@effect-trpc/core` | `Codecs` namespace (`payload`, `success`, `error`, `exit`, `encode*Sync` / `decode*Sync`)                                                                            | `src/Codecs.ts` (barrel: `src/index.ts`) |
+
+**Golden path** — define a router, implement `router.group` with plain `effect/rpc`, classify
+failures (apps normally use `@effect-trpc/server` + `@effect-trpc/client` for the last two steps):
+
+```ts
+import { Effect, Exit, Schema } from 'effect';
+import { RpcTest } from 'effect/rpc';
+import { causeToClientError, isClientInfrastructureError, query, Router } from '@effect-trpc/core';
+
+// Domain data is a Schema.Class, typed errors are Schema.TaggedError classes.
+class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+  id: Schema.Number,
+}) {}
+
+// Nested record → tags are dot-joined paths ("post.byId").
+export const appRouter = Router.make({
+  post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
+});
+export type AppRouter = typeof appRouter; // what clients import
+
+// router.group is a plain effect/rpc RpcGroup.
+const HandlersLive = appRouter.group.toLayer({
+  'post.byId': ({ id }) =>
+    id === 1
+      ? Effect.succeed(new Post({ id, title: 'Hello' }))
+      : Effect.fail(new PostNotFound({ id })),
+});
+
+// Any failure collapses to ClientError<PostNotFound>.
+const program = Effect.gen(function* () {
+  const client = yield* RpcTest.makeClient(appRouter.group);
+  const exit = yield* Effect.exit(client['post.byId']({ id: 7 }));
+  if (Exit.isSuccess(exit)) return exit.value.title;
+  const error = causeToClientError(exit.cause);
+  return isClientInfrastructureError(error) ? error._tag : `not found: ${error.id}`;
+});
+
+console.log(await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(HandlersLive))));
+// → "not found: 7"
+```
+
+**Invariants**
+
+- Typed errors are `Schema.TaggedError` classes (discriminated by `_tag`); domain data is `Schema.Class`.
+- `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; infrastructure tags are `@effect-trpc/RpcDefect`, `@effect-trpc/RpcTransportError`, `@effect-trpc/RpcInterrupted`.
+- A declared failure reaches the client as the same class instance; it is never wrapped in an infrastructure error.
+- `causeToClientError` precedence: typed failure > defect (`RpcDefect`) > interruption (`RpcInterrupted`); `Fail(RpcClientError)` → `RpcTransportError`.
+- Tags are the record paths joined by `"."`; keys are non-empty, contain no `"."` and are not `then`, `call` or `apply` (`Router.make` throws).
+- `Router.merge(a, b)` requires disjoint top-level keys (throws `duplicate key`).
+- Definitions and routers are frozen; `.middleware(M)` returns a new value; router-level middleware is added after a procedure's own middleware.
+- `subscription` requires `success` (the element schema); it compiles to a stream rpc whose rpc-level error is `Schema.Never`.
+- Every compiled rpc carries the `ProcedureKind` annotation; rpcs not built by `Router.make` read as `"query"`.
+- `Codecs.*` are memoized per rpc; `Codecs.success` of a subscription is the element codec; `*Sync` helpers throw `SchemaError` and do not support schemas with services.
+
+**Common mistakes**
+
+- Don't import Effect v3 packages (`@effect/rpc`, `@effect/platform`, `Context.Tag`) → use `effect/rpc`, `effect/http`, `Context.Service` from `effect@4`.
+- Don't use dotted keys (`{ 'post.byId': … }`) → nest records (`{ post: { byId } }`); the tag is still `"post.byId"`.
+- Don't `throw` / `Effect.die` for expected failures → declare a `Schema.TaggedError` in `error` and `Effect.fail` it; defects arrive as `RpcDefect`.
+- Don't `JSON.stringify` / `JSON.parse` outputs, errors or exits across a boundary → use `Codecs.encode*Sync` / `decode*Sync` so `Schema.Class`, `Date` and tagged errors are restored.
+- Don't match errors with `instanceof Error` or message strings → switch on `_tag` or use `isClientInfrastructureError`.
+- Don't merge routers that share a top-level key → mount one under a prefix: `Router.make({ admin: adminRouter })`.
+- Don't look up rpcs with an untyped string → `Router.getRpc(router, 'post.byId')` is typed (unknown tags are a type error, and throw at runtime).
+- Don't expect `inferError` to include infrastructure errors → wrap it: `ClientError<inferError<typeof def>>`.
+
+**Where to look**
+
+| Behaviour                                                               | Test                                                       |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| tags, nesting, key validation, merge, middleware order, `ProcedureKind` | `test/router.test.ts`                                      |
+| `inferInput` / `inferOutput` / `inferError`, `Router.Rpcs` / `Paths`    | `test/inference.test-d.ts`                                 |
+| `causeToClientError` mapping and precedence, guards                     | `test/client-error.test.ts`, `test/client-error.test-d.ts` |
+| codec round-trips, memoization, middleware errors in `Codecs.error`     | `test/codecs.test.ts`, `test/codecs.test-d.ts`             |
+| end to end through `RpcTest.makeClient(router.group)`                   | `test/e2e.test.ts`                                         |
+| this README's examples                                                  | `test/readme.test.ts`                                      |
+| JSDoc conventions (every export has examples)                           | `docs/jsdoc-style.md`                                      |
+
+**Verify**
+
+```bash
+pnpm exec vp -C packages/core test
+pnpm exec vp -C packages/core pack
+node scripts/verify-jsdoc.mjs core
+```
+
 ## Install
 
 ```bash

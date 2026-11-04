@@ -1,3 +1,13 @@
+/**
+ * Compiles nested records of procedure definitions into a tRPC-style `Router`.
+ *
+ * A router is a thin, frozen wrapper around an `effect/rpc` `RpcGroup` whose tags are the
+ * dot-joined record paths (`"post.byId"`). `@effect-trpc/server` implements `router.group`,
+ * `@effect-trpc/client` builds a nested proxy from `router.procedures`, and the type helpers here
+ * (`inferRouterInputs`, `Router.Paths`, ...) give tRPC-style inference over the whole tree.
+ *
+ * @since 0.1.0
+ */
 import { Option, Predicate } from 'effect';
 import { RpcGroup } from 'effect/rpc';
 import type { Rpc, RpcMiddleware } from 'effect/rpc';
@@ -10,12 +20,49 @@ const TypeId = '~@effect-trpc/core/Router' as const;
 /** Router keys that would break proxy-based clients (thenable detection, `Function.prototype`). */
 const reservedKeys: ReadonlySet<string> = new Set(['then', 'call', 'apply']);
 
-/** Metadata about one procedure of a router. */
+/**
+ * Metadata about one procedure of a router.
+ *
+ * **When to use**
+ *
+ * Read it from `router.procedures` (keyed by tag) or {@link Router.getByPath} when you need the
+ * path, kind or compiled rpc of a procedure at runtime — e.g. to build a client proxy, generate
+ * docs or pick an HTTP method per kind.
+ *
+ * **Example** (Listing the mutations of a router)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { mutation, query, Router } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ *
+ * const appRouter = Router.make({
+ *   health: query({ success: Schema.Literal('ok') }),
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *   },
+ * });
+ *
+ * const mutations = [...appRouter.procedures.values()]
+ *   .filter((info) => info.kind === 'mutation')
+ *   .map((info) => info.tag); // ["post.create"]
+ * ```
+ *
+ * @see {@link Router}
+ * @category models
+ * @since 0.1.0
+ */
 export interface ProcedureInfo {
   /** Path segments in the router record, e.g. `["post", "byId"]`. */
   readonly path: ReadonlyArray<string>;
   /** The rpc tag: the path joined by `"."`, e.g. `"post.byId"`. */
   readonly tag: string;
+  /** `"query"`, `"mutation"` or `"subscription"`. */
   readonly kind: ProcedureKind.Value;
   /** The compiled `effect/rpc` rpc (annotated with `ProcedureKind`). */
   readonly rpc: Rpc.AnyWithProps;
@@ -24,6 +71,41 @@ export interface ProcedureInfo {
 /**
  * A tRPC-style router: a nested record of procedure definitions (and other routers) compiled to
  * an `effect/rpc` `RpcGroup` whose tags are the dot-joined record paths.
+ *
+ * **When to use**
+ *
+ * Create one with {@link Router.make} and export its type for clients
+ * (`export type AppRouter = typeof appRouter`). Pass the router itself to `@effect-trpc/server`
+ * (`Handlers.make`, `createCaller`, `toWebHandler`) and `@effect-trpc/client` (`createClient`).
+ *
+ * **Details**
+ *
+ * - `group` is an ordinary `RpcGroup`, so every `effect/rpc` API (`group.toLayer`,
+ *   `RpcServer`, `RpcClient`, `RpcTest.makeClient`) works with it directly.
+ * - Routers are frozen; `router.middleware(M)` returns a new router.
+ *
+ * **Example** (Using the compiled group with effect/rpc)
+ *
+ * ```ts
+ * import { Effect, Schema } from 'effect';
+ * import { query, Router } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ *
+ * export const appRouter = Router.make({
+ *   post: { byId: query({ payload: { id: Schema.Number }, success: Post }) },
+ * });
+ * export type AppRouter = typeof appRouter;
+ *
+ * // handlers are keyed by the dot-joined tag
+ * const HandlersLive = appRouter.group.toLayer({
+ *   'post.byId': ({ id }) => Effect.succeed(new Post({ id, title: 'Hello' })),
+ * });
+ * ```
+ *
+ * @see {@link Router.make}
+ * @category models
+ * @since 0.1.0
  */
 export interface Router<Rec> {
   readonly [TypeId]: typeof TypeId;
@@ -39,13 +121,27 @@ export interface Router<Rec> {
   ): Router<Router.WithMiddleware<Rec, M>>;
 }
 
+/**
+ * Types related to {@link Router}.
+ *
+ * @category type-level
+ * @since 0.1.0
+ */
 export declare namespace Router {
-  /** A router record: procedure definitions, routers or nested records, keyed by path segment. */
+  /**
+   * A router record: procedure definitions, routers or nested records, keyed by path segment.
+   *
+   * @since 0.1.0
+   */
   export type Shape = {
     readonly [key: string]: ProcedureDef.Any | Any | Shape;
   };
 
-  /** Any router. */
+  /**
+   * Any router (use it to constrain generic helpers: `<R extends Router.Any>`).
+   *
+   * @since 0.1.0
+   */
   export interface Any {
     readonly [TypeId]: typeof TypeId;
     readonly record: Shape;
@@ -53,12 +149,18 @@ export declare namespace Router {
     readonly procedures: ReadonlyMap<string, ProcedureInfo>;
   }
 
-  /** The record of a router type. */
+  /**
+   * The record of a router type.
+   *
+   * @since 0.1.0
+   */
   export type Record<R> = R extends Router<infer Rec> ? Rec : never;
 
   /**
    * The union of `Rpc`s a router (or router record) compiles to, with literal tags such as
-   * `"post.byId"`.
+   * `"post.byId"`. Use with `Rpc.ExtractTag`, `RpcClient.RpcClient` and other `effect/rpc` types.
+   *
+   * @since 0.1.0
    */
   export type Rpcs<R> = R extends Any
     ? RpcsOf<R['record'], ''>
@@ -66,10 +168,20 @@ export declare namespace Router {
       ? RpcsOf<R, ''>
       : never;
 
-  /** The union of procedure tags (dot-joined paths) of a router or router record. */
+  /**
+   * The union of procedure tags (dot-joined paths) of a router or router record, e.g.
+   * `"health" | "post.byId"`.
+   *
+   * @since 0.1.0
+   */
   export type Paths<R> = TagOf<Rpcs<R>>;
 
-  /** Maps every procedure definition in a record (recursively) to the definition with `M` added. */
+  /**
+   * Maps every procedure definition in a record (recursively) to the definition with `M` added
+   * (the record type of `router.middleware(M)`).
+   *
+   * @since 0.1.0
+   */
   export type WithMiddleware<Rec, M extends RpcMiddleware.AnyService> = {
     readonly [K in keyof Rec]: Rec[K] extends ProcedureDef.Any
       ? ProcedureDef.AddMiddleware<Rec[K], M>
@@ -78,7 +190,11 @@ export declare namespace Router {
         : WithMiddleware<Rec[K], M>;
   };
 
-  /** The record produced by merging two records with disjoint keys. */
+  /**
+   * The record produced by merging two records with disjoint keys (see `Router.merge`).
+   *
+   * @since 0.1.0
+   */
   export type Merge<A, B> = {
     readonly [K in keyof A | keyof B]: K extends keyof A ? A[K] : K extends keyof B ? B[K] : never;
   };
@@ -99,12 +215,121 @@ type MapRouter<Rec, F extends 'input' | 'output' | 'error'> = {
 
 /**
  * The inputs of every procedure of a router, as a nested object mirroring the record
- * (tRPC's `inferRouterInputs`): `inferRouterInputs<typeof appRouter>['post']['byId']`.
+ * (tRPC's `inferRouterInputs`).
+ *
+ * **When to use**
+ *
+ * Use in client code that must not import server modules: derive types from
+ * `typeof appRouter` (or an exported `AppRouter` type) instead of re-declaring them.
+ *
+ * **Example** (Typing a form from the router)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { mutation, query, Router } from '@effect-trpc/core';
+ * import type {
+ *   inferRouterErrors,
+ *   inferRouterInputs,
+ *   inferRouterOutputs,
+ * } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ *
+ * const appRouter = Router.make({
+ *   health: query({ success: Schema.Literal('ok') }),
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *   },
+ * });
+ *
+ * type RouterInputs = inferRouterInputs<typeof appRouter>;
+ * type ByIdInput = RouterInputs['post']['byId']; // { readonly id: number }
+ * type HealthInput = RouterInputs['health']; // void
+ * ```
+ *
+ * @see {@link inferInput}
+ * @category type-level
+ * @since 0.1.0
  */
 export type inferRouterInputs<R> = MapRouter<RecordOf<R>, 'input'>;
-/** The outputs of every procedure of a router, as a nested object mirroring the record. */
+/**
+ * The outputs of every procedure of a router, as a nested object mirroring the record
+ * (tRPC's `inferRouterOutputs`; subscription outputs are the element type).
+ *
+ * **Example** (Typing a component prop from the router)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { mutation, query, Router } from '@effect-trpc/core';
+ * import type {
+ *   inferRouterErrors,
+ *   inferRouterInputs,
+ *   inferRouterOutputs,
+ * } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ *
+ * const appRouter = Router.make({
+ *   health: query({ success: Schema.Literal('ok') }),
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *   },
+ * });
+ *
+ * type RouterOutputs = inferRouterOutputs<typeof appRouter>;
+ * type ByIdOutput = RouterOutputs['post']['byId']; // Post
+ * ```
+ *
+ * @see {@link inferOutput}
+ * @category type-level
+ * @since 0.1.0
+ */
 export type inferRouterOutputs<R> = MapRouter<RecordOf<R>, 'output'>;
-/** The typed errors of every procedure of a router, as a nested object mirroring the record. */
+/**
+ * The typed errors of every procedure of a router, as a nested object mirroring the record
+ * (middleware errors included; infrastructure errors excluded).
+ *
+ * **Example** (Typing an error handler from the router)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { mutation, query, Router } from '@effect-trpc/core';
+ * import type {
+ *   inferRouterErrors,
+ *   inferRouterInputs,
+ *   inferRouterOutputs,
+ * } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ *
+ * const appRouter = Router.make({
+ *   health: query({ success: Schema.Literal('ok') }),
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *   },
+ * });
+ *
+ * type RouterErrors = inferRouterErrors<typeof appRouter>;
+ * type ByIdError = RouterErrors['post']['byId']; // PostNotFound
+ * type CreateError = RouterErrors['post']['create']; // never
+ * ```
+ *
+ * @see {@link inferError}
+ * @category type-level
+ * @since 0.1.0
+ */
 export type inferRouterErrors<R> = MapRouter<RecordOf<R>, 'error'>;
 
 type TagOf<R> = R extends { readonly _tag: infer Tag extends string } ? Tag : never;
@@ -119,7 +344,35 @@ type RpcsOf<Rec, Prefix extends string> = {
         : never;
 }[keyof Rec & string];
 
-/** Returns `true` when `u` is a router created by `Router.make`. */
+/**
+ * Returns `true` when `u` is a router created by `Router.make` (a plain record is not a router).
+ *
+ * **Example** (Telling routers and records apart)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { mutation, query, Router } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ *
+ * const appRouter = Router.make({
+ *   health: query({ success: Schema.Literal('ok') }),
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *   },
+ * });
+ *
+ * Router.isRouter(appRouter); // true
+ * Router.isRouter(appRouter.record); // false
+ * ```
+ *
+ * @category guards
+ * @since 0.1.0
+ */
 const isRouter = (u: unknown): u is Router.Any =>
   Predicate.hasProperty(u, TypeId) && u[TypeId] === TypeId;
 
@@ -190,15 +443,57 @@ const applyMiddleware = (
 /**
  * Creates a router from a nested record of procedure definitions, routers and records.
  *
- * Tags are the record paths joined by `"."`. Throws if a key is empty, contains `"."`, is a
- * reserved word (`then`, `call`, `apply`) or if a value is not a procedure, router or record.
+ * **When to use**
+ *
+ * Use once per API surface (usually one `appRouter` module shared by server and client). Nest
+ * plain records for namespaces and embed other routers to compose feature modules; use
+ * {@link merge} to combine two routers side by side.
+ *
+ * **Details**
+ *
+ * - Tags are the record paths joined by `"."` (`post.byId`), computed as literal types too.
+ * - Procedures are compiled in definition order; `router.procedures` and `router.group.requests`
+ *   keep that order.
+ * - Every compiled rpc is annotated with `ProcedureKind`.
+ * - The same definition may appear under several paths; nested routers are not mutated.
+ *
+ * **Gotchas**
+ *
+ * - Throws if a key is empty, contains `"."` (nest records instead), is a reserved word (`then`,
+ *   `call`, `apply` — they would break proxy-based clients) or if a value is not a procedure,
+ *   router or plain record.
+ *
+ * **Example** (A nested app router)
  *
  * ```ts
- * const appRouter = Router.make({
- *   post: { byId: query({ payload: { id: Schema.Number }, success: Post }) },
+ * import { Schema } from 'effect';
+ * import { mutation, query, Router, subscription } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ *
+ * const adminRouter = Router.make({ stats: { count: query({ success: Schema.Number }) } });
+ *
+ * export const appRouter = Router.make({
+ *   health: query({ success: Schema.Literal('ok') }),
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *     onCreated: subscription({ success: Post }),
+ *   },
+ *   admin: adminRouter, // tags: "admin.stats.count"
  * });
- * appRouter.group; // RpcGroup<Rpc<"post.byId", ...>>
+ * export type AppRouter = typeof appRouter;
+ *
+ * type Paths = Router.Paths<AppRouter>;
+ * // "health" | "post.byId" | "post.create" | "post.onCreated" | "admin.stats.count"
  * ```
+ *
+ * @see {@link merge}
+ * @category constructors
+ * @since 0.1.0
  */
 const make = <const Rec extends Router.Shape>(record: Rec): Router<Rec> => {
   const procedures = new Map<string, ProcedureInfo>();
@@ -215,7 +510,33 @@ const make = <const Rec extends Router.Shape>(record: Rec): Router<Rec> => {
 };
 
 /**
- * Merges two routers into one. Their top-level keys must be disjoint; a shared key throws.
+ * Merges two routers into one (tRPC's `mergeRouters`).
+ *
+ * **When to use**
+ *
+ * Use to combine feature routers at the top level. To mount a router under a prefix, embed it
+ * in a record instead: `Router.make({ admin: adminRouter })`.
+ *
+ * **Gotchas**
+ *
+ * - Top-level keys must be disjoint; a shared key throws (`duplicate key "post"`). Keys are not
+ *   deep-merged.
+ *
+ * **Example** (Merging feature routers)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { query, Router } from '@effect-trpc/core';
+ *
+ * const healthRouter = Router.make({ health: query({ success: Schema.Literal('ok') }) });
+ * const postRouter = Router.make({ post: { count: query({ success: Schema.Number }) } });
+ *
+ * export const appRouter = Router.merge(healthRouter, postRouter); // tags: "health", "post.count"
+ * ```
+ *
+ * @see {@link make}
+ * @category combinators
+ * @since 0.1.0
  */
 const merge = <A extends Router.Shape, B extends Router.Shape>(
   a: Router<A>,
@@ -231,6 +552,44 @@ const merge = <A extends Router.Shape, B extends Router.Shape>(
 
 /**
  * Looks up a procedure by its path segments (`["post", "byId"]`).
+ *
+ * **When to use**
+ *
+ * Use in proxy-based code that collects path segments at runtime (e.g. `client.post.byId`).
+ * Prefer {@link getRpc} when the tag is known statically.
+ *
+ * **Details**
+ *
+ * - Returns `Option.none()` for an empty path, a segment that is empty or contains `"."`, or a
+ *   path that does not end at a procedure (e.g. `["post"]`).
+ *
+ * **Example** (Resolving a proxy path)
+ *
+ * ```ts
+ * import { Option, Schema } from 'effect';
+ * import { mutation, query, Router } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ *
+ * const appRouter = Router.make({
+ *   health: query({ success: Schema.Literal('ok') }),
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *   },
+ * });
+ *
+ * const info = Router.getByPath(appRouter, ['post', 'byId']);
+ * if (Option.isSome(info)) console.log(info.value.tag, info.value.kind); // "post.byId query"
+ * Option.isNone(Router.getByPath(appRouter, ['post'])); // true: a namespace, not a procedure
+ * ```
+ *
+ * @see {@link getRpc}
+ * @category getters
+ * @since 0.1.0
  */
 const getByPath = (
   router: Router.Any,
@@ -241,8 +600,43 @@ const getByPath = (
     : Option.fromUndefinedOr(router.procedures.get(path.join('.')));
 
 /**
- * Returns the compiled rpc for a tag, precisely typed (`Rpc<"post.byId", ...>`). Useful with
- * `Codecs` and anywhere a single procedure's schemas are needed. Throws for an unknown tag.
+ * Returns the compiled rpc for a tag, precisely typed (`Rpc<"post.byId", ...>`).
+ *
+ * **When to use**
+ *
+ * Use with `Codecs` and anywhere a single procedure's schemas are needed (SSR dehydration, a
+ * server action, a custom transport).
+ *
+ * **Gotchas**
+ *
+ * - Unknown tags are a type error; with an untyped tag it throws `Unknown procedure "<tag>"`.
+ *
+ * **Example** (Getting an rpc for its codecs)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { Codecs, mutation, query, Router } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ *
+ * const appRouter = Router.make({
+ *   health: query({ success: Schema.Literal('ok') }),
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *   },
+ * });
+ *
+ * const rpc = Router.getRpc(appRouter, 'post.byId'); // Rpc<"post.byId", ...>
+ * const json = Codecs.encodeSuccessSync(rpc, new Post({ id: 1, title: 'Hello' }));
+ * ```
+ *
+ * @see {@link getByPath}
+ * @category getters
+ * @since 0.1.0
  */
 const getRpc = <R extends Router.Any, const Tag extends Router.Paths<R>>(
   router: R,
@@ -255,7 +649,53 @@ const getRpc = <R extends Router.Any, const Tag extends Router.Paths<R>>(
   return info.rpc as unknown as Rpc.ExtractTag<Router.Rpcs<R>, Tag>;
 };
 
-/** Router constructors and helpers. */
+/**
+ * Router constructors and helpers: `make`, `merge`, `getByPath`, `getRpc` and `isRouter`.
+ *
+ * **When to use**
+ *
+ * `Router.make` is the entry point for every effect-trpc API; the other helpers are for code
+ * that inspects routers (adapters, client proxies, codecs).
+ *
+ * **Details**
+ *
+ * | API                                         | Description                                      |
+ * | ------------------------------------------- | ------------------------------------------------ |
+ * | `Router.make(record)`                       | Compile a nested record of procedures / routers. |
+ * | `Router.merge(a, b)`                        | Merge two routers; overlapping keys throw.       |
+ * | `Router.getByPath(router, ['post','byId'])` | `Option<ProcedureInfo>`.                         |
+ * | `Router.getRpc(router, 'post.byId')`        | The compiled rpc, precisely typed.               |
+ * | `Router.isRouter(u)`                        | Guard.                                           |
+ *
+ * **Example** (Defining and inspecting a router)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { mutation, query, Router } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ *
+ * const appRouter = Router.make({
+ *   health: query({ success: Schema.Literal('ok') }),
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *   },
+ * });
+ *
+ * appRouter.procedures.get('post.byId')?.kind; // "query"
+ * [...appRouter.group.requests.keys()]; // ["health", "post.byId", "post.create"]
+ * const versionRouter = Router.make({ version: query({ success: Schema.String }) });
+ * const merged = Router.merge(appRouter, versionRouter); // adds the "version" tag
+ * ```
+ *
+ * @see {@link Router.make}
+ * @category constructors
+ * @since 0.1.0
+ */
 export const Router = {
   make,
   merge,

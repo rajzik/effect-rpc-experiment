@@ -17,6 +17,102 @@ The package never imports `electron` at runtime. It only uses structural types (
 satisfy. So it loads in a sandboxed renderer and in plain Node, where tests drive it with Node
 `worker_threads` `MessageChannel` ports.
 
+## For AI agents
+
+**Use this package when**
+
+- An Electron renderer calls procedures implemented in the main process (one typed connection per
+  `createClient`, no HTTP server, no `contextBridge` API to maintain).
+- A Node worker thread or another message-port peer should call (or serve) a router:
+  `MessagePortServer` + `messagePortLink`.
+
+Use a sibling instead when the server is reachable over the network (`@effect-trpc/client`
+`httpLink` / `wsLink` with `@effect-trpc/server`), when you only need an in-process call
+(`createCaller` in `@effect-trpc/server`), or for tests against a real HTTP server
+(`@effect-trpc/test-utils`).
+
+**Entry points**
+
+| Import path                      | Process               | Exports                                                                                                                         | Source                                                              |
+| -------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `@effect-trpc/electron/main`     | main                  | `MainRpcServer` (`run`, `layer`, `make`, `senderId`, `senderIdHeader`), `senderIdHeader`, `MessagePortServer`, `defaultChannel` | `src/main.ts` → `src/MainRpcServer.ts`, `src/MessagePortServer.ts`  |
+| `@effect-trpc/electron/preload`  | preload (no Effect)   | `installPreloadBridge`, `connectMessageType`, `defaultChannel`                                                                  | `src/preload.ts` → `src/PreloadBridge.ts`                           |
+| `@effect-trpc/electron/renderer` | renderer              | `rendererLink`, `messagePortLink`, `messagePortProtocolClient`, `connectMessageType`, `defaultChannel`                          | `src/renderer.ts` → `src/RendererLink.ts`, `src/MessagePortLink.ts` |
+| `@effect-trpc/electron`          | tests, workers, tools | everything above                                                                                                                | `src/index.ts`                                                      |
+
+Every entry also exports the structural types it needs (`IpcMainLike`, `PortLike`, `WindowLike`, …)
+from `src/types.ts`.
+
+**Golden path** (full code in [Setup (three files)](#setup-three-files))
+
+1. `shared/router.ts`: `Router.make({...})` with `Schema.Class` data and `Schema.TaggedError`
+   errors. Schemas only, no handlers; both processes import it.
+2. `main.ts`: `const server = await MainRpcServer.run(appRouter, { handlers: Handlers.make(appRouter, {...}), ipcMain })`
+   before the window loads, `app.on('will-quit', () => void server.dispose())`, and a
+   `BrowserWindow` with `contextIsolation: true` and the preload script.
+3. `preload.ts`: `installPreloadBridge({ ipcRenderer })`. Nothing else, no `contextBridge`.
+4. `renderer.ts`: `createClient(appRouter, { link: rendererLink() })`, then use the client directly
+   or through `@effect-trpc/tanstack-react-query`.
+
+**Invariants**
+
+- Promise calls reject with `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`;
+  `client.$effect` calls fail with `E | RpcTransportError` (defects die, aborts interrupt).
+- `/main` only in the main process, `/preload` only in preload scripts, `/renderer` only in
+  renderers. The package never imports `electron` at runtime.
+- Required options: `ipcMain` (`MainRpcServer.*`), `handlers` providing every requirement
+  (`MainRpcServer.run`), `ipcRenderer` (`installPreloadBridge`).
+- `channel` defaults to `"effect-trpc"` and must be identical on all three sides.
+- One `MessagePort` connection per client; a handler defect fails only its call.
+- `x-effect-trpc-sender-id` is set by the main process; renderer values are replaced.
+- `rendererLink` fails calls after `connectTimeout` (default `10 seconds`) without an
+  acknowledgement; `messagePortLink` has no timeout unless you pass one.
+
+**Common mistakes**
+
+- Don't expose `ipcRenderer` or an API with `contextBridge` → call `installPreloadBridge` in the
+  preload; the page only posts a port to its own window.
+- Don't set `contextIsolation: false` → keep the default `true`.
+- Don't import `@effect-trpc/electron` or `/main` in the preload → import `/preload` (no Effect,
+  bundles small for `sandbox: true`).
+- Don't load the window before `await MainRpcServer.run(...)` → `ipcMain` drops ports posted
+  before the listener exists, and calls fail with `RpcTransportError` after `connectTimeout`.
+- Don't pass a custom `channel` to one side only → pass it to `MainRpcServer`,
+  `installPreloadBridge` and `rendererLink`.
+- Don't trust a renderer-supplied header for identity → use `MainRpcServer.senderId(headers)`, and
+  `authorize` (e.g. `senderFrame?.url`) or middleware to restrict who may call.
+- Don't share `messagePortLink(port)` between two clients (the second dies with `RpcDefect`
+  "already used") → pass a function that opens a new port per client.
+- Don't keep using a client after the main process closed its port → its calls fail fast with
+  `RpcTransportError`; create a new client.
+- Don't pass `window` / `MessageChannel` to `rendererLink` in an app → those options exist for
+  tests with Node `worker_threads` ports.
+- Don't use a `MessagePortMain` as a client port → it is server-side only (`PortMainLike`).
+
+**Where to look**
+
+- `test/readme.test.ts`: the three-file setup of this README, with Electron replaced by fakes.
+- `test/electron.test.ts`: renderer → bridge → main end to end: `Schema.Class` instances, typed
+  errors, subscriptions, abort → `RpcInterrupted`, defects → `RpcDefect`, renderer isolation and
+  sender ids, port closed by main, `client.dispose()`, `server.dispose()` without leaks,
+  `connectTimeout`, custom channel + `authorize`.
+- `test/messagePort.test.ts`: `MessagePortServer` + `messagePortLink` without Electron:
+  EventEmitter ports, trusted headers, port factory vs single-use port, malformed and hostile
+  frames, binary serialization, closing the server scope.
+- `test/preload.test.ts`: which window messages the bridge forwards.
+- `test/electron.test-d.ts`: real Electron / DOM / Node objects satisfy the structural types;
+  type-level guarantees of `MainRpcServer` and the links.
+- `test/fakes.ts`: `FakeIpcMain`, `FakeWindow`, `FakePortMain`, `makeIpcRenderer`.
+- [`docs/jsdoc-style.md`](../../docs/jsdoc-style.md): the JSDoc contract for `src/`.
+
+**Verify**
+
+```sh
+pnpm exec vp -C packages/electron test
+pnpm exec vp -C packages/electron pack
+node scripts/verify-jsdoc.mjs electron
+```
+
 ## Install
 
 ```sh

@@ -17,6 +17,98 @@ What differs from tRPC: there is **no transformer**. `Schema.Class` values (with
 everywhere: on the wire, in the dehydrated RSC payload and in server action results. Client
 components get real class instances, and errors are typed as `ClientError<E>`.
 
+## For AI agents
+
+**Use this package when** you wire an `@effect-trpc/core` router into a **Next.js App Router**
+app: a `route.ts` endpoint, server components that prefetch into TanStack Query, client components
+that read the cache, and server actions that keep typed errors.
+
+- TanStack Start app → use `@effect-trpc/start`.
+- Plain React (Vite SPA, no RSC) → use `@effect-trpc/tanstack-react-query` + `@effect-trpc/client`.
+- Any other fetch server (Bun, Deno, Workers, Hono) → `toWebHandler` from `@effect-trpc/server`.
+
+**Entry points** (all from `@effect-trpc/next`; the package has no subpaths and no
+`'use client'` / `'use server'` directives of its own):
+
+| export                                                          | side   | what                                                        | source                                 |
+| --------------------------------------------------------------- | ------ | ----------------------------------------------------------- | -------------------------------------- |
+| `createRouteHandler`                                            | server | `{ GET, POST, dispose }` for `route.ts`                     | `src/routeHandler.ts`                  |
+| `createRscHelpers`                                              | server | `{ getQueryClient, rpc, prefetch, HydrateClient, caller? }` | `src/rsc.tsx`                          |
+| `createServerActionCaller`                                      | server | `actions(path)` → server action resolving an encoded `Exit` | `src/serverActions.ts`                 |
+| `createNextRpcClient`                                           | client | `{ RpcProvider, useRpc, useRpcClient, HydrationBoundary }`  | `src/client.tsx`                       |
+| `useServerAction`                                               | client | hook: `{ run, data, error, status, isPending, reset }`      | `src/useServerAction.ts`               |
+| `decodeActionResult`, `unwrapActionResult`                      | both   | encoded action result → `Exit` / `Promise` of instances     | `src/serverActions.ts`                 |
+| `makeQueryClient`, `getBaseUrl`                                 | both   | App Router `QueryClient` defaults; app origin               | `src/queryClient.ts`, `src/client.tsx` |
+| `InputAt`, `OutputAt`, `ErrorAt`, `ActionPath`, `ServerAction…` | types  | per-path types for action wrappers                          | `src/types.ts`, `src/serverActions.ts` |
+
+**Golden path** (paths in the app):
+
+1. `server/router.ts` — schemas-only router (§1). Imported by server **and** client code.
+2. `server/handlers.ts` — `import 'server-only'`, `Handlers.make(appRouter, …)` (§1).
+3. `app/api/rpc/[[...rpc]]/route.ts` — `export const { GET, POST } = createRouteHandler(…)` (§2).
+4. `trpc/client.tsx` — `'use client'`, `createNextRpcClient(appRouter)` (§4); render `RpcProvider`
+   in `app/layout.tsx`.
+5. `trpc/server.tsx` — `import 'server-only'`, `createRscHelpers(appRouter, { handlers, headers },
+{ HydrationBoundary })` with the boundary from step 4 (§5).
+6. `app/page.tsx` — `prefetch(rpc.x.queryOptions(…))` inside `<HydrateClient>`; client components
+   read it with `useSuspenseQuery(useRpc().x.queryOptions(…))` (§6).
+7. Optional: `app/actions.ts` (`'use server'`, `createServerActionCaller`, one `export async
+function` per action) and a client component with `useServerAction` (§7).
+
+**Invariants**
+
+- `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; narrow on `_tag`.
+- Server-only: `createRouteHandler`, `createRscHelpers`, `createServerActionCaller` (they import
+  your handlers). Client-only: `createNextRpcClient`'s module, `useServerAction`.
+- `createRouteHandler` requires `handlers`; `path` defaults to `/api/rpc`; `serialization`
+  (default `"ndjson"`) must match `createNextRpcClient`.
+- `GET` always answers `405`; every call (subscriptions included) is a `POST`.
+- Server actions never reject with a procedure error: they resolve with an encoded `Exit`
+  (`EncodedActionResult`), decoded on the client with the router's schemas.
+- Server `getQueryClient()` is per request (`React.cache`); browser `getQueryClient()` is a
+  singleton.
+- Relative client urls are resolved with `getBaseUrl()` because `httpLink` needs absolute urls,
+  also during SSR.
+
+**Common mistakes**
+
+- Don't create one module-level `QueryClient` on the server → use `getQueryClient()` from
+  `createRscHelpers` (per request) or `makeQueryClient()` per request.
+- Don't import `trpc/server.tsx` or `server/handlers.ts` from a `'use client'` file → client code
+  imports only the router (schemas), `trpc/client.tsx` and action functions.
+- Don't leave `createRscHelpers` on its default `HydrationBoundary` in a real app → pass the one
+  exported by your `'use client'` module.
+- Don't `throw` procedure errors from a server action or export `actions` from a `'use server'`
+  file → `return actions('post.create')(input)` inside an exported `async function`.
+- Don't rely on typed errors from an un-awaited `prefetch` that fails while streaming (it arrives
+  as a plain `Error`) → `await getQueryClient().prefetchQuery(…)` on pages that need them.
+- Don't pass a relative `url` to a hand-made `httpLink` on the server, or rely on the
+  `localhost:$PORT` fallback behind a proxy → pass an absolute `url`.
+- Don't set `keyPrefix` in `createRscHelpers` with `createNextRpcClient` (it has no prefix) → the
+  query keys would not match.
+- Don't give `useServerAction` / `unwrapActionResult` a different `path` than the action calls →
+  the result is decoded with that path's schemas.
+
+**Where to look**
+
+- Route handler (POST/GET/404/basePath/lazy build/dispose): `test/routeHandler.test.ts`.
+- RSC helpers (per-request client, in-process prefetch, Schema dehydration, `caller`, headers,
+  `keyPrefix`, remote client): `test/rsc.test.tsx`.
+- Server actions (encoding, typed errors, defects, invalid input, headers, `dispose`):
+  `test/serverActions.test.ts`; hook + provider + hydration in jsdom: `test/client.test.tsx`.
+- This README end to end: `test/readme.test.tsx`; types (`ClientError` narrowing, `NextRequest`
+  assignability): `test/types.test-d.tsx`; tRPC parity: `test/PARITY.md`.
+- JSDoc conventions: `docs/jsdoc-style.md`. Everything is tested with Web `Request`s, jsdom and
+  React Testing Library, not inside a running Next.js app (see Known limits).
+
+**Verify**
+
+```bash
+pnpm exec vp -C packages/next test
+pnpm exec vp -C packages/next pack
+node scripts/verify-jsdoc.mjs next
+```
+
 ## Install
 
 ```bash

@@ -9,7 +9,8 @@
     "fmt": "vp fmt",
     "test": "vp run -r test",
     "build": "vp run -r build",
-    "ready": "vp check && vp run typecheck && vp run -r test && vp run -r build"
+    "ready": "vp check && vp run typecheck && vp run -r test && vp run -r build && node scripts/verify-jsdoc.mjs",
+    "docs:check": "node scripts/verify-jsdoc.mjs"
   },
   "devDependencies": {
     "@effect/language-service": "catalog:",

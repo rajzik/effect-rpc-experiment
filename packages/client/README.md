@@ -12,6 +12,101 @@ subscriptions as `AsyncIterable` / `Stream`. Each call goes through a **link** (
   they never show up looking like your domain errors.
 - Aborting a call interrupts the handler on the server.
 
+## For AI agents
+
+**Use this package when**
+
+- code in a browser, another server or a script calls an `@effect-trpc/core` router served by
+  `@effect-trpc/server` (`httpLink`, `wsLink`);
+- tests or SSR should exercise the client API against in-process handlers (`localLink`);
+- you need a custom transport over any `effect/rpc` `RpcClient.Protocol` (`Link.fromProtocol`).
+
+Use a sibling instead to define routers (`@effect-trpc/core`), to implement / serve them or call
+them in-process without the client API (`@effect-trpc/server`, `createCaller`), or for React
+Query (`@effect-trpc/tanstack-react-query`, which wraps this client).
+
+**Entry points**
+
+| import path           | exports                                                                                                                                                                                                                                                                                                                      | source                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `@effect-trpc/client` | `createClient`, `httpLink`, `wsLink`, `localLink`, `Link` (`make`, `fromProtocol`); types `Client`, `ClientMethods`, `CreateClientOptions`, `ProcedureCallOptions`, `EffectCallOptions`, `HttpLinkOptions`, ...; re-exports `RpcDefect`, `RpcTransportError`, `RpcInterrupted`, `ClientError`, `isClientInfrastructureError` | `src/index.ts` → `src/Client.ts`, `src/Link.ts` (errors: `@effect-trpc/core`) |
+
+**Golden path**
+
+```ts
+import { Effect, Schema } from 'effect';
+import { query, Router } from '@effect-trpc/core';
+import { createClient, httpLink, type Client } from '@effect-trpc/client';
+
+class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+  id: Schema.Number,
+}) {}
+
+// 1. The same router value the server implements (import it from a shared module).
+const appRouter = Router.make({
+  post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
+});
+
+// 2. A client over an ABSOLUTE url, served by @effect-trpc/server (HTTP + NDJSON).
+const client = createClient(appRouter, { link: httpLink({ url: 'http://localhost:3000/rpc' }) });
+
+// 3a. Promise API: rejects with ClientError<PostNotFound>.
+try {
+  const post = await client.post.byId({ id: 1 }); // Post instance
+} catch (cause) {
+  const error = cause as Client.Error<typeof appRouter.record.post.byId>;
+  if (error._tag !== 'PostNotFound') throw error; // RpcDefect | RpcTransportError | RpcInterrupted
+}
+
+// 3b. Effect API: Effect<string, RpcTransportError>, no requirements.
+const title = client.$effect.post.byId({ id: 1 }).pipe(
+  Effect.map((post) => post.title),
+  Effect.catchTag('PostNotFound', () => Effect.succeed('missing')),
+);
+
+// 4. Release connections.
+await client.dispose();
+```
+
+See [Links](#links) for `wsLink` / `localLink` and [Effect client](#effect-client) for streams.
+
+**Invariants**
+
+- Typed errors are the procedure's `Schema.TaggedError` instances, discriminated by `_tag`.
+- Promise rejections are `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; `$effect` calls fail with `E | RpcTransportError` (defects are defects, cancellation is interruption).
+- `httpLink` needs an absolute `http(s):` URL and `wsLink` an absolute `ws(s):` URL; anything else throws when the link is created.
+- Link and server must agree on protocol (`httpLink` ↔ `protocol: "http"`, `wsLink` ↔ `protocol: "websocket"`) and serialization (link default `"ndjson"`).
+- A router may not use `$effect`, `$router`, `dispose` or `withHeaders` as top-level keys (`createClient` throws).
+- Routers with `requiredForClient` middleware require the `middleware` option (`RpcMiddleware.layerClient(...)`); it is a type error to omit it.
+- The link connects lazily on the first call; after `dispose()` calls fail with `RpcTransportError`.
+
+**Common mistakes**
+
+- Don't pass a relative URL (`'/rpc'`) to `httpLink` → `new URL('/rpc', location.origin).href`.
+- Don't point `wsLink` at a `toWebHandler` endpoint → serve `layerHttp(router, { protocol: 'websocket' })` and match `serialization` (server websocket default is `"json"`, `wsLink` default is `"ndjson"`).
+- Don't treat every rejection as a domain error → switch on `error._tag`; infrastructure tags start with `@effect-trpc/`.
+- Don't expect `RpcDefect` / `RpcInterrupted` in the `$effect` error channel → inspect the `Cause` (`Effect.exit`, `Effect.catchCause`).
+- Don't give `localLink` a handler layer without the middleware implementations → `Layer.mergeAll(handlers, AuthLive)` (missing ones are a type error).
+- Don't create a client per call → create one per app (or per request on the server) and `dispose()` it.
+- Don't mutate headers on the client → `client.withHeaders({...})` returns a client sharing the connection.
+- Don't use Effect v3 imports (`@effect/rpc`, `@effect/platform`) → `effect/rpc`, `effect/http`.
+
+**Where to look**
+
+- `test/readme.test.ts` (this README's examples), `test/httpLink.test.ts` (instances, typed errors, defects, streams, headers, non-2xx → `RpcTransportError`, absolute URLs), `test/wsLink.test.ts`, `test/localLink.test.ts` (Effect client, headers merge, proxy, lazy link, dispose), `test/abort.test.ts` (abort, interruption, subscription cleanup), `test/middleware.test.ts` (`requiredForClient`), `test/client.test-d.ts` (call, error and option types), `test/PARITY.md`.
+- JSDoc on every export (`src/*.ts`) follows `docs/jsdoc-style.md`.
+
+**Verify**
+
+```sh
+pnpm exec vp -C packages/client test
+pnpm exec vp -C packages/client pack
+node scripts/verify-jsdoc.mjs client
+```
+
+## Install
+
 ```sh
 pnpm add @effect-trpc/client @effect-trpc/core effect
 ```

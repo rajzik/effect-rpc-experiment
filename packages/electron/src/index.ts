@@ -1,5 +1,15 @@
-// Public API of @effect-trpc/electron. Process-specific entries: `./main.ts`, `./preload.ts`,
-// `./renderer.ts`.
+/**
+ * Typed effect-trpc RPC between Electron's main process and its renderers, over one
+ * `MessagePort` per renderer client.
+ *
+ * This root entry re-exports everything for tests and tooling. Apps should import the
+ * process-specific entries instead: `@effect-trpc/electron/main` (main process),
+ * `@effect-trpc/electron/preload` (preload script, no Effect) and
+ * `@effect-trpc/electron/renderer` (renderer). Routers come from `@effect-trpc/core`, handlers
+ * from `@effect-trpc/server` and clients from `@effect-trpc/client`.
+ *
+ * @since 0.1.0
+ */
 export {
   MainRpcServer,
   senderIdHeader,

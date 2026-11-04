@@ -1,3 +1,13 @@
+/**
+ * Types and the builder behind `rpc.<subscription>.subscriptionOptions(input, opts)`.
+ *
+ * Subscriptions are not TanStack queries: the options object carries the callbacks, an `enabled`
+ * flag, a key (used by `useSubscription` to detect input changes) and a `subscribe` function that
+ * iterates the Promise client's `AsyncIterable` and stops by aborting it, which interrupts the
+ * server stream. `useSubscription` consumes it in React; `subscribe` works without React.
+ *
+ * @since 0.1.0
+ */
 import type { SkipToken } from '@tanstack/react-query';
 import { skipToken } from '@tanstack/react-query';
 import { callOptions, type ProcedureCaller } from './internals/call.js';
@@ -12,15 +22,34 @@ import type {
 } from './internals/types.js';
 
 /**
- * The connection state of a subscription (tRPC's `TRPCConnectionState`). effect-trpc links do not
- * reconnect, so a subscription goes `connecting` → `pending` and stays there until it ends.
+ * The connection state of a subscription (tRPC's `TRPCConnectionState`), reported to
+ * `onConnectionStateChange`.
+ *
+ * **Details**
+ *
+ * - effect-trpc links do not reconnect, so a subscription goes `connecting` → `pending` and stays
+ *   there until it ends; `error` is always `null` here (failures go to `onError`).
+ *
+ * @category models
+ * @since 0.1.0
  */
 export interface RpcConnectionState<TError> {
   readonly state: 'idle' | 'connecting' | 'pending';
   readonly error: TError | null;
 }
 
-/** Callbacks of a subscription. */
+/**
+ * Callbacks of a subscription: `onStarted`, `onData`, `onError`, `onComplete`,
+ * `onConnectionStateChange`.
+ *
+ * **Details**
+ *
+ * - No callback runs after the subscription was stopped (abort, restart or unmount).
+ * - `onError` receives `ClientError<E>`; a stream ends after its first error.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface RpcSubscriptionCallbacks<TOutput, TError> {
   /**
    * The subscription request has been handed to the transport (status `pending`). Called once,
@@ -33,10 +62,17 @@ export interface RpcSubscriptionCallbacks<TOutput, TError> {
   onError?: (error: TError) => void;
   /** The server completed the stream. */
   onComplete?: () => void;
+  /** The connection state changed (`connecting`, then `pending`). */
   onConnectionStateChange?: (state: RpcConnectionState<TError>) => void;
 }
 
-/** `subscriptionOptions` input options. */
+/**
+ * `subscriptionOptions` input options: the callbacks plus `enabled` and `rpc: { headers }`.
+ *
+ * @see {@link RpcSubscriptionOptions}
+ * @category options
+ * @since 0.1.0
+ */
 export interface RpcSubscriptionOptionsIn<TOutput, TError> extends RpcSubscriptionCallbacks<
   TOutput,
   TError
@@ -47,7 +83,14 @@ export interface RpcSubscriptionOptionsIn<TOutput, TError> extends RpcSubscripti
   rpc?: RpcRequestOptions;
 }
 
-/** Options of `subscribe`: the callbacks plus an optional signal that unsubscribes. */
+/**
+ * Options of `subscriptionOptions(...).subscribe`: the callbacks plus an optional `signal` that
+ * unsubscribes when aborted.
+ *
+ * @see {@link RpcSubscriptionOptionsOut}
+ * @category options
+ * @since 0.1.0
+ */
 export interface RpcSubscribeOptions<TOutput, TError> extends RpcSubscriptionCallbacks<
   TOutput,
   TError
@@ -55,7 +98,19 @@ export interface RpcSubscribeOptions<TOutput, TError> extends RpcSubscriptionCal
   readonly signal?: AbortSignal | undefined;
 }
 
-/** `subscriptionOptions` result, consumed by {@link useSubscription}. */
+/**
+ * `subscriptionOptions` result, consumed by `useSubscription` or started manually with
+ * `subscribe`.
+ *
+ * **Details**
+ *
+ * - `subscribe` ignores the callbacks given to `subscriptionOptions`; pass the callbacks to
+ *   `subscribe` itself (`useSubscription` forwards the option callbacks for you).
+ *
+ * @see {@link RpcSubscriptionOptions}
+ * @category options
+ * @since 0.1.0
+ */
 export interface RpcSubscriptionOptionsOut<TOutput, TError, TFeatureFlags extends FeatureFlags>
   extends RpcSubscriptionCallbacks<TOutput, TError>, RpcOptionsResult {
   enabled: boolean;
@@ -68,8 +123,55 @@ export interface RpcSubscriptionOptionsOut<TOutput, TError, TFeatureFlags extend
 }
 
 /**
- * `rpc.<subscription>.subscriptionOptions(input | skipToken, opts?)`: options for
- * {@link useSubscription} (tRPC's `TRPCSubscriptionOptions`).
+ * The signature of `rpc.<subscription>.subscriptionOptions(input | skipToken, opts?)`: options for
+ * `useSubscription` (tRPC's `TRPCSubscriptionOptions`).
+ *
+ * **When to use**
+ *
+ * Use for subscription procedures (server `Stream`s). Pass the result to `useSubscription` in
+ * React, or call its `subscribe` outside React.
+ *
+ * **Details**
+ *
+ * - `enabled` defaults to `true`, or `false` when the input is `skipToken`.
+ * - Elements are decoded with the procedure's success schema (class instances), errors are
+ *   `ClientError<E>`.
+ * - `subscribe(callbacks)` starts the stream and returns a function that stops it; aborting
+ *   `callbacks.signal` stops it too. Stopping interrupts the server stream.
+ *
+ * **Gotchas**
+ *
+ * - tRPC's `tracked()` / `lastEventId` and automatic reconnects are not supported.
+ * - Subscriptions are not stored in the `QueryClient`; their `queryKey` only identifies the input.
+ *
+ * **Example** (Subscribing outside React)
+ *
+ * ```ts
+ * import type { Client } from '@effect-trpc/client';
+ * import { Router, subscription } from '@effect-trpc/core';
+ * import { createRpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import { Schema } from 'effect';
+ *
+ * const appRouter = Router.make({
+ *   countdown: subscription({ payload: { from: Schema.Number }, success: Schema.Number }),
+ * });
+ * declare const client: Client<typeof appRouter>;
+ *
+ * const rpc = createRpcOptionsProxy({ client });
+ * const controller = new AbortController();
+ *
+ * rpc.countdown.subscriptionOptions({ from: 3 }).subscribe({
+ *   signal: controller.signal, // abort() stops the stream and interrupts the server
+ *   onData: (n) => console.log(n),
+ *   onError: (error) => console.error(error._tag),
+ *   onComplete: () => console.log('done'),
+ * });
+ * ```
+ *
+ * @see useSubscription
+ * @see DecorateSubscriptionProcedure
+ * @category options
+ * @since 0.1.0
  */
 export interface RpcSubscriptionOptions<
   TDef extends ResolverDef,

@@ -1,3 +1,15 @@
+/**
+ * Schema-aware SSR hydration: TanStack's `dehydrate` / `hydrate` / `HydrationBoundary` for a
+ * router.
+ *
+ * TanStack's own `dehydrate` puts `Schema.Class` instances, `Date`s and `Schema.TaggedError`s into
+ * the payload as-is, so they do not survive JSON. These helpers encode the router's queries with
+ * the procedures' schemas (`Codecs.success` from `@effect-trpc/core`, per page for infinite
+ * queries; errors as an `Exit`) and decode them back to instances on the client. Queries with
+ * other keys pass through unchanged. `@effect-trpc/next` and `@effect-trpc/start` build on them.
+ *
+ * @since 0.1.0
+ */
 import {
   Codecs,
   isClientInfrastructureError,
@@ -26,7 +38,21 @@ import { Exit, Schema } from 'effect';
 import * as React from 'react';
 import { parseQueryKey } from './internals/keys.js';
 
-/** Options of `dehydrate`: TanStack's options plus `dehydrateErrors`. */
+/**
+ * Options of `dehydrate`: TanStack's `DehydrateOptions` plus `dehydrateErrors`.
+ *
+ * **Details**
+ *
+ * - `shouldDehydrateQuery`, `serializeData` and `shouldRedactErrors` fall back to the
+ *   `QueryClient`'s `defaultOptions.dehydrate`, like TanStack.
+ * - `serializeData` runs after the schema encoding (on JSON-safe values).
+ * - The default `shouldRedactErrors` (for queries dehydrated while pending) keeps procedure
+ *   `TaggedError`s and redacts everything else.
+ *
+ * @see {@link dehydrate}
+ * @category hydration
+ * @since 0.1.0
+ */
 export interface RpcDehydrateOptions extends DehydrateOptions {
   /**
    * Also dehydrate failed queries of the router, encoding their `ClientError` (typed errors and
@@ -36,10 +62,23 @@ export interface RpcDehydrateOptions extends DehydrateOptions {
   readonly dehydrateErrors?: boolean | undefined;
 }
 
-/** Props of the effect-trpc `HydrationBoundary`: the same as TanStack's. */
+/**
+ * Props of the effect-trpc `HydrationBoundary`: the same as TanStack's (`state`, `options`,
+ * `queryClient`, `children`).
+ *
+ * @see {@link createHydrationHelpers}
+ * @category hydration
+ * @since 0.1.0
+ */
 export type RpcHydrationBoundaryProps = HydrationBoundaryProps;
 
-/** Dehydration helpers bound to a router; see {@link createHydrationHelpers}. */
+/**
+ * Dehydration helpers bound to a router, returned by {@link createHydrationHelpers}.
+ *
+ * @see {@link createHydrationHelpers}
+ * @category hydration
+ * @since 0.1.0
+ */
 export interface HydrationHelpers {
   /**
    * TanStack's `dehydrate`, with the data and errors of the router's queries encoded to JSON-safe
@@ -159,11 +198,67 @@ const lookup = (router: Router.Any, queryKey: ReadonlyArray<unknown>) => {
 };
 
 /**
- * TanStack's `dehydrate` for a router: the data of every query of the router is encoded with
- * `Codecs.success(rpc)` (each page for infinite queries) and, unless `dehydrateErrors: false`,
- * failed queries are included with their error encoded through `Codecs.exit(rpc)`. Queries with
- * other keys are dehydrated unchanged. A query whose value cannot be encoded is left out (the
- * client will fetch it).
+ * TanStack's `dehydrate` for a router: returns a JSON-safe `DehydratedState` in which the router's
+ * queries are encoded with their procedures' schemas.
+ *
+ * **When to use**
+ *
+ * Use on the server after prefetching, when the state is sent to the browser as JSON. Prefer the
+ * `dehydrate` of {@link createHydrationHelpers}, which binds the router once.
+ *
+ * **Details**
+ *
+ * - Data of every query of the router is encoded with `Codecs.success(rpc)` (each page for
+ *   infinite queries). Queries with other keys are dehydrated unchanged.
+ * - Unless `dehydrateErrors: false`, failed queries of the router are included: typed errors are
+ *   encoded as an `Exit`, `RpcDefect` / `RpcTransportError` / `RpcInterrupted` with their own
+ *   schemas. The `cause` of a defect / transport error is dropped (it may hold server details).
+ * - Pending queries (streaming SSR) are supported: their promise resolves to the encoded data.
+ * - A query whose value cannot be encoded is left out; the client fetches it.
+ *
+ * **Gotchas**
+ *
+ * - Do not use `dehydrate` from `@tanstack/react-query` for these queries: `Schema.Class`
+ *   instances and `Date`s turn into plain JSON objects and strings. Pair this function with
+ *   {@link hydrate} or the `HydrationBoundary` of {@link createHydrationHelpers}; TanStack's
+ *   `HydrationBoundary` would leave the encoded values encoded.
+ *
+ * **Example** (Dehydrating a prefetched query on the server)
+ *
+ * ```ts
+ * import type { Client } from '@effect-trpc/client';
+ * import { query, Router } from '@effect-trpc/core';
+ * import { Schema } from 'effect';
+ *
+ * class Post extends Schema.Class<Post>('Post')({
+ *   id: Schema.Number,
+ *   title: Schema.String,
+ *   createdAt: Schema.Date,
+ * }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ * const appRouter = Router.make({
+ *   post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
+ * });
+ * import { createRpcOptionsProxy, dehydrate } from '@effect-trpc/tanstack-react-query';
+ * import { QueryClient } from '@tanstack/react-query';
+ *
+ * declare const client: Client<typeof appRouter>;
+ *
+ * export async function renderState(id: number): Promise<string> {
+ *   const queryClient = new QueryClient();
+ *   const rpc = createRpcOptionsProxy({ client, queryClient });
+ *   await queryClient.prefetchQuery(rpc.post.byId.queryOptions({ id }));
+ *   // A PostNotFound failure is included too (dehydrateErrors defaults to true).
+ *   return JSON.stringify(dehydrate(appRouter, queryClient));
+ * }
+ * ```
+ *
+ * @see {@link hydrate}
+ * @see {@link createHydrationHelpers}
+ * @category hydration
+ * @since 0.1.0
  */
 export const dehydrate = (
   router: Router.Any,
@@ -315,7 +410,49 @@ const withIdentityDeserializer = <O extends { defaultOptions?: object | undefine
 
 /**
  * TanStack's `hydrate` for a router: decodes what {@link dehydrate} encoded (data with
- * `Codecs.success`, errors with `Codecs.exit`) back to class instances, then hydrates.
+ * `Codecs.success`, errors as an `Exit` or infrastructure error) back to class instances, then
+ * hydrates the `QueryClient`.
+ *
+ * **When to use**
+ *
+ * Use to hydrate imperatively (e.g. when creating the browser `QueryClient` from an inline
+ * payload). In React trees prefer the `HydrationBoundary` of {@link createHydrationHelpers}.
+ *
+ * **Details**
+ *
+ * - `null` / `undefined` states are ignored.
+ * - `deserializeData` (from `options` or the client's defaults) runs before the schema decoding.
+ * - Queries that fail to decode are dropped, so the client fetches them again.
+ *
+ * **Example** (Hydrating the browser QueryClient)
+ *
+ * ```ts
+ * import { query, Router } from '@effect-trpc/core';
+ * import { Schema } from 'effect';
+ *
+ * class Post extends Schema.Class<Post>('Post')({
+ *   id: Schema.Number,
+ *   title: Schema.String,
+ *   createdAt: Schema.Date,
+ * }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ * const appRouter = Router.make({
+ *   post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
+ * });
+ * import { hydrate } from '@effect-trpc/tanstack-react-query';
+ * import { QueryClient, type DehydratedState } from '@tanstack/react-query';
+ *
+ * declare const payload: string; // JSON.stringify(dehydrate(appRouter, serverQueryClient))
+ *
+ * const queryClient = new QueryClient();
+ * hydrate(appRouter, queryClient, JSON.parse(payload) as DehydratedState);
+ * ```
+ *
+ * @see {@link dehydrate}
+ * @category hydration
+ * @since 0.1.0
  */
 export const hydrate = (
   router: Router.Any,
@@ -358,17 +495,86 @@ const makeHydrationBoundary = (router: Router.Any): React.FC<RpcHydrationBoundar
 };
 
 /**
- * Schema-aware SSR hydration for a router. Class instances (`Schema.Class` with methods, `Date`
- * fields, ...) and typed errors survive the server → client JSON round trip:
+ * Creates the schema-aware `dehydrate`, `hydrate` and `HydrationBoundary` for a router, so class
+ * instances (`Schema.Class` with methods, `Date` fields, ...) and typed errors survive the server
+ * → client JSON round trip.
+ *
+ * **When to use**
+ *
+ * Use once per router (module scope) in any SSR setup with TanStack Query: dehydrate on the
+ * server, render `HydrationBoundary` on the client. With Next.js or TanStack Start, prefer the
+ * helpers of `@effect-trpc/next` / `@effect-trpc/start`, which wire this up.
+ *
+ * **Details**
+ *
+ * - `dehydrate(queryClient, options?)` and `hydrate(queryClient, state, options?)` are
+ *   {@link dehydrate} / {@link hydrate} with the router bound.
+ * - `HydrationBoundary` has TanStack's props. It decodes a new `state` once (memoized on `state`)
+ *   and hydrates through TanStack's boundary.
+ * - A dehydrated `RpcDefect` keeps its message but drops its server-side `cause`.
+ *
+ * **Gotchas**
+ *
+ * - Both sides must use helpers for the same router: queries whose procedure the client's router
+ *   does not know are dropped and refetched.
+ * - Mixing in TanStack's own `dehydrate` / `HydrationBoundary` for router queries loses the class
+ *   instances (data arrives as plain objects and ISO strings).
+ *
+ * **Example** (Server loader and client page)
  *
  * ```tsx
- * const { dehydrate, hydrate, HydrationBoundary } = createHydrationHelpers(appRouter);
- * // server
- * await queryClient.prefetchQuery(rpc.post.byId.queryOptions({ id: 1 }));
- * const state = dehydrate(queryClient); // JSON-safe
- * // client
- * <HydrationBoundary state={state}><Post /></HydrationBoundary>
+ * import type { Client } from '@effect-trpc/client';
+ * import { query, Router } from '@effect-trpc/core';
+ * import { Schema } from 'effect';
+ *
+ * class Post extends Schema.Class<Post>('Post')({
+ *   id: Schema.Number,
+ *   title: Schema.String,
+ *   createdAt: Schema.Date,
+ * }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ * const appRouter = Router.make({
+ *   post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
+ * });
+ * import {
+ *   createHydrationHelpers,
+ *   createRpcOptionsProxy,
+ *   type RpcOptionsProxy,
+ * } from '@effect-trpc/tanstack-react-query';
+ * import { QueryClient, useQuery, type DehydratedState } from '@tanstack/react-query';
+ *
+ * export const { dehydrate, HydrationBoundary } = createHydrationHelpers(appRouter);
+ *
+ * // Server (loader / server component): prefetch, then dehydrate to a JSON-safe state.
+ * export async function loadPostPage(client: Client<typeof appRouter>, id: number) {
+ *   const queryClient = new QueryClient();
+ *   const rpc = createRpcOptionsProxy({ client, queryClient });
+ *   await queryClient.prefetchQuery(rpc.post.byId.queryOptions({ id }));
+ *   return dehydrate(queryClient);
+ * }
+ *
+ * // Client: the hydrated value is a real Post, so `createdAt` is a Date.
+ * declare const useRpc: () => RpcOptionsProxy<typeof appRouter>;
+ * function PostView({ id }: { id: number }) {
+ *   const post = useQuery(useRpc().post.byId.queryOptions({ id }));
+ *   return <p>{post.data?.createdAt.toISOString()}</p>;
+ * }
+ *
+ * export function PostPage({ state, id }: { state: DehydratedState; id: number }) {
+ *   return (
+ *     <HydrationBoundary state={state}>
+ *       <PostView id={id} />
+ *     </HydrationBoundary>
+ *   );
+ * }
  * ```
+ *
+ * @see {@link dehydrate}
+ * @see {@link hydrate}
+ * @category hydration
+ * @since 0.1.0
  */
 export const createHydrationHelpers = (router: Router.Any): HydrationHelpers => ({
   dehydrate: (queryClient, options) => dehydrate(router, queryClient, options),

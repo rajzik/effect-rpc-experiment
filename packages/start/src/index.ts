@@ -1,6 +1,14 @@
 /**
  * `@effect-trpc/start` — TanStack Start integration: a server route handler, an isomorphic client
  * and loader / hydration helpers for TanStack Query.
+ *
+ * Server-only: `createStartHandler` (`src/routes/api/rpc.$.ts`) and `createServerClient`
+ * (in-process `localLink`). Browser: `createBrowserClient` (`httpLink`). Both sides:
+ * `createIsomorphicClient`, `createStartHelpers`, `createStartHydration`, `getBaseUrl`,
+ * `getRpcUrl`. `@tanstack/react-start` is only imported as types, so the package has no Start
+ * runtime dependency.
+ *
+ * @since 0.1.0
  */
 export {
   createStartHandler,

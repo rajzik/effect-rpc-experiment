@@ -13,6 +13,45 @@ TanStack Start and Electron.
 - **Built on `effect/rpc`**, not a reimplementation: `RpcGroup`, `RpcServer`, `RpcClient`,
   `RpcMiddleware` and `RpcSerialization` do the heavy lifting.
 
+## For AI agents
+
+Start here, then read the `## For AI agents` section of the package you are touching. Every public
+export carries Effect-style JSDoc (summary, **When to use**, **Details**, **Gotchas**, a
+type-checked **Example**, `@category`, `@since`): hover it, or read it in `packages/<name>/src`.
+
+**Pick the package by job**
+
+| You need to…                                              | Use                                                        |
+| --------------------------------------------------------- | ---------------------------------------------------------- |
+| Declare procedures and a router (shared by server+client) | `@effect-trpc/core`                                        |
+| Implement handlers and serve them (Node, fetch, caller)   | `@effect-trpc/server` (`/node` for a Node listener)        |
+| Call procedures from TS (Promise or Effect)               | `@effect-trpc/client`                                      |
+| Use procedures in React with TanStack Query               | `@effect-trpc/tanstack-react-query`                        |
+| Wire it into Next.js App Router / RSC / server actions    | `@effect-trpc/next`                                        |
+| Wire it into TanStack Start (server route + loaders)      | `@effect-trpc/start`                                       |
+| Run the server in Electron main, call it from a renderer  | `@effect-trpc/electron` (`/main`, `/preload`, `/renderer`) |
+| Write tests against a real server                         | `@effect-trpc/test-utils`                                  |
+
+**Golden path:** `Router.make({...})` in a shared module (core) → `Handlers.make(router, {...})` and
+`toWebHandler` / `serve` (server) → `createClient(router, { link: httpLink({ url }) })` (client) →
+`createRpcOptionsProxy` + `useQuery(rpc.x.queryOptions(input))` (tanstack-react-query) → the
+framework adapter for your app.
+
+**Invariants**
+
+- Effect v4 only (`Context.Service`, `yield* Service`, `effect/rpc`, `effect/http`). Verify APIs in
+  `node_modules/effect/dist/**/*.d.ts`; v3 snippets from memory are usually wrong.
+- Domain data is `Schema.Class`, typed errors are `Schema.TaggedError`; narrow on `_tag`.
+- Client-side errors are `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`.
+- Cross a JSON boundary (SSR, server actions, caches) only through the provided codecs /
+  `dehydrate` / `hydrate`, or class instances are lost.
+- Servers built on `RpcServer.layerHttp` use `protocol: "http"` and `disableFatalDefects: true`;
+  client URLs are absolute.
+
+**Before you hand work back:** `pnpm exec vp check`, `pnpm exec vp run typecheck`,
+`pnpm exec vp -C packages/<name> test`, `pnpm exec vp run -r build`, `pnpm docs:check`. New or
+changed exports follow [`docs/jsdoc-style.md`](docs/jsdoc-style.md).
+
 ## Packages
 
 | Package                             | Purpose                                                                                                                                                                                                    |
@@ -40,6 +79,7 @@ pnpm exec vp run typecheck   # tsgo --build across all packages (project referen
 pnpm exec vp run -r test     # Vitest 5 in every package (runtime + type tests)
 pnpm exec vp -C packages/core test   # one package
 pnpm exec vp run -r build    # vp pack (tsdown) every package → dist/
+pnpm docs:check              # JSDoc contract + type-check every @example (after build)
 pnpm run ready               # everything above, in order
 ```
 
@@ -60,8 +100,8 @@ packages/<name>/
   src/index.ts        # public barrel
   test/*.test.ts(x)   # runtime tests (import from 'vite-plus/test' or '@effect/vitest')
   test/*.test-d.ts    # type tests (vitest typecheck)
-scripts/verify-*.mjs  # verification oracles used by the acceptance gates
-docs/                 # tRPC test inventory and parity table
+scripts/verify-*.mjs  # verification oracles (verify-jsdoc.mjs enforces docs/jsdoc-style.md)
+docs/                 # JSDoc style guide, tRPC test inventory and parity table
 ```
 
 ### Conventions

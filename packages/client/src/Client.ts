@@ -1,3 +1,16 @@
+/**
+ * Creates typed clients for `@effect-trpc/core` routers: a tRPC-style Promise client and an
+ * Effect client (`client.$effect`).
+ *
+ * `createClient(router, { link })` returns a proxy mirroring the router record. Each call is
+ * routed by the procedure's tag through the link's `effect/rpc` `RpcClient`; results are
+ * decoded with the procedure's schemas, so `Schema.Class` values arrive as instances. Promise
+ * calls reject with `ClientError<E>` (from `@effect-trpc/core`); Effect calls fail with
+ * `E | RpcTransportError`. `@effect-trpc/tanstack-react-query` builds its query options on top of
+ * this client.
+ *
+ * @since 0.1.0
+ */
 import {
   causeToClientError,
   isRpcClientError,
@@ -22,7 +35,25 @@ import type { HeadersOption, Link } from './Link.js';
 // Types
 // ---------------------------------------------------------------------------------------------
 
-/** Options of a Promise-client call. */
+/**
+ * Options of a Promise-client call (`client.post.byId(input, options)`).
+ *
+ * **Example** (Aborting a call and sending a trace header)
+ *
+ * ```ts
+ * import type { ProcedureCallOptions } from '@effect-trpc/client';
+ *
+ * const controller = new AbortController();
+ * const options: ProcedureCallOptions = {
+ *   signal: controller.signal, // abort() rejects the call with RpcInterrupted
+ *   headers: { 'x-trace': 'abc' },
+ * };
+ * ```
+ *
+ * @see {@link EffectCallOptions}
+ * @category options
+ * @since 0.1.0
+ */
 export interface ProcedureCallOptions {
   /**
    * Aborting interrupts the call (and, through the transport, the server handler): the Promise
@@ -33,7 +64,14 @@ export interface ProcedureCallOptions {
   readonly headers?: Headers.Input | undefined;
 }
 
-/** Options of an Effect-client call. Interrupt the fiber to cancel. */
+/**
+ * Options of an Effect-client call (`client.$effect.post.byId(input, options)`). There is no
+ * `signal`: interrupt the fiber to cancel.
+ *
+ * @see {@link ProcedureCallOptions}
+ * @category options
+ * @since 0.1.0
+ */
 export interface EffectCallOptions {
   /** Headers for this call only; merged over the client's headers. */
   readonly headers?: Headers.Input | undefined;
@@ -45,17 +83,59 @@ type PayloadOf<D> =
 /**
  * The input a client accepts for a procedure: the payload schema's constructor input (for a
  * `Schema.Struct` payload, the plain fields object). `void` when the procedure takes no input.
+ *
+ * @see {@link Client.Input}
+ * @category type-level
+ * @since 0.1.0
  */
 export type inferClientInput<D extends ProcedureDef.Any> =
   PayloadOf<D> extends Schema.Top ? PayloadOf<D>['~type.make.in'] : never;
 
-/** The rejection type of a Promise-client call: `ClientError<inferError<D>>`. */
+/**
+ * The rejection type of a Promise-client call: `ClientError<inferError<D>>`, i.e. the
+ * procedure's errors or `RpcDefect` / `RpcTransportError` / `RpcInterrupted`.
+ *
+ * **Example** (Narrowing a rejection by `_tag`)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { query, Router } from '@effect-trpc/core';
+ * import type { inferClientError } from '@effect-trpc/client';
+ *
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ * const appRouter = Router.make({
+ *   post: { byId: query({ payload: { id: Schema.Number }, error: PostNotFound }) },
+ * });
+ *
+ * declare const cause: unknown; // from a `catch` block
+ * const error = cause as inferClientError<typeof appRouter.record.post.byId>;
+ * if (error._tag === 'PostNotFound') console.log(error.id);
+ * ```
+ *
+ * @see {@link Client.Error}
+ * @category type-level
+ * @since 0.1.0
+ */
 export type inferClientError<D extends ProcedureDef.Any> = ClientError<inferError<D>>;
 
-/** The error channel of an Effect-client call: the procedure's errors plus `RpcTransportError`. */
+/**
+ * The error channel of an Effect-client call: the procedure's errors plus `RpcTransportError`.
+ * Defects and interruption are not in it; they stay in the `Cause`.
+ *
+ * @category type-level
+ * @since 0.1.0
+ */
 export type inferEffectClientError<D extends ProcedureDef.Any> = inferError<D> | RpcTransportError;
 
-/** The call arguments: the input is optional when the procedure takes no input (`void`). */
+/**
+ * The call arguments: the input is optional when the procedure takes no input (`void`), so
+ * `client.health()` and `client.health(undefined, { signal })` both type-check.
+ *
+ * @category type-level
+ * @since 0.1.0
+ */
 export type CallArgs<Input, Options> = undefined extends Input
   ? [input?: Input, options?: Options]
   : [input: Input, options?: Options];
@@ -64,6 +144,16 @@ export type CallArgs<Input, Options> = undefined extends Input
  * A Promise-client procedure. Queries and mutations return a `Promise` that rejects with a
  * `ClientError<E>` instance (see {@link inferClientError}); subscriptions return an
  * `AsyncIterable` that throws one.
+ *
+ * **Details**
+ *
+ * - Breaking out of a `for await` loop ends the subscription on the server.
+ * - Aborting `signal` rejects with `RpcInterrupted` (an iterator's `next()` throws it) and
+ *   interrupts the server handler.
+ *
+ * @see {@link EffectProcedure}
+ * @category type-level
+ * @since 0.1.0
  */
 export type PromiseProcedure<D extends ProcedureDef.Any> = D['kind'] extends 'subscription'
   ? (...args: CallArgs<inferClientInput<D>, ProcedureCallOptions>) => AsyncIterable<inferOutput<D>>
@@ -73,6 +163,14 @@ export type PromiseProcedure<D extends ProcedureDef.Any> = D['kind'] extends 'su
  * An Effect-client procedure: an `Effect` (or a `Stream` for subscriptions) with no environment
  * requirement, failing with the procedure's errors or `RpcTransportError`. Server defects are
  * defects (`Effect.die`) and cancellation is interruption, as usual in Effect.
+ *
+ * **Details**
+ *
+ * - The returned Effect is lazy: it can be built once and run many times; each run is a call.
+ *
+ * @see {@link PromiseProcedure}
+ * @category type-level
+ * @since 0.1.0
  */
 export type EffectProcedure<D extends ProcedureDef.Any> = D['kind'] extends 'subscription'
   ? (
@@ -96,7 +194,13 @@ type EffectRecord<Rec> = {
     : EffectRecord<RecordOf<Rec[K]>>;
 };
 
-/** Root keys of a {@link Client} that a router cannot use at its top level. */
+/**
+ * Root keys of a {@link Client} that a router cannot use at its top level. `createClient`
+ * throws for a router that does.
+ *
+ * @category type-level
+ * @since 0.1.0
+ */
 export type ReservedClientKey = '$effect' | '$router' | 'dispose' | 'withHeaders';
 
 const reservedClientKeys: ReadonlySet<string> = new Set<ReservedClientKey>([
@@ -106,10 +210,21 @@ const reservedClientKeys: ReadonlySet<string> = new Set<ReservedClientKey>([
   'withHeaders',
 ]);
 
-/** The Effect client of a router: `client.$effect.post.byId(input)`. */
+/**
+ * The Effect client of a router: `client.$effect.post.byId(input)`.
+ *
+ * @see {@link EffectProcedure}
+ * @category models
+ * @since 0.1.0
+ */
 export type EffectClient<R extends Router.Any> = EffectRecord<Router.Record<R>>;
 
-/** The methods every {@link Client} has besides the procedures. */
+/**
+ * The methods every {@link Client} has besides the procedures.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface ClientMethods<R extends Router.Any> {
   /** The same procedures as `Effect`s / `Stream`s (no environment requirement). */
   readonly $effect: EffectClient<R>;
@@ -127,7 +242,18 @@ export interface ClientMethods<R extends Router.Any> {
 }
 
 /**
- * A Promise client mirroring a router: `client.post.byId(input, { signal, headers })`.
+ * A Promise client mirroring a router: `client.post.byId(input, { signal, headers })`, plus
+ * {@link ClientMethods} (`$effect`, `$router`, `withHeaders`, `dispose`).
+ *
+ * **Details**
+ *
+ * - The client is not thenable and its proxies are stable (`client.post.byId ===
+ *   client.post.byId`), so it is safe to return from async functions and to use in React deps.
+ * - Calling a path that is not a procedure throws an `Error` naming the known procedures.
+ *
+ * @see {@link createClient}
+ * @category models
+ * @since 0.1.0
  */
 export type Client<R extends Router.Any> = {
   readonly [
@@ -137,22 +263,55 @@ export type Client<R extends Router.Any> = {
     : PromiseRecord<RecordOf<Router.Record<R>[K]>>;
 } & ClientMethods<R>;
 
+/**
+ * Type-level helpers of {@link Client}, keyed by router or procedure definition
+ * (`typeof appRouter.record.post.byId`).
+ *
+ * @category type-level
+ * @since 0.1.0
+ */
 export declare namespace Client {
-  /** The Effect client of a router (`client.$effect`). */
+  /**
+   * The Effect client of a router (`client.$effect`).
+   *
+   * @since 0.1.0
+   */
   export type Effect<R extends Router.Any> = EffectClient<R>;
-  /** A Promise-client procedure for a procedure definition. */
+  /**
+   * A Promise-client procedure for a procedure definition.
+   *
+   * @since 0.1.0
+   */
   export type Procedure<D extends ProcedureDef.Any> = PromiseProcedure<D>;
-  /** The rejection type of a Promise-client call. */
+  /**
+   * The rejection type of a Promise-client call: `ClientError<E>`.
+   *
+   * @since 0.1.0
+   */
   export type Error<D extends ProcedureDef.Any> = inferClientError<D>;
-  /** The input of a client call. */
+  /**
+   * The input of a client call.
+   *
+   * @since 0.1.0
+   */
   export type Input<D extends ProcedureDef.Any> = inferClientInput<D>;
-  /** The output of a client call (each element, for subscriptions). */
+  /**
+   * The output of a client call (each element, for subscriptions).
+   *
+   * @since 0.1.0
+   */
   export type Output<D extends ProcedureDef.Any> = inferOutput<D>;
 }
 
 type RouterRpcs<R extends Router.Any> = Extract<Router.Rpcs<R>, Rpc.Any>;
 
-/** The `middleware` option: required when the router has `requiredForClient` middleware. */
+/**
+ * The `middleware` option: required when the router has `requiredForClient` middleware.
+ *
+ * @see {@link CreateClientOptions}
+ * @category options
+ * @since 0.1.0
+ */
 export type MiddlewareOption<R extends Router.Any> = [Rpc.MiddlewareClient<RouterRpcs<R>>] extends [
   never,
 ]
@@ -168,7 +327,17 @@ export type MiddlewareOption<R extends Router.Any> = [Rpc.MiddlewareClient<Route
       readonly middleware: Layer.Layer<Rpc.MiddlewareClient<RouterRpcs<R>>, unknown>;
     };
 
-/** Options of {@link createClient}. */
+/**
+ * Options of {@link createClient}.
+ *
+ * **Gotchas**
+ *
+ * - With `localLink`, the handler layer must implement every procedure and server middleware
+ *   of the router, or `link` is a type error.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export type CreateClientOptions<R extends Router.Any> = {
   /** The transport: `httpLink`, `wsLink`, `localLink` or a custom `Link`. */
   readonly link: Link<Rpc.ToHandler<RouterRpcs<R>> | Rpc.Middleware<RouterRpcs<R>>>;
@@ -446,15 +615,108 @@ const makeFacade = <R extends Router.Any>(
 /**
  * Creates a client for a router over a link.
  *
+ * **When to use**
+ *
+ * Use wherever code calls a router: browsers, other servers, tests (`localLink`), SSR. Pass the
+ * same router value the server implements; only its schemas and structure are used.
+ *
+ * **Details**
+ *
+ * - The link is connected lazily on the first call (once, shared by every call and by
+ *   `withHeaders` clients) and kept until `client.dispose()`.
+ * - Results are decoded with the procedure's schemas: `Schema.Class` values are instances,
+ *   `Schema.Date` fields are `Date`s.
+ * - Promise calls reject with `ClientError<E>`: the procedure's `Schema.TaggedError` instance,
+ *   `RpcDefect` (the handler died), `RpcTransportError` (network, HTTP status, protocol, disposed
+ *   client) or `RpcInterrupted` (aborted).
+ * - `client.$effect` calls fail with `E | RpcTransportError` and need no services.
+ * - Headers from `createClient({ headers })`, `withHeaders(...)` and the call are merged; the
+ *   most specific wins. A headers function runs once per call.
+ * - After `dispose()` calls fail with `RpcTransportError`.
+ *
+ * **Gotchas**
+ *
+ * - Throws if the router uses a reserved top-level key (`$effect`, `$router`, `dispose`,
+ *   `withHeaders`); nest such procedures under another key.
+ * - Routers with `requiredForClient` middleware need the `middleware` option
+ *   (`RpcMiddleware.layerClient(...)`); it is a type error to omit it.
+ *
+ * **Example** (Promise and Effect calls over HTTP)
+ *
  * ```ts
+ * import { Effect, Schema } from 'effect';
+ * import { query, Router, subscription } from '@effect-trpc/core';
+ * import { createClient, httpLink, type Client } from '@effect-trpc/client';
+ *
+ * class Post extends Schema.Class<Post>('Post')({
+ *   id: Schema.Number,
+ *   title: Schema.String,
+ *   createdAt: Schema.Date,
+ * }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ *
+ * const appRouter = Router.make({
+ *   post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
+ *   countdown: subscription({ payload: { from: Schema.Number }, success: Schema.Number }),
+ * });
+ *
  * const client = createClient(appRouter, { link: httpLink({ url: 'http://localhost:3000/rpc' }) });
- * const post = await client.post.byId({ id: 1 }); // Post instance
- * const exit = await Effect.runPromiseExit(client.$effect.post.byId({ id: 1 }));
+ *
+ * try {
+ *   const post = await client.post.byId({ id: 1 }); // a Post instance
+ *   post.createdAt.getFullYear(); // a real Date
+ * } catch (cause) {
+ *   const error = cause as Client.Error<typeof appRouter.record.post.byId>;
+ *   if (error._tag !== 'PostNotFound') throw error; // RpcDefect | RpcTransportError | RpcInterrupted
+ * }
+ *
+ * for await (const n of client.countdown({ from: 3 })) console.log(n); // 3, 2, 1, 0
+ *
+ * // Effect<string, RpcTransportError>
+ * const title = client.$effect.post.byId({ id: 1 }).pipe(
+ *   Effect.map((post) => post.title),
+ *   Effect.catchTag('PostNotFound', (e) => Effect.succeed(`missing #${e.id}`)),
+ * );
+ *
+ * await client.dispose();
  * ```
  *
- * The link is connected lazily on the first call and kept until `client.dispose()`.
- * Throws if the router uses a reserved top-level key (`$effect`, `$router`, `dispose`,
- * `withHeaders`).
+ * **Example** (A client with `requiredForClient` middleware)
+ *
+ * ```ts
+ * import { Effect, Schema } from 'effect';
+ * import { Headers } from 'effect/http';
+ * import { RpcMiddleware } from 'effect/rpc';
+ * import { query, Router } from '@effect-trpc/core';
+ * import { createClient, httpLink } from '@effect-trpc/client';
+ *
+ * class Unauthorized extends Schema.TaggedError<Unauthorized>()('Unauthorized', {}) {}
+ * class Token extends RpcMiddleware.Service<Token>()('Token', {
+ *   error: Unauthorized,
+ *   requiredForClient: true,
+ * }) {}
+ *
+ * const appRouter = Router.make({ secret: query({ success: Schema.String }).middleware(Token) });
+ *
+ * // The client half attaches the token to every request of a procedure using `Token`.
+ * const TokenClient = RpcMiddleware.layerClient(Token, ({ request, next }) =>
+ *   next({ ...request, headers: Headers.set(request.headers, 'authorization', 'Bearer t0k3n') }),
+ * );
+ *
+ * const client = createClient(appRouter, {
+ *   link: httpLink({ url: 'http://localhost:3000/rpc' }),
+ *   middleware: TokenClient,
+ * });
+ * const secret = await client.secret(); // rejects with Unauthorized when the server says so
+ * ```
+ *
+ * @see {@link httpLink}
+ * @see {@link localLink}
+ * @see {@link Client}
+ * @category constructors
+ * @since 0.1.0
  */
 export const createClient = <R extends Router.Any>(
   router: R,

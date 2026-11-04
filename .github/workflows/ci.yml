@@ -44,3 +44,6 @@ jobs:
 
       - name: Test
         run: pnpm exec vp run -r test
+
+      - name: JSDoc contract and examples
+        run: node scripts/verify-jsdoc.mjs

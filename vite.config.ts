@@ -14,7 +14,13 @@ export default defineConfig({
       typeAware: true,
       typeCheck: true,
     },
-    ignorePatterns: ['**/dist/**', '**/node_modules/**', '**/.next/**', '**/.output/**'],
+    ignorePatterns: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/.next/**',
+      '**/.output/**',
+      '**/.jsdoc-examples/**',
+    ],
     rules: {
       'no-console': ['error', { allow: ['warn', 'error'] }],
       // Effect's discriminant convention is `_tag`; underscore-prefixed names are idiomatic.
@@ -58,7 +64,12 @@ export default defineConfig({
     semi: true,
     printWidth: 100,
     trailingComma: 'all',
-    ignorePatterns: ['**/dist/**', 'pnpm-lock.yaml', '**/__snapshots__/**'],
+    ignorePatterns: [
+      '**/dist/**',
+      'pnpm-lock.yaml',
+      '**/__snapshots__/**',
+      '**/.jsdoc-examples/**',
+    ],
   },
   run: {
     cache: true,

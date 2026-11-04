@@ -1,3 +1,12 @@
+/**
+ * Client links over a message port, the client half of `MessagePortServer` / `MainRpcServer`.
+ *
+ * `messagePortLink` turns a Web-style port (DOM `MessagePort`, Node `worker_threads` port) into
+ * an `@effect-trpc/client` `Link`; `messagePortProtocolClient` is the underlying
+ * `RpcClient.Protocol`. `rendererLink` builds on them for Electron renderers.
+ *
+ * @since 0.1.0
+ */
 import { Duration, Effect, Layer, Queue } from 'effect';
 import type { Scope } from 'effect';
 import { RpcClient, RpcClientError, RpcSerialization } from 'effect/rpc';
@@ -6,10 +15,25 @@ import { Link } from '@effect-trpc/client';
 import { closePort, listen, post, readyFrame } from './internal/port.js';
 import type { PortLike } from './types.js';
 
-/** A port, or a (possibly async) function opening a new one for every client. */
+/**
+ * A port, or a (possibly async) function opening a new one for every client.
+ *
+ * **Details**
+ *
+ * - A bare port can back one client only: a second client on the same link dies with a defect
+ *   (`RpcDefect` "already used"). A function is called once per client.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type PortSource = PortLike | (() => PortLike | PromiseLike<PortLike>);
 
-/** Options of {@link messagePortLink} and {@link messagePortProtocolClient}. */
+/**
+ * Options of {@link messagePortLink} and {@link messagePortProtocolClient}.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface MessagePortLinkOptions {
   /**
    * Encodes every protocol message to one frame (a string, or bytes for binary formats).
@@ -37,6 +61,40 @@ const transportError = (message: string, cause?: unknown): RpcClientError.RpcCli
  * over the port; acks give subscriptions backpressure. When the port closes (or the server
  * sends its close frame) every pending call fails with `RpcClientError` and later calls fail
  * immediately. Closing the scope closes the port.
+ *
+ * **When to use**
+ *
+ * Use to build a custom `Link` (e.g. with `Link.fromProtocol`) or a raw `effect/rpc`
+ * `RpcClient`. Prefer {@link messagePortLink} for an effect-trpc client.
+ *
+ * **Details**
+ *
+ * - With `connectTimeout`, the port is closed and every call fails when no frame (not even the
+ *   server's ready frame) arrives in time.
+ * - The `RpcClientError`s it produces surface as `RpcTransportError` in effect-trpc clients.
+ *
+ * **Example** (A custom link from the protocol)
+ *
+ * ```ts
+ * // renderer, worker or any process holding a Web-style port
+ * import { Layer } from 'effect';
+ * import { RpcClient } from 'effect/rpc';
+ * import { Link } from '@effect-trpc/client';
+ * import { messagePortProtocolClient, type PortLike } from '@effect-trpc/electron/renderer';
+ *
+ * declare const port: PortLike;
+ *
+ * // Equivalent to `messagePortLink(port, { connectTimeout: '5 seconds' })`.
+ * export const link = Link.fromProtocol(
+ *   Layer.effect(RpcClient.Protocol)(
+ *     messagePortProtocolClient(port, { connectTimeout: '5 seconds' }),
+ *   ),
+ * );
+ * ```
+ *
+ * @see {@link messagePortLink}
+ * @category links
+ * @since 0.1.0
  */
 export const messagePortProtocolClient = (
   port: PortLike,
@@ -176,6 +234,47 @@ const acquirePort = (source: PortSource, used: { value: boolean }): Effect.Effec
  * peer is served by `MessagePortServer` / `MainRpcServer`. Pass a port (usable by one client) or
  * a function opening a new port for every client. `client.dispose()` closes the port; a port
  * closed by the peer fails pending calls with `RpcTransportError`.
+ *
+ * **When to use**
+ *
+ * Use when you already hold a port connected to a `MessagePortServer` (worker thread, iframe,
+ * custom handshake). In an Electron renderer with the preload bridge use `rendererLink`.
+ *
+ * **Details**
+ *
+ * - Promise-client calls reject with `ClientError<E> = E | RpcDefect | RpcTransportError |
+ *   RpcInterrupted`; `client.$effect` calls fail with `E | RpcTransportError`.
+ * - No `connectTimeout` by default: if nobody serves the port, calls wait forever.
+ *
+ * **Gotchas**
+ *
+ * - Sharing a link built from a bare port between two `createClient` calls fails the second
+ *   client's calls with `RpcDefect`. Pass a function that opens a new port instead.
+ * - Electron's `MessagePortMain` is not a `PortLike`; it can only be the server side.
+ *
+ * **Example** (Calling a router from a Node worker thread)
+ *
+ * ```ts
+ * // worker.ts (worker thread; the parent attached the other end with `MessagePortServer`)
+ * import { workerData, type MessagePort } from 'node:worker_threads';
+ * import { Schema } from 'effect';
+ * import { query, Router } from '@effect-trpc/core';
+ * import { createClient } from '@effect-trpc/client';
+ * import { messagePortLink } from '@effect-trpc/electron';
+ *
+ * const appRouter = Router.make({ ping: query({ success: Schema.String }) });
+ * const { port } = workerData as { readonly port: MessagePort };
+ *
+ * const client = createClient(appRouter, {
+ *   link: messagePortLink(port, { connectTimeout: '5 seconds' }),
+ * });
+ * console.log(await client.ping()); // 'pong'
+ * await client.dispose(); // closes the port; the server interrupts this connection's handlers
+ * ```
+ *
+ * @see {@link messagePortProtocolClient}
+ * @category links
+ * @since 0.1.0
  */
 export const messagePortLink = (source: PortSource, options: MessagePortLinkOptions = {}): Link => {
   const used = { value: false };

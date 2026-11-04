@@ -1,16 +1,63 @@
+/**
+ * Option types and plumbing shared by the test harnesses in `harness.ts`.
+ *
+ * Only {@link TestFetch} and {@link TestHarnessOptions} (through `TestServerOptions` /
+ * `TestWebHandlerOptions`) are public; the helpers build the `httpLink` client, merge the
+ * caller's layer and make `dispose` idempotent.
+ *
+ * @since 0.1.0
+ */
 import { Layer } from 'effect';
 import type { Router } from '@effect-trpc/core';
 import { createClient, httpLink } from '@effect-trpc/client';
 import type { Client, CreateClientOptions, HeadersOption } from '@effect-trpc/client';
 import type { Caller, Handlers } from '@effect-trpc/server';
 
-/** Default route of the rpc endpoint (the server's default). */
+/** @internal Default route of the rpc endpoint (the server's default). */
 export const DEFAULT_PATH = '/rpc' as const;
 
-/** A fetch-style request function that also accepts relative urls (`"/rpc"`). */
+/**
+ * A fetch-style request function that also accepts relative urls (`"/rpc"`).
+ *
+ * **Details**
+ *
+ * - A `Request` without `init` is passed through unchanged; a string url is resolved against the
+ *   harness `url`, so `ctx.fetch('/rpc', init)` hits the rpc endpoint.
+ *
+ * **Example** (Sending a raw rpc request)
+ *
+ * ```ts
+ * import type { TestFetch } from '@effect-trpc/test-utils';
+ *
+ * declare const fetchRpc: TestFetch; // e.g. `ctx.fetch` or `web.fetch`
+ *
+ * // a raw effect/rpc request frame, as an RpcClient sends it
+ * const frame = { _tag: 'Request', id: '1', tag: 'health', payload: null, headers: [] };
+ * const response = await fetchRpc('/rpc', {
+ *   method: 'POST',
+ *   headers: { 'content-type': 'application/ndjson' },
+ *   body: `${JSON.stringify(frame)}\n`,
+ * });
+ * ```
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type TestFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
-/** Options shared by {@link testServerAndClient} and {@link testWebHandler}. */
+/**
+ * Options shared by `testServerAndClient`, `withTestServer` and `testWebHandler` (exported as
+ * `TestServerOptions` and `TestWebHandlerOptions`).
+ *
+ * **Gotchas**
+ *
+ * - `handlers` must implement every procedure of the router; a partial layer is a type error.
+ * - `middleware` is only needed for routers whose middleware is declared with
+ *   `requiredForClient: true`; a missing client middleware is reported at call time.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface TestHarnessOptions<R extends Router.Any, LE = never> {
   /** Layer providing every handler of the router and its server middleware. */
   readonly handlers: Layer.Layer<Handlers.Requirements<R>, LE>;
@@ -27,13 +74,13 @@ export interface TestHarnessOptions<R extends Router.Any, LE = never> {
   readonly middleware?: Layer.Layer<never, unknown> | undefined;
 }
 
-/** Turns `fetch`-style arguments into a `Request`, resolving relative urls against `base`. */
+/** @internal Turns `fetch`-style arguments into a `Request`, resolving relative urls against `base`. */
 export const toRequest = (base: string, input: string | URL | Request, init?: RequestInit) =>
   input instanceof Request && init === undefined
     ? input
     : new Request(typeof input === 'string' ? new URL(input, base) : input, init);
 
-/** A Promise client over `httpLink` for the harness options. */
+/** @internal A Promise client over `httpLink` for the harness options. */
 export const makeHttpClient = <R extends Router.Any, LE>(
   router: R,
   url: string,
@@ -54,7 +101,7 @@ export const makeHttpClient = <R extends Router.Any, LE>(
   return createClient(router, clientOptions);
 };
 
-/** The caller's handler layer: the server handlers plus the optional client middleware. */
+/** @internal The caller's handler layer: the server handlers plus the optional client middleware. */
 export const callerLayer = <R extends Router.Any, LE>(
   options: TestHarnessOptions<R, LE>,
 ): Layer.Layer<Caller.Requirements<R>, unknown> =>
@@ -67,6 +114,8 @@ export const callerLayer = <R extends Router.Any, LE>(
 /**
  * Runs the finalizers in order, each exactly once (even if an earlier one fails), and rethrows
  * the first failure. The returned function is idempotent: later calls share the first promise.
+ *
+ * @internal
  */
 export const onceDispose = (
   finalizers: ReadonlyArray<() => Promise<void>>,

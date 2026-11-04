@@ -1,3 +1,15 @@
+/**
+ * Builds the typed options proxy that mirrors a router and produces plain TanStack Query options.
+ *
+ * `createRpcOptionsProxy({ client, queryClient })` is the effect-trpc counterpart of tRPC's
+ * `createTRPCOptionsProxy`. Every router node gets `pathKey` / `pathFilter`; every procedure gets
+ * the helpers of its kind (`queryOptions`, `infiniteQueryOptions`, `mutationOptions`,
+ * `subscriptionOptions` and the key/filter helpers). Calls go through the Promise client of
+ * `@effect-trpc/client`, so `data` is the decoded output and `error` is `ClientError<E>` from
+ * `@effect-trpc/core`. `createRpcContext` wraps this proxy for React.
+ *
+ * @since 0.1.0
+ */
 import type { Client } from '@effect-trpc/client';
 import type { ProcedureDef, ProcedureKind, Router } from '@effect-trpc/core';
 import type { DataTag, QueryClient, QueryFilters } from '@tanstack/react-query';
@@ -28,7 +40,26 @@ import {
   type RpcSubscriptionOptionsIn,
 } from './subscriptionOptions.js';
 
-/** `pathKey()` / `pathFilter()`, available on every router node and procedure. */
+/**
+ * The `pathKey()` / `pathFilter()` helpers, available on the root, every router node and every
+ * query procedure.
+ *
+ * **When to use**
+ *
+ * Use to invalidate, cancel, refetch or remove every query beneath a path, e.g.
+ * `queryClient.invalidateQueries(rpc.post.pathFilter())` after a mutation. Prefer
+ * `queryFilter(input)` to target one procedure (and optionally one input).
+ *
+ * **Details**
+ *
+ * - `rpc.post.pathKey()` is `[["post"]]`; `rpc.pathKey()` is `[]`, which matches every query.
+ * - With a key prefix the key is `[[prefix], path]` (`[[prefix]]` for the root).
+ * - Path keys match by prefix, so they cover query and infinite keys of every input.
+ *
+ * @see {@link DecorateQueryProcedure}
+ * @category models
+ * @since 0.1.0
+ */
 export interface DecorateRouterKeyable<TFeatureFlags extends FeatureFlags> {
   /**
    * The query key of this path: invalidate / cancel / remove every procedure beneath it.
@@ -63,11 +94,24 @@ type InfiniteQueryTag<TDef extends ResolverDef> = DataTag<
   TDef['error']
 >;
 
-/** The helpers of a query procedure with a `cursor` input. */
+/**
+ * The infinite-query helpers of a query procedure whose input has a `cursor` key.
+ *
+ * **Details**
+ *
+ * - Present only when the input type has an optional `cursor` (or no input at all); otherwise
+ *   `infiniteQueryOptions` does not exist on the procedure.
+ * - Infinite keys are `[path, { input, type: "infinite" }]` with `cursor` (and `direction`)
+ *   removed from `input`, so every page lives under one key.
+ *
+ * @see {@link RpcInfiniteQueryOptions}
+ * @category models
+ * @since 0.1.0
+ */
 export interface DecorateInfiniteQueryProcedure<TDef extends ResolverDef> extends TypeHelper<TDef> {
   /** Options for `useInfiniteQuery`, `prefetchInfiniteQuery`, ... */
   infiniteQueryOptions: RpcInfiniteQueryOptions<TDef>;
-  /** The (data-tagged) key of an infinite query (`type: "infinite"`, without the cursor). */
+  /** The data-tagged key of an infinite query (`type: "infinite"`, without the cursor). */
   infiniteQueryKey: (input?: Partial<TDef['input']>) => InfiniteQueryTag<TDef>;
   /** A query filter for infinite queries of this procedure. */
   infiniteQueryFilter: (
@@ -76,12 +120,27 @@ export interface DecorateInfiniteQueryProcedure<TDef extends ResolverDef> extend
   ) => WithRequired<QueryFilters<InfiniteQueryTag<TDef>>, 'queryKey'>;
 }
 
-/** The helpers of a query procedure. */
+/**
+ * The helpers of a query procedure: `queryOptions`, `queryKey`, `queryFilter`, plus `pathKey` /
+ * `pathFilter`.
+ *
+ * **Details**
+ *
+ * - `queryKey(input?)` is `[path, { input?, type: "query" }]` and is data-tagged, so
+ *   `queryClient.getQueryData(rpc.post.byId.queryKey({ id: 1 }))` is typed as the output.
+ * - `queryKey()` / `queryFilter()` without input match every input of the procedure (TanStack
+ *   matches keys by prefix); `input` may be `Partial`.
+ *
+ * @see {@link RpcQueryOptions}
+ * @see {@link DecorateRouterKeyable}
+ * @category models
+ * @since 0.1.0
+ */
 export interface DecorateQueryProcedure<TDef extends ResolverDef>
   extends TypeHelper<TDef>, DecorateRouterKeyable<TDef['featureFlags']> {
   /** Options for `useQuery`, `useSuspenseQuery`, `fetchQuery`, `prefetchQuery`, ... */
   queryOptions: RpcQueryOptions<TDef, TDef['featureFlags']>;
-  /** The (data-tagged) query key: `[path, { input?, type: "query" }]`. */
+  /** The data-tagged query key: `[path, { input?, type: "query" }]`. */
   queryKey: (input?: Partial<TDef['input']>) => QueryTag<TDef>;
   /** A query filter for this procedure (all inputs when `input` is omitted). */
   queryFilter: (
@@ -90,7 +149,13 @@ export interface DecorateQueryProcedure<TDef extends ResolverDef>
   ) => WithRequired<QueryFilters<QueryTag<TDef>>, 'queryKey'>;
 }
 
-/** The helpers of a mutation procedure. */
+/**
+ * The helpers of a mutation procedure: `mutationOptions` and `mutationKey`.
+ *
+ * @see {@link RpcMutationOptions}
+ * @category models
+ * @since 0.1.0
+ */
 export interface DecorateMutationProcedure<TDef extends ResolverDef> extends TypeHelper<TDef> {
   /** Options for `useMutation`. */
   mutationOptions: RpcMutationOptions<TDef, TDef['featureFlags']>;
@@ -98,13 +163,31 @@ export interface DecorateMutationProcedure<TDef extends ResolverDef> extends Typ
   mutationKey: () => RpcMutationKey<TDef['featureFlags']['keyPrefix']>;
 }
 
-/** The helpers of a subscription procedure. */
+/**
+ * The helper of a subscription procedure: `subscriptionOptions`, consumed by `useSubscription`.
+ *
+ * @see {@link RpcSubscriptionOptions}
+ * @category models
+ * @since 0.1.0
+ */
 export interface DecorateSubscriptionProcedure<TDef extends ResolverDef> extends TypeHelper<TDef> {
   /** Options for `useSubscription`. */
   subscriptionOptions: RpcSubscriptionOptions<TDef, TDef['featureFlags']>;
 }
 
-/** The helpers of a procedure, by kind. Infinite helpers need a `cursor` in the input. */
+/**
+ * The helpers of one procedure, selected by its kind (`query`, `mutation`, `subscription`).
+ *
+ * **Details**
+ *
+ * - Queries get {@link DecorateQueryProcedure}, plus {@link DecorateInfiniteQueryProcedure} when
+ *   the input has a `cursor` key.
+ * - Calling a helper of another kind at runtime (e.g. `queryOptions` on a mutation) throws an
+ *   `Error` that names the right helper.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type DecorateProcedure<
   TKind extends ProcedureKind,
   TDef extends ResolverDef,
@@ -119,7 +202,14 @@ export type DecorateProcedure<
 
 type RecordOf<R> = R extends Router<infer Rec> ? Rec : R;
 
-/** A router record decorated with the option helpers. */
+/**
+ * A router record with every procedure replaced by its helpers and every nested router node
+ * extended with `pathKey` / `pathFilter`.
+ *
+ * @see {@link RpcOptionsProxy}
+ * @category models
+ * @since 0.1.0
+ */
 export type DecoratedRouterRecord<Rec, TFeatureFlags extends FeatureFlags> = {
   readonly [K in keyof Rec]: Rec[K] extends ProcedureDef.Any
     ? DecorateProcedure<Rec[K]['kind'], ResolverDefOf<Rec[K], TFeatureFlags>>
@@ -127,16 +217,94 @@ export type DecoratedRouterRecord<Rec, TFeatureFlags extends FeatureFlags> = {
 };
 
 /**
- * The options proxy of a router (tRPC's `TRPCOptionsProxy`): mirrors the router, with
+ * The options proxy of a router (tRPC's `TRPCOptionsProxy`): it mirrors the router, with
  * `queryOptions` / `mutationOptions` / `subscriptionOptions` / key helpers on each procedure and
  * `pathKey` / `pathFilter` on every node.
+ *
+ * **When to use**
+ *
+ * Use as the type of a value returned by `useRpc()` or {@link createRpcOptionsProxy}, e.g. to
+ * pass the proxy to a helper function or to write components against an abstract router.
+ *
+ * **Details**
+ *
+ * - The proxy is a recursive JS `Proxy`; only the helper calls do work. Calling a router node
+ *   itself (`rpc.post()`) throws.
+ * - The second type argument carries the feature flags (`{ keyPrefix: true }` for prefixed keys).
+ *
+ * **Example** (A helper that prefetches through the proxy)
+ *
+ * ```ts
+ * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { Schema } from 'effect';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ * const appRouter = Router.make({
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *   },
+ * });
+ * type AppRouter = typeof appRouter;
+ * import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import type { QueryClient } from '@tanstack/react-query';
+ *
+ * export const prefetchPost = (rpc: RpcOptionsProxy<AppRouter>, queryClient: QueryClient, id: number) =>
+ *   queryClient.prefetchQuery(rpc.post.byId.queryOptions({ id }));
+ * ```
+ *
+ * @see {@link createRpcOptionsProxy}
+ * @category models
+ * @since 0.1.0
  */
 export type RpcOptionsProxy<
   R extends Router.Any,
   TFeatureFlags extends FeatureFlags = DefaultFeatureFlags,
 > = DecoratedRouterRecord<Router.Record<R>, TFeatureFlags> & DecorateRouterKeyable<TFeatureFlags>;
 
-/** The input type of a decorated procedure: `inferProxyInput<typeof rpc.post.byId>`. */
+/**
+ * The input type of a decorated procedure: `inferProxyInput<typeof rpc.post.byId>`.
+ *
+ * **Example** (Typing a form value from the procedure input)
+ *
+ * ```ts
+ * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { Schema } from 'effect';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ * const appRouter = Router.make({
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *   },
+ * });
+ * type AppRouter = typeof appRouter;
+ * import type {
+ *   inferProxyError,
+ *   inferProxyInput,
+ *   inferProxyOutput,
+ *   RpcOptionsProxy,
+ * } from '@effect-trpc/tanstack-react-query';
+ *
+ * declare const rpc: RpcOptionsProxy<AppRouter>;
+ * type CreateInput = inferProxyInput<typeof rpc.post.create>; // { readonly title: string }
+ * type ById = inferProxyOutput<typeof rpc.post.byId>; // Post
+ * type ByIdError = inferProxyError<typeof rpc.post.byId>; // PostNotFound | RpcDefect | ...
+ *
+ * const draft: CreateInput = { title: 'Hello' };
+ * ```
+ *
+ * @see {@link inferProxyOutput}
+ * @see {@link inferProxyError}
+ * @category type-level
+ * @since 0.1.0
+ */
 export type inferProxyInput<
   TProcedure extends
     | DecorateQueryProcedure<any>
@@ -144,7 +312,14 @@ export type inferProxyInput<
     | DecorateSubscriptionProcedure<any>,
 > = TProcedure['~types']['input'];
 
-/** The output type of a decorated procedure: `inferProxyOutput<typeof rpc.post.byId>`. */
+/**
+ * The output type of a decorated procedure: `inferProxyOutput<typeof rpc.post.byId>` (the
+ * element type for subscriptions).
+ *
+ * @see {@link inferProxyInput}
+ * @category type-level
+ * @since 0.1.0
+ */
 export type inferProxyOutput<
   TProcedure extends
     | DecorateQueryProcedure<any>
@@ -152,7 +327,14 @@ export type inferProxyOutput<
     | DecorateSubscriptionProcedure<any>,
 > = TProcedure['~types']['output'];
 
-/** The error type (`ClientError<E>`) of a decorated procedure. */
+/**
+ * The error type of a decorated procedure: `ClientError<E>`, i.e. the procedure's typed errors plus
+ * `RpcDefect`, `RpcTransportError` and `RpcInterrupted`.
+ *
+ * @see {@link inferProxyInput}
+ * @category type-level
+ * @since 0.1.0
+ */
 export type inferProxyError<
   TProcedure extends
     | DecorateQueryProcedure<any>
@@ -160,11 +342,25 @@ export type inferProxyError<
     | DecorateSubscriptionProcedure<any>,
 > = TProcedure['~types']['error'];
 
-/** Options of {@link createRpcOptionsProxy} besides the client. */
+/**
+ * Options of {@link createRpcOptionsProxy} besides the client (also used by the framework
+ * adapters).
+ *
+ * **Details**
+ *
+ * - `keyPrefix` is required exactly when the feature flags are `{ keyPrefix: true }`.
+ * - `overrides.mutations.onSuccess` wraps the `onSuccess` of every mutation; it requires
+ *   `queryClient`, otherwise `mutationOptions()` throws.
+ *
+ * @see {@link MutationOptionsOverride}
+ * @category options
+ * @since 0.1.0
+ */
 export type RpcOptionsProxyOptionsBase<TFeatureFlags extends FeatureFlags = DefaultFeatureFlags> = {
   /**
-   * The query client (or a function returning it). Needed for the mutation `overrides` and for
-   * `setMutationDefaults` to keep working with `mutationOptions`.
+   * The query client (or a function returning it). Required by `overrides.mutations`. When it is
+   * set, `mutationOptions` returns an `onSuccess` wrapper that also calls the `onSuccess` of
+   * `queryClient.setMutationDefaults` for the mutation key itself.
    */
   readonly queryClient?: QueryClient | (() => QueryClient) | undefined;
   readonly overrides?:
@@ -174,7 +370,13 @@ export type RpcOptionsProxyOptionsBase<TFeatureFlags extends FeatureFlags = Defa
     | undefined;
 } & KeyPrefixOptions<TFeatureFlags>;
 
-/** Options of {@link createRpcOptionsProxy}. */
+/**
+ * Options of {@link createRpcOptionsProxy}: the Promise client plus
+ * {@link RpcOptionsProxyOptionsBase}.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export type RpcOptionsProxyOptions<
   R extends Router.Any,
   TFeatureFlags extends FeatureFlags = DefaultFeatureFlags,
@@ -239,15 +441,112 @@ const createRecursiveProxy = (
 
 /**
  * Creates the options proxy of a router from a Promise client (tRPC's `createTRPCOptionsProxy`).
- * Works without React (loaders, server components, plain TanStack Query):
+ *
+ * **When to use**
+ *
+ * Use outside of React context: route loaders, server components, prefetching before
+ * `dehydrate`, scripts and tests. In components, prefer `useRpc()` from `createRpcContext`,
+ * which returns the same proxy.
+ *
+ * **Details**
+ *
+ * - The router is read from the client (`client.$router`), so only the client is required.
+ * - `queryOptions` passes TanStack's `AbortSignal` to the call: cancelling a query (or unmounting
+ *   its last observer) interrupts the server handler.
+ * - `queryClient` is required by `overrides.mutations`; with it, `mutationOptions` also runs the
+ *   `onSuccess` of `queryClient.setMutationDefaults`.
+ * - With `{ keyPrefix: true }` feature flags, every query and mutation key starts with
+ *   `[keyPrefix]`.
+ *
+ * **Gotchas**
+ *
+ * - Calling the wrong helper for a procedure kind (`queryOptions` on a mutation) or a path that is
+ *   not a procedure throws an `Error` at call time.
+ * - tRPC's `router` + `ctx` server mode does not exist: on the server, create a client over
+ *   `localLink({ handlers })` from `@effect-trpc/client`, which calls the handlers in-process.
+ * - The request option is `rpc: { headers }` (tRPC: `trpc: { context }`), and the metadata on each
+ *   result is `.rpc.path` (tRPC: `.trpc.path`).
+ *
+ * **Example** (Prefetching in a loader, then invalidating by path)
  *
  * ```ts
+ * import { createClient, httpLink } from '@effect-trpc/client';
+ * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { Schema } from 'effect';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ * const appRouter = Router.make({
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *   },
+ * });
+ * type AppRouter = typeof appRouter;
+ * import { createRpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import { QueryClient } from '@tanstack/react-query';
+ *
+ * const client = createClient(appRouter, { link: httpLink({ url: 'http://localhost:3000/rpc' }) });
+ * const queryClient = new QueryClient();
  * const rpc = createRpcOptionsProxy({ client, queryClient });
- * await queryClient.prefetchQuery(rpc.post.byId.queryOptions({ id: 1 }));
+ *
+ * export async function loadPost(id: number) {
+ *   // Throws the ClientError (e.g. a PostNotFound instance) when the query fails.
+ *   const post = await queryClient.fetchQuery(rpc.post.byId.queryOptions({ id }));
+ *   // Typed through the data-tagged key: Post | undefined.
+ *   const cached = queryClient.getQueryData(rpc.post.byId.queryKey({ id }));
+ *   return { post, cached };
+ * }
+ *
+ * export const refreshPosts = () => queryClient.invalidateQueries(rpc.post.pathFilter());
  * ```
  *
- * Pass the key prefix flag as second type argument to use `keyPrefix`:
- * `createRpcOptionsProxy<AppRouter, { keyPrefix: true }>({ client, keyPrefix: 'billing' })`.
+ * **Example** (Invalidate everything after any mutation)
+ *
+ * ```ts
+ * import type { Client } from '@effect-trpc/client';
+ * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { Schema } from 'effect';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ * const appRouter = Router.make({
+ *   post: {
+ *     byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+ *     create: mutation({ payload: { title: Schema.String }, success: Post }),
+ *   },
+ * });
+ * type AppRouter = typeof appRouter;
+ * import { createRpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import { QueryClient } from '@tanstack/react-query';
+ *
+ * declare const client: Client<AppRouter>;
+ * const queryClient = new QueryClient();
+ *
+ * const rpc = createRpcOptionsProxy({
+ *   client,
+ *   queryClient,
+ *   overrides: {
+ *     mutations: {
+ *       onSuccess: async ({ originalFn, queryClient }) => {
+ *         await originalFn(); // the onSuccess given to mutationOptions
+ *         await queryClient.invalidateQueries();
+ *       },
+ *     },
+ *   },
+ * });
+ *
+ * export const createPostOptions = rpc.post.create.mutationOptions();
+ * ```
+ *
+ * @see createRpcContext
+ * @see {@link RpcOptionsProxy}
+ * @category constructors
+ * @since 0.1.0
  */
 export const createRpcOptionsProxy = <
   R extends Router.Any,

@@ -14,6 +14,96 @@ routers. It follows the layout of TanStack Start's `with-trpc` example:
 `@tanstack/react-start` is only imported as types, so this package has no Start runtime
 dependency.
 
+## For AI agents
+
+**Use this package when** you wire an `@effect-trpc/core` router into a **TanStack Start** app:
+a catch-all server route, loaders that prefetch into the router-context `QueryClient`, and SSR
+hydration that keeps `Schema.Class` / `TaggedError` instances.
+
+- Next.js App Router → use `@effect-trpc/next`.
+- Plain React without Start (Vite SPA) → `@effect-trpc/tanstack-react-query` + `@effect-trpc/client`.
+- Any other fetch server → `toWebHandler` from `@effect-trpc/server`.
+
+**Entry points** (all from `@effect-trpc/start`; no subpaths):
+
+| export                                   | side    | what                                                                     | source           |
+| ---------------------------------------- | ------- | ------------------------------------------------------------------------ | ---------------- |
+| `createStartHandler`, `defaultStartPath` | server  | `({ request }) => Promise<Response>` + `dispose()` for `server.handlers` | `src/handler.ts` |
+| `createServerClient`                     | server  | `Client<R>` over `localLink` (handlers in-process)                       | `src/client.ts`  |
+| `createBrowserClient`                    | browser | `Client<R>` over `httpLink` (relative url resolved)                      | `src/client.ts`  |
+| `createIsomorphicClient`                 | both    | server → `createServerClient`, browser → `createBrowserClient`           | `src/client.ts`  |
+| `getBaseUrl`, `getRpcUrl`                | both    | app origin / absolute rpc url (SSR needs absolute urls)                  | `src/client.ts`  |
+| `createStartHelpers`                     | both    | `{ rpc, getRpc, client, RpcProvider, useRpc, useRpcClient, hydration }`  | `src/helpers.ts` |
+| `createStartHydration`                   | both    | `{ dehydrate, hydrate, routerOptions }`, Schema-aware                    | `src/helpers.ts` |
+
+**Golden path** (paths in the app):
+
+1. `src/rpc/router.ts` — schemas-only router, shared (§1).
+2. `src/rpc/handlers.server.ts` — `Handlers.make(appRouter, …)`, server only (§1).
+3. `src/routes/api/rpc.$.ts` — `createStartHandler(appRouter, { handlers })` under
+   `server.handlers.POST` (and `GET`) (§2).
+4. `src/rpc/client.ts` — `createIsomorphicClient` (or `createIsomorphicFn` +
+   `createServerClient` / `createBrowserClient` to keep handlers out of the browser bundle), then
+   `createStartHelpers(appRouter, { client })` (§3).
+5. `src/router.tsx` — a `QueryClient` per `getRouter()` call, `...hydration.routerOptions(queryClient)`,
+   `Wrap` with `QueryClientProvider` + `RpcProvider client queryClient` (§4).
+6. `src/routes/__root.tsx` — `createRootRouteWithContext<{ queryClient: QueryClient }>()` (§5).
+7. Routes — loaders `await context.queryClient.ensureQueryData(rpc(context.queryClient).x.queryOptions(…))`
+   (or `prefetchQuery` for typed errors on SSR'd pages); components `useSuspenseQuery(useRpc().x.queryOptions(…))` (§6).
+
+**Invariants**
+
+- `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; narrow on `_tag`.
+- Server-only: `createStartHandler`, `createServerClient`, and any module importing your handlers
+  (including one calling `createIsomorphicClient`).
+- `createStartHandler` requires `handlers`; `path` (default `"/api/rpc"`) is the route path
+  without the `$` splat; `serialization` (default `"ndjson"`) must match the client.
+- Non-`POST` requests get `405` (`Allow: POST`); other paths `404`; after `dispose()` `503`.
+- Typed failures and defects are encoded in the response `Exit` with status `200`.
+- `rpc(queryClient)` is memoized per `QueryClient`; `RpcProvider` needs `client` and
+  `queryClient` props (and `keyPrefix` with the `{ keyPrefix: true }` flag).
+- Relative browser-client urls are resolved with `getBaseUrl()`: `serverOrigin` → `PUBLIC_URL` /
+  `URL` → `https://$VERCEL_URL` → `http://localhost:$PORT` on the server.
+
+**Common mistakes**
+
+- Don't create the `QueryClient` at module level → create it inside `getRouter()` (one per SSR
+  request).
+- Don't import `handlers.server.ts` into modules the browser loads unless you accept the bundle
+  cost → use `createIsomorphicFn().server(…).client(…)`.
+- Don't return rpc data from a loader → `await` `ensureQueryData` / `prefetchQuery`; loader return
+  values go through Start's serializer, which does not know `Schema.Class`.
+- Don't rely on a loader's thrown `TaggedError` reaching `errorComponent` during SSR → use
+  `prefetchQuery` and read `query.error` in the component.
+- Don't use `createBrowserClient` during SSR without an origin in production → set `PUBLIC_URL`,
+  pass `serverOrigin`, or pass an absolute `url`.
+- Don't mount the handler on a path other than `path` → pass `path` (include the router
+  `basepath`).
+- Don't combine `hydration.routerOptions` and `@tanstack/react-router-ssr-query` for the same rpc
+  data → one serializer per query (the combination is not tested).
+
+**Where to look**
+
+- Route handler (encoding, NDJSON, rewrites, 405/404/503, lazy build, retry, `dispose`):
+  `test/handler.test.ts`.
+- Clients (`isServer` switching, `httpLink`, subscriptions, SSR url resolution):
+  `test/client.test.ts`.
+- Helpers (loader `ensureQueryData`, typed errors, dehydrate/hydrate, infinite queries,
+  `keyPrefix`): `test/helpers.test.ts`.
+- This README wired with real `@tanstack/react-router` objects (`router.load()` → `dehydrate` →
+  `hydrate`): `test/app.tsx`, `test/readme.test.ts`; types: `test/start.test-d.tsx`; tRPC parity:
+  `test/PARITY.md`.
+- JSDoc conventions: `docs/jsdoc-style.md`. Tests use Web `Request`s and router objects, not a
+  running Start server or Vite build (so `createIsomorphicFn` stripping is not exercised).
+
+**Verify**
+
+```bash
+pnpm exec vp -C packages/start test
+pnpm exec vp -C packages/start pack
+node scripts/verify-jsdoc.mjs start
+```
+
 ```sh
 pnpm add @effect-trpc/start @effect-trpc/core @effect-trpc/server @effect-trpc/client @effect-trpc/tanstack-react-query effect @tanstack/react-query
 # already in a Start app: @tanstack/react-start @tanstack/react-router react

@@ -1,3 +1,13 @@
+/**
+ * Query and mutation key construction and parsing (tRPC's `getQueryKeyInternal` /
+ * `readQueryKey`).
+ *
+ * The options proxy builds every key here; the hydration helpers use `parseQueryKey` to find the
+ * router queries in a cache. The module is public as the `QueryKeys` namespace, and
+ * `getQueryKey` / `getMutationKey` / `readQueryKey` are re-exported from the package entry.
+ *
+ * @since 0.1.0
+ */
 import { skipToken } from '@tanstack/react-query';
 import type {
   AnyRpcMutationKey,
@@ -19,7 +29,12 @@ const splitPath = (path: ReadonlyArray<string>): string[] =>
 export const isPrefixedQueryKey = (queryKey: AnyRpcQueryKey): queryKey is RpcQueryKeyWithPrefix =>
   queryKey.length >= 3;
 
-/** The parts of an effect-trpc query key. */
+/**
+ * The parts of an effect-trpc query key, as returned by {@link readQueryKey}.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type ReadQueryKeyResult =
   | {
       readonly type: 'prefixed';
@@ -34,7 +49,12 @@ export type ReadQueryKeyResult =
       readonly args: RpcQueryKeyWithoutPrefix[1];
     };
 
-/** Splits an effect-trpc query key into prefix, path and args (tRPC's `readQueryKey`). */
+/**
+ * Splits an effect-trpc query key into prefix, path and args (tRPC's `readQueryKey`).
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const readQueryKey = (queryKey: AnyRpcQueryKey): ReadQueryKeyResult =>
   isPrefixedQueryKey(queryKey)
     ? { type: 'prefixed', prefix: queryKey[0], path: queryKey[1], args: queryKey[2] }
@@ -75,10 +95,17 @@ export const parseQueryKey = (
 };
 
 /**
- * Builds a query key (tRPC's `getQueryKeyInternal`): `[path, { input?, type }]`, `[path]` for
- * `type: "any"` without input, `[]` for the root path; `[[prefix], ...]` with a prefix. `input` is
- * omitted when `undefined` or `skipToken`; infinite keys drop the `cursor` and `direction` of the
- * input.
+ * Builds a query key (tRPC's `getQueryKeyInternal`, exported as `getQueryKey`):
+ * `[path, { input?, type }]`, `[path]` for `type: "any"` without input, `[]` for the root path;
+ * `[[prefix], ...]` with a prefix. `input` is omitted when `undefined` or `skipToken`; infinite
+ * keys drop the `cursor` and `direction` of the input. Dotted path parts (`"post.byId"`) are
+ * split.
+ *
+ * Prefer the proxy helpers (`rpc.post.byId.queryKey(input)`), which are data-tagged; use this
+ * only when you have a path but no proxy.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const getQueryKeyInternal = (opts: {
   readonly path: ReadonlyArray<string>;
@@ -111,7 +138,13 @@ export const getQueryKeyInternal = (opts: {
   return key;
 };
 
-/** Builds a mutation key: `[path]`, or `[[prefix], path]` with a prefix. */
+/**
+ * Builds a mutation key (exported as `getMutationKey`): `[path]`, or `[[prefix], path]` with a
+ * prefix.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const getMutationKeyInternal = (opts: {
   readonly path: ReadonlyArray<string>;
   readonly prefix: string | undefined;

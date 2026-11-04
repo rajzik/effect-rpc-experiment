@@ -16,6 +16,7 @@ Always run commands through the project-local Vite+ CLI from the repository root
 | test one package (runtime + type tests)             | `vp -C packages/<name> test`                     |
 | test everything                                     | `vp run -r test`                                 |
 | build one package / all                             | `vp -C packages/<name> pack` / `vp run -r build` |
+| JSDoc contract + type-check examples (after build)  | `node scripts/verify-jsdoc.mjs [<name>...]`      |
 
 `vp test` is a built-in (Vitest 5). Import test APIs from `vite-plus/test` (or `@effect/vitest` for
 `it.effect`). React tests need `// @vitest-environment jsdom` at the top of the file. Type tests
@@ -46,6 +47,10 @@ When unsure, grep `node_modules/effect/dist/**/*.d.ts` — do not trust memory o
 ## Conventions
 
 - Public API: `const` arrow exports, `readonly` types, barrel `src/index.ts`, README per package.
+- Docs: every public export has Effect-style JSDoc (summary, **When to use**, **Details**,
+  **Gotchas**, a compiling **Example**, `@category`, `@since`) per `docs/jsdoc-style.md`; every
+  `src/` file opens with a module header. Each package README has a `## For AI agents` section
+  (entry points, golden path, invariants, common mistakes, verify commands): update it with the API.
 - Errors: `Schema.TaggedError` classes, discriminated by `_tag`. The client error union is
   `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted` (from `@effect-trpc/core`).
 - Tests prove behaviour through the public API; every typed-error claim has a `.test-d.ts` check.
@@ -60,4 +65,5 @@ When unsure, grep `node_modules/effect/dist/**/*.d.ts` — do not trust memory o
 - [ ] `vp run typecheck` passes
 - [ ] `vp -C packages/<name> test` passes with no type errors
 - [ ] `vp -C packages/<name> pack` builds
-- [ ] README and `test/PARITY.md` updated
+- [ ] `node scripts/verify-jsdoc.mjs <name>` passes (after `pack`)
+- [ ] README (incl. `## For AI agents`) and `test/PARITY.md` updated

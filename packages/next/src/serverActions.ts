@@ -1,3 +1,16 @@
+/**
+ * Server actions with typed errors: run a router's procedures as Next.js server actions and
+ * decode their results on the client.
+ *
+ * An error thrown by a server action reaches the client as a plain `Error` (class, fields and,
+ * in production, message lost). So {@link createServerActionCaller}'s actions never throw a
+ * procedure error: they resolve with the procedure's `Exit` encoded by `Codecs.exit(rpc)` (plain
+ * JSON). {@link decodeActionResult}, {@link unwrapActionResult} and `useServerAction` decode it
+ * back to class instances and `ClientError<E>` (`E | RpcDefect | RpcTransportError |
+ * RpcInterrupted`). `createServerActionCaller` is server-only; the decoders work anywhere.
+ *
+ * @since 0.1.0
+ */
 import {
   causeToClientError,
   Codecs,
@@ -17,7 +30,14 @@ import type { Layer } from 'effect';
 import type { Headers } from 'effect/http';
 import type { ActionPath, ErrorAt, InputArgs, InputAt, OutputAt, RecordOf } from './types.js';
 
-/** One reason of an encoded `Cause` (see `Codecs.exit`). */
+/**
+ * One reason of an encoded `Cause` (see `Codecs.exit`): a typed failure (`Fail`, encoded with
+ * the procedure's error schema), a defect (`Die`, message only) or an interruption.
+ *
+ * @see {@link EncodedExit}
+ * @category codecs
+ * @since 0.1.0
+ */
 export type EncodedCauseReason =
   | { readonly _tag: 'Fail'; readonly error: Schema.Json }
   | { readonly _tag: 'Die'; readonly defect: Schema.Json }
@@ -26,12 +46,28 @@ export type EncodedCauseReason =
 /**
  * The JSON form of an `Exit` produced by `Codecs.exit(rpc)`: what a server action returns. It
  * is plain JSON, so React can send it from the server to the client unchanged.
+ *
+ * **Details**
+ *
+ * - Success: `{ _tag: 'Success', value }` with `value` encoded by the success schema (a `Date`
+ *   becomes an ISO string).
+ * - Failure: `{ _tag: 'Failure', cause: [...] }`, e.g.
+ *   `[{ _tag: 'Fail', error: { _tag: 'PostNotFound', id: 404 } }]`.
+ *
+ * @see {@link decodeActionResult}
+ * @category codecs
+ * @since 0.1.0
  */
 export type EncodedExit =
   | { readonly _tag: 'Success'; readonly value: Schema.Json }
   | { readonly _tag: 'Failure'; readonly cause: ReadonlyArray<EncodedCauseReason> };
 
-/** Type-level only: the decoded success / error types of an {@link EncodedActionResult}. */
+/**
+ * Type-level only: the decoded success / error types of an {@link EncodedActionResult}.
+ *
+ * @category type-level
+ * @since 0.1.0
+ */
 export interface ActionResultTypes<A, E> {
   readonly success: A;
   readonly error: E;
@@ -41,6 +77,15 @@ export interface ActionResultTypes<A, E> {
  * The result of a {@link ServerAction}: an {@link EncodedExit} that remembers (at the type level
  * only) the procedure's decoded output `A` and typed error `E`. Decode it with
  * `decodeActionResult` / `unwrapActionResult` / `useServerAction`.
+ *
+ * **Gotchas**
+ *
+ * - Its `value` / `error` fields are the **encoded** JSON (ISO strings, plain objects), never
+ *   class instances; do not read them directly in client code.
+ *
+ * @see {@link unwrapActionResult}
+ * @category models
+ * @since 0.1.0
  */
 export type EncodedActionResult<A, E> = EncodedExit & {
   /** Type-level only; never present at runtime. */
@@ -52,12 +97,22 @@ export type EncodedActionResult<A, E> = EncodedExit & {
  * rejects with a typed error — failures (typed errors, defects, interruption, invalid input) are
  * encoded into the result, because errors thrown by a server action lose their class and fields
  * on the way to the client (and their message in production).
+ *
+ * @see {@link createServerActionCaller}
+ * @category models
+ * @since 0.1.0
  */
 export type ServerAction<D extends ProcedureDef.Any> = (
   ...args: InputArgs<inferInput<D>>
 ) => Promise<EncodedActionResult<inferOutput<D>, inferError<D>>>;
 
-/** The decoded output type of a server action (or of its encoded result). */
+/**
+ * The decoded output type of a server action (or of its encoded result):
+ * `inferActionOutput<typeof createPost>` is `Post`.
+ *
+ * @category type-level
+ * @since 0.1.0
+ */
 export type inferActionOutput<T> = T extends (
   ...args: ReadonlyArray<never>
 ) => PromiseLike<EncodedActionResult<infer A, infer _E>>
@@ -66,7 +121,14 @@ export type inferActionOutput<T> = T extends (
     ? A
     : never;
 
-/** The typed error of a server action (or of its encoded result), without `ClientError`. */
+/**
+ * The typed error of a server action (or of its encoded result), without the infrastructure
+ * errors of `ClientError`.
+ *
+ * @see {@link inferActionClientError}
+ * @category type-level
+ * @since 0.1.0
+ */
 export type inferActionError<T> = T extends (
   ...args: ReadonlyArray<never>
 ) => PromiseLike<EncodedActionResult<infer _A, infer E>>
@@ -77,11 +139,21 @@ export type inferActionError<T> = T extends (
 
 /**
  * The error a decoded server action result fails with (what `unwrapActionResult` rejects with):
- * `ClientError<E>` — the procedure's typed errors or an infrastructure error.
+ * `ClientError<E>` — the procedure's typed errors or an infrastructure error
+ * (`RpcDefect | RpcTransportError | RpcInterrupted`).
+ *
+ * @category type-level
+ * @since 0.1.0
  */
 export type inferActionClientError<T> = ClientError<inferActionError<T>>;
 
-/** The server actions of a router record, nested like the router. */
+/**
+ * The server actions of a router record, nested like the router (subscriptions map to `never`).
+ *
+ * @see {@link ServerActionCaller}
+ * @category type-level
+ * @since 0.1.0
+ */
 export type ServerActionRecord<Rec> = {
   readonly [K in keyof Rec]: Rec[K] extends ProcedureDef.Any
     ? Rec[K]['kind'] extends 'subscription'
@@ -90,12 +162,23 @@ export type ServerActionRecord<Rec> = {
     : ServerActionRecord<RecordOf<Rec[K]>>;
 };
 
-/** The server action of the procedure at path `P` (same shape as {@link ServerAction}). */
+/**
+ * The server action of the procedure at path `P` (same shape as {@link ServerAction}).
+ *
+ * @category type-level
+ * @since 0.1.0
+ */
 export type ServerActionAt<R extends Router.Any, P extends string> = (
   ...args: InputArgs<InputAt<R, P>>
 ) => Promise<EncodedActionResult<OutputAt<R, P>, ErrorAt<R, P>>>;
 
-/** Options of {@link createServerActionCaller}. */
+/**
+ * Options of {@link createServerActionCaller}. `handlers` is required.
+ *
+ * @see {@link createServerActionCaller}
+ * @category options
+ * @since 0.1.0
+ */
 export interface ServerActionCallerOptions<R extends Router.Any, LE = never> {
   /**
    * Layer providing every handler of the router and the server implementation of every
@@ -104,14 +187,25 @@ export interface ServerActionCallerOptions<R extends Router.Any, LE = never> {
   readonly handlers: Layer.Layer<Caller.Requirements<R>, LE>;
   /**
    * Headers for every action call, visible to middleware and handlers (`ctx.headers`). Evaluated
-   * once per call — pass Next's `headers()` here: `headers: async () => await headers()`.
+   * once per call — pass Next's `headers()` here: `headers: async () => await headers()`. If it
+   * throws or rejects, the call resolves with a defect.
    */
   readonly headers?: (() => Headers.Input | PromiseLike<Headers.Input>) | undefined;
 }
 
-/** What {@link createServerActionCaller} returns. */
+/**
+ * What {@link createServerActionCaller} returns: a function from a path to its server action,
+ * plus the nested form, the underlying caller and `dispose`.
+ *
+ * @see {@link createServerActionCaller}
+ * @category models
+ * @since 0.1.0
+ */
 export interface ServerActionCaller<R extends Router.Any> {
-  /** The server action of a query or mutation: `actions('post.byId')`. */
+  /**
+   * The server action of a query or mutation: `actions('post.byId')`. Memoized per path. Throws
+   * synchronously for an unknown path or a subscription.
+   */
   <const P extends ActionPath<R>>(path: P): ServerActionAt<R, P>;
   /** The same actions, nested like the router: `actions.nested.post.byId`. */
   readonly nested: ServerActionRecord<Router.Record<R>>;
@@ -183,26 +277,91 @@ const procedureOf = (caller: unknown, path: ReadonlyArray<string>): EffectFn =>
 
 /**
  * Creates server actions for a router's queries and mutations (tRPC's
- * `experimental_createServerActionHandler`). Each action runs the procedure in-process (through
- * `createCaller`, so middleware runs) and resolves with the **encoded** `Exit`: success values,
- * typed errors and defects all cross the server → client boundary as JSON, and the client turns
- * them back into class instances with `decodeActionResult` / `unwrapActionResult` /
- * `useServerAction`.
+ * `experimental_createServerActionHandler`).
+ *
+ * **When to use**
+ *
+ * Use it in a `'use server'` module when client components should call procedures as Next.js
+ * server actions (forms, progressive enhancement) and still get typed errors. Prefer
+ * `createNextRpcClient` + `useRpc().x.mutationOptions()` for mutations that go through the route
+ * handler and TanStack Query, and `createRscHelpers` for reads in server components.
+ *
+ * **Details**
+ *
+ * - Each action runs the procedure in-process (through `createCaller`, so middleware runs) and
+ *   resolves with the **encoded** `Exit`: success values, typed errors and defects all cross
+ *   the server → client boundary as JSON.
+ * - The client decodes it with `useServerAction`, `unwrapActionResult` or
+ *   `decodeActionResult`, getting class instances and `ClientError<E>`.
+ * - The input comes from the network, so it is validated with the procedure's payload schema
+ *   (the decoded type or its encoded JSON form are accepted); invalid input resolves with a
+ *   defect.
+ * - Defects keep only their message (no stack, no `cause`). A result that cannot be encoded
+ *   becomes a defect too.
+ * - `actions(path)` and `actions.nested.a.b` return the same memoized function. The handler layer
+ *   is built lazily on the first call; after `dispose()` calls resolve with an interrupted
+ *   result (`RpcInterrupted` once decoded).
+ *
+ * **Gotchas**
+ *
+ * - A `'use server'` module may only export async functions: keep `actions` module-private and
+ *   export one `async function` wrapper per action (this also names the action).
+ * - Server-only: never import this module's handlers into client components; client components
+ *   import only the exported action functions.
+ * - Never `throw` the result or rethrow a procedure error from the action; it would arrive as a
+ *   plain `Error`.
+ * - `actions('a.subscription')` and unknown paths throw synchronously; subscriptions cannot be
+ *   actions.
+ *
+ * **Example** (app/actions.ts, a `'use server'` module)
  *
  * ```ts
- * // app/actions.ts
+ * // app/actions.ts — server only
  * 'use server';
+ * import { mutation, Router } from '@effect-trpc/core';
+ * import { createServerActionCaller, type InputAt } from '@effect-trpc/next';
+ * import { Handlers } from '@effect-trpc/server';
+ * import { Effect, Schema } from 'effect';
+ *
+ * // In the app: `import { headers } from 'next/headers'`.
+ * declare const headers: () => Promise<Headers>;
+ *
+ * // server/router.ts (shared) and server/handlers.ts (server only) in a real app
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
+ *   reason: Schema.String,
+ * }) {}
+ * const appRouter = Router.make({
+ *   post: {
+ *     create: mutation({ payload: { title: Schema.String }, success: Post, error: Forbidden }),
+ *   },
+ * });
+ * type AppRouter = typeof appRouter;
+ * const HandlersLive = Handlers.make(appRouter, {
+ *   post: {
+ *     create: ({ title }, { headers }) =>
+ *       headers['x-user'] === undefined
+ *         ? Effect.fail(new Forbidden({ reason: 'sign in first' }))
+ *         : Effect.succeed(new Post({ id: 2, title })),
+ *   },
+ * });
+ *
+ * // Module-private: a 'use server' file may only export async functions.
  * const actions = createServerActionCaller(appRouter, {
  *   handlers: HandlersLive,
- *   headers: async () => await headers(),
+ *   headers: async () => await headers(), // evaluated once per call
  * });
- * export async function createPost(input: { title: string }) {
+ *
+ * export async function createPost(input: InputAt<AppRouter, 'post.create'>) {
  *   return actions('post.create')(input);
  * }
  * ```
  *
- * The input is validated with the procedure's payload schema (it comes from the network); an
- * invalid input resolves with a defect. Defects only keep their message.
+ * @see {@link useServerAction} to call the action from a client component
+ * @see {@link unwrapActionResult}
+ * @see {@link decodeActionResult}
+ * @category constructors
+ * @since 0.1.0
  */
 export const createServerActionCaller = <R extends Router.Any, LE = never>(
   router: R,
@@ -299,9 +458,61 @@ const decodeResult = (
 
 /**
  * Decodes the result of a server action back to an `Exit` of class instances:
- * `Exit<Post, ClientError<PostNotFound>>`. Typed errors are the procedure's `TaggedError`
- * instances; defects become `RpcDefect`, interruption `RpcInterrupted`. A malformed result also
- * becomes an `RpcDefect`.
+ * `Exit<Post, ClientError<PostNotFound>>`.
+ *
+ * **When to use**
+ *
+ * Use it when you want to branch on success / failure without `try` / `catch` (e.g. in a form
+ * `action` or an Effect program). Prefer `useServerAction` in components and
+ * `unwrapActionResult` when a rejected promise is what you want.
+ *
+ * **Details**
+ *
+ * - Typed errors are the procedure's `TaggedError` instances; defects become `RpcDefect`
+ *   (message only), interruption `RpcInterrupted`.
+ * - A malformed result (wrong shape for the procedure's schemas) becomes an `RpcDefect`.
+ *
+ * **Gotchas**
+ *
+ * - `path` must be the procedure the action called: the result is decoded with that
+ *   procedure's schemas. An unknown or subscription path throws.
+ * - It takes the awaited result; a rejected action call (network failure) is not handled here.
+ *   Use `unwrapActionResult` / `useServerAction` to turn that into `RpcTransportError`.
+ *
+ * **Example** (Branching on the decoded Exit in a client component)
+ *
+ * ```ts
+ * // app/new-post.tsx — client code ('use client')
+ * import { mutation, Router } from '@effect-trpc/core';
+ * import { decodeActionResult, type ServerActionAt } from '@effect-trpc/next';
+ * import { Exit, Schema } from 'effect';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
+ *   reason: Schema.String,
+ * }) {}
+ * const appRouter = Router.make({
+ *   post: {
+ *     create: mutation({ payload: { title: Schema.String }, success: Post, error: Forbidden }),
+ *   },
+ * });
+ * // `import { createPost } from './actions'` in the app ('use server').
+ * declare const createPost: ServerActionAt<typeof appRouter, 'post.create'>;
+ *
+ * export async function submit(title: string): Promise<string> {
+ *   const exit = decodeActionResult(appRouter, 'post.create', await createPost({ title }));
+ *   if (Exit.isSuccess(exit)) return `Created ${exit.value.title}`;
+ *   const error = exit.cause.reasons[0];
+ *   return error !== undefined && error._tag === 'Fail' && error.error._tag === 'Forbidden'
+ *     ? `Forbidden: ${error.error.reason}`
+ *     : 'Something went wrong';
+ * }
+ * ```
+ *
+ * @see {@link unwrapActionResult}
+ * @see {@link useServerAction}
+ * @category codecs
+ * @since 0.1.0
  */
 export const decodeActionResult = <R extends Router.Any, const P extends ActionPath<R>>(
   router: R,
@@ -317,12 +528,68 @@ export const decodeActionResult = <R extends Router.Any, const P extends ActionP
 
 /**
  * Awaits and decodes the result of a server action: resolves with the output (class instances)
- * or rejects with a `ClientError<E>` instance — like a client call. A rejected action call (the
- * server action request itself failed) rejects with `RpcTransportError`.
+ * or rejects with a `ClientError<E>` instance — like a client call.
+ *
+ * **When to use**
+ *
+ * Use it where a rejecting promise fits: as a TanStack `mutationFn`, in event handlers with
+ * `try` / `catch`, or in tests. Prefer `useServerAction` for component state and
+ * `decodeActionResult` to branch without exceptions.
+ *
+ * **Details**
+ *
+ * - Accepts the result or the action's promise.
+ * - A rejected action call (the server action request itself failed) rejects with
+ *   `RpcTransportError`; a typed error rejects with the procedure's `TaggedError` instance;
+ *   defects with `RpcDefect` (also for malformed results); interruption with `RpcInterrupted`.
+ *
+ * **Gotchas**
+ *
+ * - `path` must be the procedure the action called: its schemas decode the result.
+ * - The rejection type is not tracked by `Promise`; narrow with `instanceof` or annotate the
+ *   catch variable as `inferActionClientError<typeof action>`.
+ *
+ * **Example** (A TanStack mutation backed by a server action, client code)
  *
  * ```ts
- * const post = await unwrapActionResult(appRouter, 'post.create', createPost({ title }));
+ * // app/new-post.tsx — client code ('use client')
+ * import { mutation, Router } from '@effect-trpc/core';
+ * import {
+ *   unwrapActionResult,
+ *   type inferActionClientError,
+ *   type ServerActionAt,
+ * } from '@effect-trpc/next';
+ * import { useMutation } from '@tanstack/react-query';
+ * import { Schema } from 'effect';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
+ *   reason: Schema.String,
+ * }) {}
+ * const appRouter = Router.make({
+ *   post: {
+ *     create: mutation({ payload: { title: Schema.String }, success: Post, error: Forbidden }),
+ *   },
+ * });
+ * declare const createPost: ServerActionAt<typeof appRouter, 'post.create'>;
+ *
+ * export function useCreatePost() {
+ *   return useMutation({
+ *     // Resolves with a Post instance or rejects with Forbidden | RpcDefect | ...
+ *     mutationFn: (title: string) =>
+ *       unwrapActionResult(appRouter, 'post.create', createPost({ title })),
+ *     onError: (error) => {
+ *       const typed = error as inferActionClientError<typeof createPost>;
+ *       if (typed._tag === 'Forbidden') console.warn(typed.reason);
+ *     },
+ *   });
+ * }
  * ```
+ *
+ * @see {@link decodeActionResult}
+ * @see {@link useServerAction}
+ * @category codecs
+ * @since 0.1.0
  */
 export const unwrapActionResult = async <R extends Router.Any, const P extends ActionPath<R>>(
   router: R,

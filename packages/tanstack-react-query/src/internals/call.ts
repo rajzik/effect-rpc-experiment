@@ -1,3 +1,11 @@
+/**
+ * Internal: the procedure-calling contract shared by the option builders.
+ *
+ * `createRpcOptionsProxy` implements {@link ProcedureCaller} on top of the Promise client; the
+ * builders only pass the path, input and per-call options (signal, headers).
+ *
+ * @since 0.1.0
+ */
 import type { ProcedureCallOptions } from '@effect-trpc/client';
 
 /**

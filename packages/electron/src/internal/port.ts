@@ -1,3 +1,10 @@
+/**
+ * Port helpers shared by the client and server transports: listening on Web- and
+ * EventEmitter-style ports, best-effort posting, and the ready / close control frames.
+ *
+ * @internal
+ * @since 0.1.0
+ */
 import type { AnyPort, Frame, MessageEventLike, PortLike } from '../types.js';
 
 /**

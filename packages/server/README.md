@@ -21,6 +21,103 @@ defects are encoded into that call's `Exit` and later calls keep working. `Schem
 and `Schema.TaggedError` failures are encoded with their schemas, so clients receive real
 instances (methods, `Date` fields, `instanceof`).
 
+## For AI agents
+
+**Use this package when**
+
+- you implement an `@effect-trpc/core` router (`Handlers.make`) and serve it over HTTP
+  (`toWebHandler`, `layerHttp`, `@effect-trpc/server/node`);
+- you call a router in-process from tests, scripts or SSR (`createCaller`);
+- you add auth / request context with `Middleware`.
+
+Use a sibling instead to define procedures and routers (`@effect-trpc/core`), to call a server
+from another process or the browser (`@effect-trpc/client`), or for React Query hooks
+(`@effect-trpc/tanstack-react-query`).
+
+**Entry points**
+
+| import path                | exports                                                                                                                                                                                                                                                       | source                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `@effect-trpc/server`      | `Handlers` (`make`, `flat`, `of`), `toWebHandler`, `layerHttp` / `toHttpLayer`, `serializationLayer`, `createCaller`, `Middleware`; types `Caller`, `CallerOptions`, `CallOptions`, `PromiseCallOptions`, `WebHandler`, `ServerOptions`, `Serialization`, ... | `src/index.ts` → `src/Handlers.ts`, `src/Http.ts`, `src/Caller.ts`, `src/Middleware.ts` |
+| `@effect-trpc/server/node` | `serve` (Layer), `runServer` (Promise); types `NodeServeOptions`, `RunningServer`                                                                                                                                                                             | `src/node.ts` (needs the optional peer `@effect/platform-node`)                         |
+
+**Golden path**
+
+```ts
+import { Effect, Schema } from 'effect';
+import { query, Router } from '@effect-trpc/core';
+import { createCaller, Handlers, toWebHandler } from '@effect-trpc/server';
+
+class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+  id: Schema.Number,
+}) {}
+
+// 1. Router (usually in a module shared with the client).
+export const appRouter = Router.make({
+  post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
+});
+
+// 2. Handlers: a nested record mirroring the router. Merge middleware layers in with Layer.mergeAll.
+const HandlersLive = Handlers.make(appRouter, {
+  post: {
+    byId: ({ id }) =>
+      id === 1
+        ? Effect.succeed(new Post({ id, title: 'Hello' }))
+        : Effect.fail(new PostNotFound({ id })),
+  },
+});
+
+// 3a. Serve over HTTP (fetch runtimes). `path` must equal the URL path of the route.
+const { handler, dispose } = await toWebHandler(appRouter, {
+  handlers: HandlersLive,
+  path: '/rpc',
+});
+
+// 3b. Or call in-process.
+const caller = createCaller(appRouter, { handlers: HandlersLive });
+const post = await caller.$promise.post.byId({ id: 1 }); // Post instance
+await caller.dispose();
+await dispose();
+```
+
+For a Node process use `runServer` / `serve` from `@effect-trpc/server/node` ([Node server](#node-server--effect-trpcservernode));
+for auth see [Middleware and auth context](#middleware-and-auth-context).
+
+**Invariants**
+
+- Typed errors are `Schema.TaggedError` classes declared on the procedure (or middleware `error`); anything else a handler throws or dies with is a defect.
+- Every HTTP endpoint is `protocol: "http"` (websocket only via `layerHttp({ protocol: 'websocket' })`) with `disableFatalDefects: true`; one defect never breaks later calls.
+- Default serialization is `"ndjson"` (`"json"` for websockets); clients must use the same one.
+- The server layer must provide `Handlers.Requirements<R>`: every handler plus every middleware implementation (`Layer.mergeAll(HandlersLive, AuthLive)`).
+- Promise caller rejections are `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; Effect caller calls fail with exactly `E`.
+- `toWebHandler` / `runServer` build the handler layer eagerly (the promise rejects on failure); `createCaller` builds it on the first call.
+- `$promise`, `$router` and `dispose` are reserved top-level keys on a caller.
+
+**Common mistakes**
+
+- Don't pass only `HandlersLive` when the router uses middleware → pass `Layer.mergeAll(HandlersLive, AuthLive)`.
+- Don't mount `toWebHandler` at `/api/rpc` with the default `path` → set `path: '/api/rpc'` (other paths answer `404`).
+- Don't return an un-annotated record from an `Effect` build → wrap it in `Handlers.of(router, {...})`.
+- Don't throw or `Effect.die` for expected failures → `Effect.fail(new PostNotFound({ id }))` with a declared `Schema.TaggedError`.
+- Don't use Effect v3 APIs (`Context.Tag`, `@effect/rpc`, `@effect/platform`) → `Context.Service`, `effect/rpc`, `effect/http`.
+- Don't import `serve` / `runServer` from `@effect-trpc/server` → import from `@effect-trpc/server/node`.
+- Don't forget `dispose()` on `toWebHandler`, `createCaller` and `runServer` results in tests → use `try/finally` or `await using`.
+- Don't call `RpcServer.layerHttp` directly without `protocol: "http"` and `disableFatalDefects: true` → use `layerHttp` from this package.
+
+**Where to look**
+
+- `test/readme.test.ts` (this README's example), `test/handlers.test.ts` / `test/handlers.test-d.ts` (`Handlers`), `test/web-handler.test.ts` (`toWebHandler`: errors, defects, NDJSON, path, dispose → 503), `test/node.test.ts` (`runServer`, `layerHttp` in an Effect app), `test/caller.test.ts` / `test/caller.test-d.ts` (`createCaller`, abort, dispose), `test/middlewares.test.ts` (ordering, provided services, middleware errors), `test/procedure-errors.test.ts` (typed errors vs defects), `test/streaming.test.ts`, `test/validation.test.ts`, `test/PARITY.md`.
+- JSDoc on every export (`src/*.ts`) follows `docs/jsdoc-style.md`.
+
+**Verify**
+
+```sh
+pnpm exec vp -C packages/server test
+pnpm exec vp -C packages/server pack
+node scripts/verify-jsdoc.mjs server
+```
+
 ## Install
 
 ```bash

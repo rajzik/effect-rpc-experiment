@@ -1,7 +1,21 @@
+/**
+ * The preload-script half of the Electron transport: forwards renderer ports to the main process.
+ *
+ * `installPreloadBridge` runs in the preload's isolated world. It relays the `MessagePort` that
+ * `rendererLink` posts to the page's own window to `MainRpcServer` via `ipcRenderer`. It uses no
+ * Effect and no Node APIs, so it fits a small sandboxed preload bundle.
+ *
+ * @since 0.1.0
+ */
 import { connectMessageType, defaultChannel } from './types.js';
 import type { IpcRendererLike, PortLike, WindowLike, WindowMessageEventLike } from './types.js';
 
-/** Options of {@link installPreloadBridge}. */
+/**
+ * Options of {@link installPreloadBridge}.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface PreloadBridgeOptions<Port = PortLike> {
   /** Electron's `ipcRenderer`. */
   readonly ipcRenderer: IpcRendererLike<Port>;
@@ -11,7 +25,13 @@ export interface PreloadBridgeOptions<Port = PortLike> {
   readonly channel?: string | undefined;
 }
 
-/** The handshake message the renderer posts to its own window (see `rendererLink`). */
+/**
+ * The handshake message the renderer posts to its own window (see `rendererLink`), with exactly
+ * one transferred port.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface ConnectMessage {
   readonly type: typeof connectMessageType;
   readonly channel: string;
@@ -29,6 +49,55 @@ const isConnectMessage = (data: unknown, channel: string): data is ConnectMessag
  * the main process via `ipcRenderer.postMessage(channel, ..., [port])`. Only messages whose
  * `source` is this window (not an iframe) and whose `channel` matches are forwarded.
  * Returns a function that removes the listener.
+ *
+ * **When to use**
+ *
+ * In the preload script of every `BrowserWindow` whose page uses `rendererLink`. It is the only
+ * code from this package that runs there.
+ *
+ * **Details**
+ *
+ * - Forwards a message only when its `type` is `"effect-trpc/connect"`, its `channel` matches
+ *   and it carries exactly one port. Everything else is ignored.
+ * - The listener stays installed until the returned function is called, so every client the
+ *   page creates is forwarded. A page reload re-runs the preload script, which installs a fresh
+ *   bridge.
+ * - Throws synchronously when there is no `window` (pass `window` outside a renderer).
+ *
+ * **Gotchas**
+ *
+ * - No `contextBridge.exposeInMainWorld` is needed: the page never sees `ipcRenderer`; it only
+ *   posts a port to its own window. Keep `contextIsolation: true`.
+ * - With `sandbox: true` the preload cannot `require` npm packages: bundle it. Import only
+ *   `@effect-trpc/electron/preload` there, never `/main` or the root entry.
+ * - Any script in the page (not iframes) can hand a port to the bridge. Authorize in the main
+ *   process (`authorize`, handlers, middleware), not here.
+ *
+ * **Example** (The whole preload script)
+ *
+ * ```ts
+ * // preload.ts (preload script, isolated world; bundled when `sandbox: true`)
+ * import { ipcRenderer } from 'electron';
+ * import { installPreloadBridge } from '@effect-trpc/electron/preload';
+ *
+ * installPreloadBridge({ ipcRenderer });
+ * ```
+ *
+ * **Example** (Two independent servers on custom channels)
+ *
+ * ```ts
+ * // preload.ts (preload script): one bridge per channel; the main process runs one
+ * // `MainRpcServer` per channel and the renderer passes the same `channel` to `rendererLink`.
+ * import { ipcRenderer } from 'electron';
+ * import { installPreloadBridge } from '@effect-trpc/electron/preload';
+ *
+ * installPreloadBridge({ ipcRenderer, channel: 'app-rpc' });
+ * installPreloadBridge({ ipcRenderer, channel: 'admin-rpc' });
+ * ```
+ *
+ * @see {@link ConnectMessage}
+ * @category adapters
+ * @since 0.1.0
  */
 export const installPreloadBridge = <Port = PortLike>(
   options: PreloadBridgeOptions<Port>,

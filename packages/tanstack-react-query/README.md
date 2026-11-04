@@ -22,6 +22,166 @@ you use the normal TanStack hooks (`useQuery`, `useMutation`, `useInfiniteQuery`
 pnpm add @effect-trpc/tanstack-react-query @effect-trpc/client @effect-trpc/core effect @tanstack/react-query react
 ```
 
+## For AI agents
+
+**Use this package when**
+
+- A React app calls an effect-trpc router through TanStack Query (`useQuery`, `useMutation`,
+  `useInfiniteQuery`, `useSuspenseQuery`, ...) and you want typed `data`, typed `error` and typed
+  query keys.
+- You prefetch on the server and hydrate on the client while keeping `Schema.Class` instances and
+  `Schema.TaggedError`s.
+- You consume subscription procedures in React (`useSubscription`).
+
+Use a sibling package instead when:
+
+- Next.js App Router: [`@effect-trpc/next`](../next/README.md) (route handler, RSC prefetch +
+  `HydrationBoundary`, server actions). It builds on this package.
+- TanStack Start: [`@effect-trpc/start`](../start/README.md) (server route, isomorphic client,
+  loader helpers). It builds on this package.
+- No TanStack Query (scripts, servers, other UI libraries): the plain Promise / Effect client of
+  [`@effect-trpc/client`](../client/README.md).
+
+**Entry points**
+
+The package has a single entry, `@effect-trpc/tanstack-react-query`.
+
+| Import path                         | Exports                                                                                       | Source                                                                         |
+| ----------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `@effect-trpc/tanstack-react-query` | `createRpcContext` (`RpcProvider`, `useRpc`, `useRpcClient`)                                  | `src/Context.tsx`                                                              |
+| `@effect-trpc/tanstack-react-query` | `createRpcOptionsProxy`, `RpcOptionsProxy`, `Decorate*`, `inferProxyInput/Output/Error`       | `src/createOptionsProxy.ts`                                                    |
+| `@effect-trpc/tanstack-react-query` | `RpcQueryOptions`, `RpcInfiniteQueryOptions`, `RpcMutationOptions`, `MutationOptionsOverride` | `src/queryOptions.ts`, `src/infiniteQueryOptions.ts`, `src/mutationOptions.ts` |
+| `@effect-trpc/tanstack-react-query` | `useSubscription`, `RpcSubscriptionOptions`, `RpcSubscriptionResult`                          | `src/useSubscription.ts`, `src/subscriptionOptions.ts`                         |
+| `@effect-trpc/tanstack-react-query` | `createHydrationHelpers`, `dehydrate`, `hydrate`                                              | `src/Hydration.tsx`                                                            |
+| `@effect-trpc/tanstack-react-query` | `getQueryKey`, `getMutationKey`, `readQueryKey`, `QueryKeys`, key and flag types, `skipToken` | `src/internals/keys.ts`, `src/internals/types.ts`                              |
+
+**Golden path**
+
+1. Define the router with `@effect-trpc/core` ([section 1](#1-define-the-router)).
+2. Call `createRpcContext<AppRouter>()` once at module scope, and render `RpcProvider` inside
+   `QueryClientProvider` with the same `QueryClient` ([section 2](#2-set-up-the-context-provider)).
+3. In components: `const rpc = useRpc()`, then `useQuery(rpc.x.queryOptions(input))` /
+   `useMutation(rpc.x.mutationOptions(opts))`. Narrow `error` by `_tag`
+   ([sections 3–4](#3-queries-with-errors-narrowed-by-_tag)).
+4. Invalidate with `queryClient.invalidateQueries(rpc.x.pathFilter())` or `rpc.x.queryFilter(input)`.
+5. SSR: `createHydrationHelpers(appRouter)` → `dehydrate` on the server and `HydrationBoundary` on
+   the client ([section 7](#7-ssr-hydration-with-class-instances)).
+
+```tsx
+import { createClient, httpLink } from '@effect-trpc/client';
+import { query, Router } from '@effect-trpc/core';
+import { createRpcContext } from '@effect-trpc/tanstack-react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { Schema } from 'effect';
+import { useState, type ReactNode } from 'react';
+
+class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+  id: Schema.Number,
+}) {}
+const appRouter = Router.make({
+  post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
+});
+
+const { RpcProvider, useRpc } = createRpcContext<typeof appRouter>();
+
+export function App({ children }: { children: ReactNode }) {
+  const [queryClient] = useState(() => new QueryClient());
+  const [client] = useState(() =>
+    createClient(appRouter, { link: httpLink({ url: 'http://localhost:3000/rpc' }) }),
+  );
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RpcProvider client={client} queryClient={queryClient}>
+        {children}
+      </RpcProvider>
+    </QueryClientProvider>
+  );
+}
+
+export function PostTitle({ id }: { id: number }) {
+  const rpc = useRpc();
+  const post = useQuery(rpc.post.byId.queryOptions({ id }));
+  if (post.error?._tag === 'PostNotFound') return <p>No post #{post.error.id}</p>;
+  if (post.error) return <p>{post.error.message}</p>; // RpcDefect | RpcTransportError | RpcInterrupted
+  return <h1>{post.data?.title ?? 'Loading…'}</h1>;
+}
+```
+
+**Invariants**
+
+- `error` is `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted` (from
+  `@effect-trpc/core`); the infrastructure tags are `@effect-trpc/RpcDefect`,
+  `@effect-trpc/RpcTransportError` and `@effect-trpc/RpcInterrupted`.
+- `data` is the decoded output: `Schema.Class` values are real instances, `Schema.Date` fields are
+  `Date`.
+- Query keys are `[path, { input?, type: 'query' | 'infinite' }]` with `path` a string array
+  (`[['post', 'byId'], { input: { id: 1 }, type: 'query' }]`); path keys are `[path]`; the root
+  key is `[]`.
+- Mutation keys are `[path]`. With a key prefix, every key starts with `[prefix]`.
+- Infinite keys drop `cursor` (and `direction`) from the input; `infiniteQueryOptions` exists only
+  for inputs with a `cursor` key.
+- `keyPrefix` is required exactly when the context / proxy has `{ keyPrefix: true }` feature
+  flags.
+- Queries forward TanStack's `AbortSignal`: cancelling a query interrupts the server handler.
+  Mutations get no signal.
+- SSR state for router queries must go through this package's `dehydrate` / `hydrate` /
+  `HydrationBoundary`, bound to the same router on both sides, to keep class instances.
+- Calling a helper of the wrong kind (`queryOptions` on a mutation) throws at call time.
+
+**Common mistakes**
+
+- Don't write tRPC-v10 hooks (`rpc.post.byId.useQuery(...)`). Use
+  `useQuery(rpc.post.byId.queryOptions(...))` with the TanStack hook.
+- Don't check `error instanceof TRPCClientError` or `error.data?.code`. Switch on `error._tag`.
+- Don't use TanStack's `dehydrate` / `HydrationBoundary` for router queries (instances become
+  plain objects and ISO strings). Use `createHydrationHelpers(appRouter)`.
+- Don't pass `trpcClient=`. `RpcProvider` takes `client=` and `queryClient=`, and you must render
+  `QueryClientProvider` yourself.
+- Don't disable a query with a placeholder input and `enabled: false`. Pass `skipToken` as the
+  input.
+- Don't hand-write keys like `['post.byId', id]`. Use `rpc.post.byId.queryKey(input)`,
+  `queryFilter(input)` or `pathFilter()`.
+- Don't share one `QueryClient` between routers without prefixes. Use
+  `createRpcContext<R, { keyPrefix: true }>()` and `keyPrefix="..."`.
+- Don't retry every error. Retry only `RpcTransportError`; typed errors and defects do not change
+  on retry.
+- Don't send `trpc: { context }` per request. Use `rpc: { headers }`.
+- Don't pass `overrides` to `RpcProvider`. Use `createRpcOptionsProxy({ client, queryClient,
+overrides })`.
+- Don't expect `tracked()`, `lastEventId` or automatic reconnects for subscriptions. Call
+  `sub.reset()` to retry.
+
+**Where to look**
+
+| Behaviour                                               | Test                                                     |
+| ------------------------------------------------------- | -------------------------------------------------------- |
+| Every README example, end to end                        | `test/readme.test.tsx`                                   |
+| `queryOptions`, `select`, `initialData`, headers, abort | `test/queryOptions.test.tsx`                             |
+| Typed errors and defects as class instances             | `test/procedureErrors.test.tsx`, `test/types.test-d.tsx` |
+| Keys, filters, invalidation by path, wrong-kind errors  | `test/queryKeyable.test.tsx`, `test/utils.test.ts`       |
+| Mutations, mutation defaults, `overrides`               | `test/mutationOptions.test.tsx`                          |
+| Infinite queries                                        | `test/infiniteQueryOptions.test.tsx`                     |
+| `skipToken`                                             | `test/skipToken.test.tsx`                                |
+| Subscriptions                                           | `test/useSubscription.test.tsx`                          |
+| SSR hydration                                           | `test/hydration.test.tsx`                                |
+| Key prefixes with several routers                       | `test/multipleRpcProviders.test.tsx`                     |
+| Provider, `useRpcClient`, proxy memoization             | `test/client.test.tsx`                                   |
+| Real HTTP transport                                     | `test/http.test.tsx`                                     |
+| Components against an abstract router                   | `test/polymorphism.test.tsx`                             |
+| tRPC test parity                                        | `test/PARITY.md`                                         |
+
+The JSDoc on every export follows [`docs/jsdoc-style.md`](../../docs/jsdoc-style.md) and carries
+type-checked examples.
+
+**Verify**
+
+```sh
+pnpm exec vp -C packages/tanstack-react-query test
+pnpm exec vp -C packages/tanstack-react-query pack
+node scripts/verify-jsdoc.mjs tanstack-react-query
+```
+
 ## 1. Define the router
 
 ```ts
@@ -211,8 +371,9 @@ onData, signal })` returns an unsubscribe function.
 
 TanStack's `dehydrate` would put `Post` instances and `TaggedError`s into the payload as-is. They
 would not survive JSON. `createHydrationHelpers(router)` encodes the router's queries with
-`Codecs.success` (each page for infinite queries) and encodes their errors with `Codecs.exit`.
-On the client it decodes them back to instances. Queries with other keys pass through unchanged.
+`Codecs.success` (each page for infinite queries). It encodes typed errors with `Codecs.exit`, and
+`RpcDefect` / `RpcTransportError` / `RpcInterrupted` with their own schemas. On the client it
+decodes them back to instances. Queries with other keys pass through unchanged.
 
 ```tsx
 import { createHydrationHelpers, createRpcOptionsProxy } from '@effect-trpc/tanstack-react-query';

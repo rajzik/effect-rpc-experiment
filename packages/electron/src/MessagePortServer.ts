@@ -1,3 +1,13 @@
+/**
+ * A generic `effect/rpc` server transport over message ports, with no Electron dependency.
+ *
+ * `MessagePortServer` implements `RpcServer.Protocol` for Electron `MessagePortMain`, DOM
+ * `MessagePort` and Node `worker_threads` ports: every attached port is one rpc client.
+ * `MainRpcServer` builds on it for renderers; use it directly for utility processes, worker
+ * threads or a custom handshake. The client side is `messagePortLink`.
+ *
+ * @since 0.1.0
+ */
 import { Effect, Layer, Option, Queue, Schema, Scope } from 'effect';
 import { RpcMessage, RpcSerialization, RpcServer } from 'effect/rpc';
 import type { Rpc, RpcGroup } from 'effect/rpc';
@@ -6,7 +16,12 @@ import type { Handlers } from '@effect-trpc/server';
 import { closePort, listen, post, readyFrame } from './internal/port.js';
 import type { AnyPort } from './types.js';
 
-/** Options of {@link MessagePortServer.make}. */
+/**
+ * Options of {@link MessagePortServer.make}.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface MessagePortServerOptions {
   /**
    * Encodes every protocol message to one frame (a string, or bytes for binary formats).
@@ -15,7 +30,12 @@ export interface MessagePortServerOptions {
   readonly serialization?: RpcSerialization.RpcSerialization['Service'] | undefined;
 }
 
-/** Options of {@link MessagePortServer.attach}. */
+/**
+ * Options of `MessagePortServer.attach`.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface AttachOptions {
   /**
    * Trusted headers added to every request of this connection. They replace any header of the
@@ -25,7 +45,17 @@ export interface AttachOptions {
   readonly headers?: Readonly<Record<string, string | undefined>> | undefined;
 }
 
-/** An `RpcServer.Protocol` over message ports: every attached port is one rpc client. */
+/**
+ * An `RpcServer.Protocol` over message ports: every attached port is one rpc client.
+ *
+ * **Details**
+ *
+ * - Created by {@link MessagePortServer.make} (bare protocol, you run `RpcServer` yourself) or
+ *   {@link MessagePortServer.serve} (protocol plus a running `RpcServer` for a router).
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface MessagePortServer {
   /** The `effect/rpc` server protocol; provide it to `RpcServer.make` / `RpcServer.layer`. */
   readonly protocol: RpcServer.Protocol['Service'];
@@ -37,7 +67,12 @@ export interface MessagePortServer {
   readonly attach: (port: AnyPort, options?: AttachOptions) => Effect.Effect<number>;
 }
 
-/** Options of {@link MessagePortServer.serve}. */
+/**
+ * Options of {@link MessagePortServer.serve}, also accepted by `MainRpcServer`.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface ServeOptions<LOut, LE, LR> extends MessagePortServerOptions {
   /**
    * The handler layer (e.g. `Handlers.make(router, {...})`) merged with the server
@@ -91,8 +126,46 @@ const withTrustedHeaders = (
 /**
  * Creates a {@link MessagePortServer}: an `RpcServer.Protocol` whose clients are message ports
  * (Electron `MessagePortMain`, DOM `MessagePort`, Node `worker_threads` `MessagePort`). Frames
- * are strings produced by the serialization (JSON by default). The ports are closed when the
- * scope closes.
+ * are produced by the serialization (JSON strings by default, bytes for binary formats). The
+ * ports are closed when the scope closes.
+ *
+ * **When to use**
+ *
+ * Use when you need full control over the `RpcServer` (your own `RpcGroup`, options or layer
+ * wiring). Prefer {@link serve} to serve an effect-trpc router.
+ *
+ * **Details**
+ *
+ * - `attach(port)` sends a ready frame (the client's connection acknowledgement) and returns the
+ *   new client id.
+ * - Malformed frames are answered with a defect frame; the connection keeps serving.
+ *
+ * **Example** (Running an `RpcServer` over the bare protocol)
+ *
+ * ```ts
+ * // any Node or Electron main process
+ * import { Effect, Schema } from 'effect';
+ * import { RpcServer } from 'effect/rpc';
+ * import { query, Router } from '@effect-trpc/core';
+ * import { Handlers } from '@effect-trpc/server';
+ * import { MessagePortServer } from '@effect-trpc/electron/main';
+ *
+ * const appRouter = Router.make({ ping: query({ success: Schema.String }) });
+ * const HandlersLive = Handlers.make(appRouter, { ping: () => Effect.succeed('pong') });
+ *
+ * const program = Effect.gen(function* () {
+ *   const server = yield* MessagePortServer.make();
+ *   yield* RpcServer.make(appRouter.group, { disableFatalDefects: true }).pipe(
+ *     Effect.provideService(RpcServer.Protocol, server.protocol),
+ *     Effect.provide(HandlersLive),
+ *     Effect.forkScoped,
+ *   );
+ *   return server; // call `server.attach(port)` for every connection
+ * });
+ * ```
+ *
+ * @see {@link serve}
+ * @since 0.1.0
  */
 const make = (
   options: MessagePortServerOptions = {},
@@ -225,6 +298,59 @@ const make = (
  * Runs an rpc server for `router` over a {@link MessagePortServer} in the current scope and
  * returns it; call `attach(port)` for every connection. Handler defects fail only their call
  * (`disableFatalDefects: true`).
+ *
+ * **When to use**
+ *
+ * Use to serve a router to a peer that is not a renderer with the preload bridge: a Node
+ * worker thread, an Electron utility process, or a renderer reached through your own
+ * handshake. Prefer `MainRpcServer` for renderers.
+ *
+ * **Details**
+ *
+ * - `handlers` is built once in the current scope. Services it does not provide stay
+ *   requirements of the returned effect.
+ * - `attach(port, { headers })` adds trusted headers to every request of that connection; they
+ *   replace client headers of the same name (case-insensitive).
+ * - When a port closes (or the peer sends its close frame) its client is disconnected and its
+ *   in-flight handlers and streams are interrupted. Closing the scope closes every port, so
+ *   pending client calls reject with `RpcTransportError`.
+ *
+ * **Gotchas**
+ *
+ * - The client must use the same `serialization` (default `RpcSerialization.json`).
+ *
+ * **Example** (Serving a router to a Node worker thread)
+ *
+ * ```ts
+ * // main.ts (Electron main process or any Node process)
+ * import { MessageChannel, Worker } from 'node:worker_threads';
+ * import { Effect, Schema } from 'effect';
+ * import { query, Router } from '@effect-trpc/core';
+ * import { Handlers } from '@effect-trpc/server';
+ * import { MessagePortServer } from '@effect-trpc/electron/main';
+ *
+ * const appRouter = Router.make({ ping: query({ success: Schema.String }) });
+ * const HandlersLive = Handlers.make(appRouter, { ping: () => Effect.succeed('pong') });
+ *
+ * const program = Effect.gen(function* () {
+ *   const server = yield* MessagePortServer.serve(appRouter, { handlers: HandlersLive });
+ *   const { port1, port2 } = new MessageChannel();
+ *   // Trusted headers: the worker cannot override them.
+ *   yield* server.attach(port2, { headers: { 'x-caller': 'worker' } });
+ *   // The worker calls the router with `messagePortLink(workerData.port)`.
+ *   const worker = new Worker(new URL('./worker.js', import.meta.url), {
+ *     workerData: { port: port1 },
+ *     transferList: [port1],
+ *   });
+ *   yield* Effect.addFinalizer(() => Effect.promise(() => worker.terminate()));
+ *   return yield* Effect.never;
+ * });
+ *
+ * Effect.runFork(Effect.scoped(program));
+ * ```
+ *
+ * @see {@link make}
+ * @since 0.1.0
  */
 const serve = <R extends Router.Any, LOut = never, LE = never, LR = never>(
   router: R,
@@ -257,7 +383,52 @@ const serve = <R extends Router.Any, LOut = never, LE = never, LR = never>(
     Scope.Scope | LR | Exclude<Handlers.Requirements<R>, LOut>
   >;
 
-/** A generic `effect/rpc` server transport over message ports. */
+/**
+ * A generic `effect/rpc` server transport over message ports.
+ *
+ * **When to use**
+ *
+ * Use for message-port peers other than preload-bridged renderers (worker threads, utility
+ * processes, custom handshakes). Members: `serve` (router + handlers, returns `{ protocol,
+ * attach }`) and `make` (bare protocol). For renderers use `MainRpcServer`, which wraps `serve`.
+ *
+ * **Details**
+ *
+ * - Accepts Web-style (`PortLike`) and EventEmitter-style (`PortMainLike`) ports.
+ * - Each side posts a close frame before closing its port, so the peer notices even where the
+ *   platform emits no `close` event.
+ *
+ * **Example** (Serving a router and attaching one port)
+ *
+ * ```ts
+ * // any Node or Electron main process
+ * import { MessageChannel } from 'node:worker_threads';
+ * import { Effect, Schema } from 'effect';
+ * import { query, Router } from '@effect-trpc/core';
+ * import { createClient } from '@effect-trpc/client';
+ * import { Handlers } from '@effect-trpc/server';
+ * import { messagePortLink, MessagePortServer } from '@effect-trpc/electron';
+ *
+ * const appRouter = Router.make({ ping: query({ success: Schema.String }) });
+ * const HandlersLive = Handlers.make(appRouter, { ping: () => Effect.succeed('pong') });
+ *
+ * const program = Effect.gen(function* () {
+ *   const server = yield* MessagePortServer.serve(appRouter, { handlers: HandlersLive });
+ *   const { port1, port2 } = new MessageChannel();
+ *   yield* server.attach(port2);
+ *   const client = createClient(appRouter, { link: messagePortLink(port1) });
+ *   const pong = yield* Effect.promise(() => client.ping());
+ *   yield* Effect.promise(() => client.dispose());
+ *   return pong;
+ * });
+ *
+ * const pong = await Effect.runPromise(Effect.scoped(program));
+ * ```
+ *
+ * @see {@link MessagePortServer.serve}
+ * @category adapters
+ * @since 0.1.0
+ */
 export const MessagePortServer = {
   make,
   serve,

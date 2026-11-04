@@ -1,5 +1,14 @@
-// Public API of @effect-trpc/tanstack-react-query: a port of @trpc/tanstack-react-query for
-// effect-trpc routers.
+/**
+ * TanStack React Query integration for effect-trpc routers: a port of `@trpc/tanstack-react-query`.
+ *
+ * `createRpcContext` / `createRpcOptionsProxy` give a typed options proxy that mirrors the router
+ * and produces plain TanStack options (`useQuery(rpc.post.byId.queryOptions({ id }))`), with
+ * `error` typed as `ClientError<E>` from `@effect-trpc/core`. `useSubscription` consumes
+ * subscription procedures, and `createHydrationHelpers` provides schema-aware SSR hydration. Calls
+ * go through the Promise client of `@effect-trpc/client`.
+ *
+ * @since 0.1.0
+ */
 export { skipToken } from '@tanstack/react-query';
 export type { SkipToken } from '@tanstack/react-query';
 export { createRpcContext } from './Context.js';

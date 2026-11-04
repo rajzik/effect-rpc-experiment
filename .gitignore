@@ -12,3 +12,4 @@ graft/
 .output/
 .tanstack/
 dist-types/
+.jsdoc-examples/
