@@ -4,16 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "vp check",
-    "lint": "vp lint",
+    "check": "effect-tsgo vp check",
+    "lint": "effect-tsgo vp lint",
     "fmt": "vp fmt",
     "test": "vp run -r test",
     "build": "vp run -r build",
-    "ready": "vp check && vp run typecheck && vp run -r test && vp run -r build && node scripts/verify-jsdoc.mjs",
+    "ready": "effect-tsgo vp check && vp run typecheck && vp run -r test && vp run -r build && node scripts/verify-jsdoc.mjs",
     "docs:check": "node scripts/verify-jsdoc.mjs"
   },
   "devDependencies": {
     "@effect/language-service": "catalog:",
+    "@effect/tsgo": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",

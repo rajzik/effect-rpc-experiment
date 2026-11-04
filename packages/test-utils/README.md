@@ -207,7 +207,7 @@ describe('appRouter', () => {
 - **`withTestServer(router, options, async (ctx) => ...)`** — runs the callback against a fresh
   harness and always disposes it, returning the callback's result.
 - **`testWebHandler(router, { handlers, serialization?, path?, headers?, middleware? })`** → `{ handler, fetch, url,
-client, dispose }`: a `toWebHandler` fetch handler plus a Promise client whose `fetch` calls it
+  client, dispose }`: a `toWebHandler` fetch handler plus a Promise client whose `fetch` calls it
   directly — the full HTTP wire format without opening a port (how Next.js / TanStack Start
   adapters are exercised).
 - **`testCaller(router, handlers)`** — `createCaller(router, { handlers })`; disposable.

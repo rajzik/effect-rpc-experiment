@@ -17,7 +17,7 @@ if (!existsSync(resolve(pkgDir, 'package.json'))) {
   process.stdout.write(`no such package: ${name}\n`);
   process.exit(2);
 }
-step('vp check (repo)', bin('vp'), ['check']);
+step('vp check (repo)', bin('effect-tsgo'), ['vp', 'check']);
 step(`tsgo build (repo)`, bin('vp'), ['run', 'typecheck']);
 const testOut = step(`vitest ${name}`, bin('vp'), ['-C', `packages/${name}`, 'test']);
 const m = /Tests\s+(\d+) passed/.exec(testOut);

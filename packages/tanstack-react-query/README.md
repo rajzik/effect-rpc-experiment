@@ -148,7 +148,7 @@ export function PostTitle({ id }: { id: number }) {
   on retry.
 - Don't send `trpc: { context }` per request. Use `rpc: { headers }`.
 - Don't pass `overrides` to `RpcProvider`. Use `createRpcOptionsProxy({ client, queryClient,
-overrides })`.
+  overrides })`.
 - Don't expect `tracked()`, `lastEventId` or automatic reconnects for subscriptions. Call
   `sub.reset()` to retry.
 

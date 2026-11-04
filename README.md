@@ -48,7 +48,7 @@ framework adapter for your app.
 - Servers built on `RpcServer.layerHttp` use `protocol: "http"` and `disableFatalDefects: true`;
   client URLs are absolute.
 
-**Before you hand work back:** `pnpm exec vp check`, `pnpm exec vp run typecheck`,
+**Before you hand work back:** `pnpm check`, `pnpm exec vp run typecheck`,
 `pnpm exec vp -C packages/<name> test`, `pnpm exec vp run -r build`, `pnpm docs:check`. New or
 changed exports follow [`docs/jsdoc-style.md`](docs/jsdoc-style.md).
 
@@ -68,13 +68,15 @@ changed exports follow [`docs/jsdoc-style.md`](docs/jsdoc-style.md).
 ## Toolchain
 
 This repository uses [Vite+](https://viteplus.dev) (`vp`) as the single toolchain entry point,
-TypeScript 7 (`tsgo`) for type-checking, Oxlint (type-aware via tsgolint) for linting and Oxfmt for
-formatting. Package manager: pnpm (see `packageManager` in `package.json`); Node ≥ 22.18.
+TypeScript 7 (`tsgo`) for type-checking, Oxlint (type-aware via tsgolint, plus the Effect rules of
+[`@effect/tsgo`](https://github.com/Effect-TS/tsgo)) for linting and Oxfmt for formatting. `pnpm check`
+runs `effect-tsgo vp check`, which loads the Effect-patched Oxlint binding; plain `vp check` cannot
+load the `effecttsgo` plugin. Package manager: pnpm (see `packageManager` in `package.json`); Node ≥ 22.18.
 
 ```bash
 pnpm install                 # install (honours pnpm-workspace.yaml catalog + overrides)
-pnpm exec vp check           # format + lint + type-check (Oxfmt, Oxlint, tsgolint)
-pnpm exec vp check --fix     # fix formatting and autofixable lint
+pnpm check                   # format + lint + type-check (Oxfmt, Oxlint + Effect rules, tsgolint)
+pnpm check --fix             # fix formatting and autofixable lint
 pnpm exec vp run typecheck   # tsgo --build across all packages (project references)
 pnpm exec vp run -r test     # Vitest 5 in every package (runtime + type tests)
 pnpm exec vp -C packages/core test   # one package

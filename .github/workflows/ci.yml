@@ -36,8 +36,8 @@ jobs:
       - name: Build
         run: pnpm exec vp run -r build
 
-      - name: Format, lint, type-aware lint
-        run: pnpm exec vp check
+      - name: Format, lint (incl. Effect rules), type-aware lint
+        run: pnpm run check # effect-tsgo vp check: Oxlint with the Effect rules
 
       - name: Typecheck (tsgo --build)
         run: pnpm exec vp run typecheck

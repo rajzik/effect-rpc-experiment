@@ -11,7 +11,7 @@ Always run commands through the project-local Vite+ CLI from the repository root
 
 | Task                                                | Command                                          |
 | --------------------------------------------------- | ------------------------------------------------ |
-| format + lint + type-check                          | `vp check` (`--fix` to autofix)                  |
+| format + lint (incl. Effect rules) + type-check     | `pnpm check` (`pnpm check --fix` to autofix)     |
 | type-check only (TypeScript 7 / tsgo project build) | `vp run typecheck`                               |
 | test one package (runtime + type tests)             | `vp -C packages/<name> test`                     |
 | test everything                                     | `vp run -r test`                                 |
@@ -21,6 +21,13 @@ Always run commands through the project-local Vite+ CLI from the repository root
 `vp test` is a built-in (Vitest 5). Import test APIs from `vite-plus/test` (or `@effect/vitest` for
 `it.effect`). React tests need `// @vitest-environment jsdom` at the top of the file. Type tests
 live in `test/**/*.test-d.ts(x)` and run as part of `vp test`.
+
+Lint runs Oxlint with the Effect rules (`effecttsgo/*`, recommended preset of
+[`@effect/tsgo`](https://github.com/Effect-TS/tsgo)). Those rules need the Effect-patched Oxlint
+binding, so always lint through the wrapper: `pnpm check` / `pnpm lint` (= `effect-tsgo vp check` /
+`effect-tsgo vp lint`). Plain `vp check` / `vp lint` fail with `Unknown plugin: 'effecttsgo'`.
+Keep `vite-plus` on a release whose bundled `oxlint` / `oxlint-tsgolint` versions `@effect/tsgo`
+supports (see its README) and bump both together.
 
 Lint and format configuration live ONLY in the root `vite.config.ts`. Package `vite.config.ts`
 files configure `pack` and `test`. Do not add `.oxlintrc.json`, `vitest.config.ts` or
@@ -61,7 +68,7 @@ When unsure, grep `node_modules/effect/dist/**/*.d.ts` — do not trust memory o
 
 ## Review checklist
 
-- [ ] `vp check` passes (format, lint, type-check)
+- [ ] `pnpm check` passes (format, lint incl. Effect rules, type-check)
 - [ ] `vp run typecheck` passes
 - [ ] `vp -C packages/<name> test` passes with no type errors
 - [ ] `vp -C packages/<name> pack` builds

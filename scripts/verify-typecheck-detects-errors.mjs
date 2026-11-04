@@ -7,7 +7,7 @@ const file = resolve(repoRoot, 'packages/core/src/__negative_control__.ts');
 mkdirSync(resolve(repoRoot, 'packages/core/src'), { recursive: true });
 writeFileSync(file, 'export const shouldFail: number = "not a number";\n');
 try {
-  const { code, out } = run(bin('vp'), ['check', '--no-fmt']);
+  const { code, out } = run(bin('effect-tsgo'), ['vp', 'check', '--no-fmt']);
   if (code === 0) {
     process.stdout.write('\n[FAIL] vp check passed despite a type error\n');
     process.exit(1);

@@ -49,11 +49,11 @@ that read the cache, and server actions that keep typed errors.
 4. `trpc/client.tsx` — `'use client'`, `createNextRpcClient(appRouter)` (§4); render `RpcProvider`
    in `app/layout.tsx`.
 5. `trpc/server.tsx` — `import 'server-only'`, `createRscHelpers(appRouter, { handlers, headers },
-{ HydrationBoundary })` with the boundary from step 4 (§5).
+   { HydrationBoundary })` with the boundary from step 4 (§5).
 6. `app/page.tsx` — `prefetch(rpc.x.queryOptions(…))` inside `<HydrateClient>`; client components
    read it with `useSuspenseQuery(useRpc().x.queryOptions(…))` (§6).
 7. Optional: `app/actions.ts` (`'use server'`, `createServerActionCaller`, one `export async
-function` per action) and a client component with `useServerAction` (§7).
+   function` per action) and a client component with `useServerAction` (§7).
 
 **Invariants**
 

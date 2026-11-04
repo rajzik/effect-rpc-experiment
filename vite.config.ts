@@ -1,3 +1,4 @@
+import { recommended as effectRecommended } from '@effect/tsgo/oxlint-presets';
 import { defineConfig } from 'vite-plus';
 
 // Root Vite+ config: shared lint (Oxlint + tsgolint type-check), format (Oxfmt),
@@ -5,6 +6,9 @@ import { defineConfig } from 'vite-plus';
 // Vitest configuration; lint/fmt are root-only by design (see docs/guide/monorepo).
 export default defineConfig({
   lint: {
+    // Effect rules (`effecttsgo/*`) from @effect/tsgo. They need the Effect-patched Oxlint binding:
+    // run lint through `effect-tsgo vp …` (the `check` / `lint` package scripts do).
+    extends: [effectRecommended],
     plugins: ['typescript', 'import', 'promise', 'unicorn', 'oxc'],
     categories: {
       correctness: 'error',
@@ -34,6 +38,12 @@ export default defineConfig({
       'typescript/no-namespace': 'off',
       'typescript/no-explicit-any': 'off',
       'import/no-cycle': 'error',
+      // effect-trpc is built on `effect/rpc`, which Effect marks unstable: every import would warn.
+      'effecttsgo/unstable-api-usage': 'off',
+      // Proxy/adapter internals erase rpc types on purpose and restore them at the public API, the
+      // same trade-off as `typescript/no-unsafe-type-assertion` (a warning here too).
+      'effecttsgo/any-unknown-in-error-context': 'warn',
+      'effecttsgo/unsafe-effect-type-assertion': 'warn',
     },
     overrides: [
       {
@@ -49,12 +59,24 @@ export default defineConfig({
         env: { node: true },
       },
       {
-        files: ['**/*.test.ts', '**/*.test.tsx', '**/*.test-d.ts', '**/test/**'],
+        files: ['**/*.test.ts', '**/*.test.tsx', '**/*.test-d.ts', '**/*.test-d.tsx', '**/test/**'],
         plugins: ['vitest'],
         rules: {
           'no-console': 'off',
           'vitest/no-disabled-tests': 'error',
+          // Tests build ad-hoc layers and effects with unknown channels on purpose.
+          'effecttsgo/any-unknown-in-error-context': 'off',
+          'effecttsgo/unsafe-effect-type-assertion': 'off',
           'vitest/no-focused-tests': 'error',
+        },
+      },
+      {
+        // Type tests write effects only to check their types; they are never run.
+        files: ['**/*.test-d.ts', '**/*.test-d.tsx'],
+        // Type tests also feed deliberately wrong values to `@ts-expect-error` lines.
+        rules: {
+          'effecttsgo/floating-effect': 'off',
+          'effecttsgo/missing-layer-context': 'off',
         },
       },
     ],
