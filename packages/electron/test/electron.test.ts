@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vite-plus/test';
 import type { MessagePort } from 'node:worker_threads';
 import { createClient, RpcDefect, RpcInterrupted, RpcTransportError } from '@effect-trpc/client';
 import { MainRpcServer, rendererLink } from '../src/index.js';
-import { FakeWindow, MessageChannel, openPorts, tick } from './fakes.js';
+import { FakeWindow, makeIpcRenderer, MessageChannel, openPorts, tick } from './fakes.js';
 import { appRouter, createdAt, NotFound, User } from './fixtures.js';
 import { drain, rejectionOf, within } from './helpers.js';
 import { startApp, type App } from './setup.js';
@@ -166,5 +166,27 @@ describe('renderer link → preload bridge → main-process server', () => {
     // ports on another channel are ignored by the main process
     expect(app.ipcMain.listenerCount('effect-trpc')).toBe(0);
     expect(app.ipcMain.listenerCount('app-rpc')).toBe(1);
+
+    // The main process closes every port it rejects; the renderer side sees `close`.
+    const closedOnRendererSide = (port: MessagePort): Promise<void> =>
+      new Promise((resolve) => port.once('close', () => resolve()));
+    const send = (url: string, transfer: Array<MessagePort>): void => {
+      makeIpcRenderer(app!.ipcMain, 9, url).postMessage('app-rpc', null, transfer);
+    };
+    // Unauthorized origin.
+    const evil = new MessageChannel();
+    const evilClosed = closedOnRendererSide(evil.port1);
+    send('https://evil.example/', [evil.port2]);
+    // Malformed: two ports from an authorized origin.
+    const a = new MessageChannel();
+    const b = new MessageChannel();
+    const malformedClosed = Promise.all([
+      closedOnRendererSide(a.port1),
+      closedOnRendererSide(b.port1),
+    ]);
+    send('app://index.html', [a.port2, b.port2]);
+    await within(Promise.all([evilClosed, malformedClosed]));
+    // The authorized connection is unaffected.
+    await expect(client.whoami()).resolves.toBe(7);
   });
 });

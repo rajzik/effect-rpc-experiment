@@ -14,12 +14,17 @@ import { createClient, httpLink } from '@effect-trpc/client';
 import type { Client, HeadersOption, SerializationOption } from '@effect-trpc/client';
 import type { Router } from '@effect-trpc/core';
 import { createHydrationHelpers, createRpcContext } from '@effect-trpc/tanstack-react-query';
-import type { RpcHydrationBoundaryProps, RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import type {
+  FeatureFlags,
+  RpcHydrationBoundaryProps,
+  RpcOptionsProxy,
+} from '@effect-trpc/tanstack-react-query';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import type { Layer } from 'effect';
 import * as React from 'react';
 import { makeQueryClient } from './queryClient.js';
+import type { PrefixFlags } from './rsc.js';
 
 const isServer = (): boolean => typeof window === 'undefined';
 
@@ -74,13 +79,14 @@ export const getBaseUrl = (): string => {
  *
  * **Details**
  *
- * - There is no `keyPrefix` option: the options proxy of `useRpc()` never prefixes query keys.
+ * - `keyPrefix` prefixes every query key of `useRpc()`. Give `createRscHelpers` the same
+ *   `keyPrefix`, or client components will not find the data prefetched on the server.
  *
  * @see {@link createNextRpcClient}
  * @category options
  * @since 0.1.0
  */
-export interface NextRpcClientOptions {
+export interface NextRpcClientOptions<P extends string | undefined = undefined> {
   /** Url of the route handler; relative urls resolve against `getBaseUrl()`. Default `/api/rpc`. */
   readonly url?: string | URL | undefined;
   /** Headers of every request (a function is evaluated per request). */
@@ -93,6 +99,11 @@ export interface NextRpcClientOptions {
   readonly middleware?: Layer.Layer<never, unknown> | undefined;
   /** Creates query clients. Defaults to {@link makeQueryClient}. */
   readonly makeQueryClient?: (() => QueryClient) | undefined;
+  /**
+   * Query key prefix of the `useRpc()` options proxy (tRPC's `keyPrefix` feature flag). Must equal
+   * the `keyPrefix` of `createRscHelpers` so hydrated data is found. Default: no prefix.
+   */
+  readonly keyPrefix?: P;
 }
 
 /**
@@ -115,14 +126,14 @@ export interface NextRpcProviderProps {
  * @category models
  * @since 0.1.0
  */
-export interface NextRpcClient<R extends Router.Any> {
+export interface NextRpcClient<R extends Router.Any, P extends string | undefined = undefined> {
   /**
    * Provides a `QueryClient` (`getQueryClient()`) and an `httpLink` client (created once per
    * provider) to TanStack Query and to `useRpc` / `useRpcClient`.
    */
   readonly RpcProvider: React.FC<NextRpcProviderProps>;
   /** The options proxy: `useQuery(useRpc().post.byId.queryOptions({ id }))`. */
-  readonly useRpc: () => RpcOptionsProxy<R>;
+  readonly useRpc: () => RpcOptionsProxy<R, PrefixFlags<P>>;
   /** The Promise client. */
   readonly useRpcClient: () => Client<R>;
   /**
@@ -170,8 +181,8 @@ export interface NextRpcClient<R extends Router.Any> {
  *   render client components that come from a `'use client'` module.
  * - `serialization` must match `createRouteHandler`'s. On a non-Vercel host behind a proxy, pass
  *   an absolute `url` so SSR does not call `http://localhost:$PORT`.
- * - There is no `keyPrefix`: do not set `keyPrefix` in `createRscHelpers` when its data must be
- *   read by this provider's `useRpc()`, the query keys would not match.
+ * - `keyPrefix` must be the same here and in `createRscHelpers`; with different prefixes (or a
+ *   prefix on one side only) the query keys do not match and client components refetch.
  *
  * **Example** (trpc/client.tsx, a `'use client'` module)
  *
@@ -240,11 +251,22 @@ export interface NextRpcClient<R extends Router.Any> {
  * @category constructors
  * @since 0.1.0
  */
-export const createNextRpcClient = <R extends Router.Any>(
+export const createNextRpcClient = <
+  R extends Router.Any,
+  const P extends string | undefined = undefined,
+>(
   router: R,
-  options: NextRpcClientOptions = {},
-): NextRpcClient<R> => {
-  const context = createRpcContext<R>();
+  options: NextRpcClientOptions<P> = {},
+): NextRpcClient<R, P> => {
+  // The flags only shape the proxy's types; at runtime the context provider accepts an optional
+  // `keyPrefix` (it only forwards a defined one), so widen its props to that.
+  const context = createRpcContext<R, FeatureFlags>();
+  const ContextProvider = context.RpcProvider as unknown as React.FC<{
+    readonly client: Client<R>;
+    readonly queryClient: QueryClient;
+    readonly keyPrefix?: string;
+    readonly children?: React.ReactNode;
+  }>;
   const { HydrationBoundary } = createHydrationHelpers(router);
   const make = options.makeQueryClient ?? (() => makeQueryClient());
   let browserQueryClient: QueryClient | undefined;
@@ -272,9 +294,13 @@ export const createNextRpcClient = <R extends Router.Any>(
     const [client] = React.useState(newClient);
     return (
       <QueryClientProvider client={queryClient}>
-        <context.RpcProvider client={client} queryClient={queryClient}>
+        <ContextProvider
+          client={client}
+          queryClient={queryClient}
+          {...(options.keyPrefix !== undefined && { keyPrefix: options.keyPrefix })}
+        >
           {props.children}
-        </context.RpcProvider>
+        </ContextProvider>
       </QueryClientProvider>
     );
   };
@@ -282,7 +308,7 @@ export const createNextRpcClient = <R extends Router.Any>(
 
   return {
     RpcProvider,
-    useRpc: context.useRpc,
+    useRpc: context.useRpc as () => RpcOptionsProxy<R, PrefixFlags<P>>,
     useRpcClient: context.useRpcClient,
     HydrationBoundary,
     getQueryClient,

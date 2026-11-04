@@ -95,7 +95,8 @@ from `src/types.ts`.
 - `test/electron.test.ts`: renderer → bridge → main end to end: `Schema.Class` instances, typed
   errors, subscriptions, abort → `RpcInterrupted`, defects → `RpcDefect`, renderer isolation and
   sender ids, port closed by main, `client.dispose()`, `server.dispose()` without leaks,
-  `connectTimeout`, custom channel + `authorize`.
+  `connectTimeout`, custom channel, and `authorize` / malformed connections whose ports main
+  closes.
 - `test/messagePort.test.ts`: `MessagePortServer` + `messagePortLink` without Electron:
   EventEmitter ports, trusted headers, port factory vs single-use port, malformed and hostile
   frames, binary serialization, closing the server scope.
@@ -226,7 +227,8 @@ bridge is missing or the channel differs), calls fail with `RpcTransportError` i
   `webContents.id`. A renderer cannot spoof this header because the server replaces it. Read it
   with `MainRpcServer.senderId(headers)` in a handler or middleware.
 - `authorize: (event) => boolean` rejects connections, for example by origin:
-  `authorize: (e) => e.senderFrame?.url.startsWith('app://') === true`.
+  `authorize: (e) => e.senderFrame?.url.startsWith('app://') === true`. Main closes the ports
+  of a rejected connection (and of one that transfers more than one port).
 - Use a custom `channel` on all three sides to run several independent servers.
 
 ## Effect API

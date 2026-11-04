@@ -13,7 +13,7 @@ import { RpcTransportError, type ClientError, type Router } from '@effect-trpc/c
 import { Exit } from 'effect';
 import * as React from 'react';
 import { decodeActionResultInternal, type EncodedActionResult } from './serverActions.js';
-import type { ActionPath } from './types.js';
+import type { ActionPath, ErrorAt, OutputAt } from './types.js';
 
 /**
  * The status of a {@link useServerAction} hook.
@@ -31,15 +31,33 @@ export type ServerActionStatus = 'idle' | 'pending' | 'success' | 'error';
  * @category options
  * @since 0.1.0
  */
-export interface UseServerActionOptions<R extends Router.Any> {
+export interface UseServerActionOptions<
+  R extends Router.Any,
+  P extends ActionPath<R> = ActionPath<R>,
+> {
   /** The router the action was created from (its schemas decode the result). */
   readonly router: R;
   /**
-   * The procedure the action calls, e.g. `"post.create"`. Not checked against the action's type:
-   * a wrong path decodes with the wrong schemas.
+   * The procedure the action calls, e.g. `"post.create"`. `useServerAction` rejects a path whose
+   * output or error type differs from the action's, so the result is decoded with its schemas.
    */
-  readonly path: ActionPath<R>;
+  readonly path: P;
 }
+
+/**
+ * Type-level guard of {@link useServerAction}: `{}` when the procedure at `P` has the action's
+ * output `A` and error `E`, otherwise a `path` that no string is assignable to.
+ *
+ * @internal
+ */
+export type CheckActionPath<R extends Router.Any, P extends string, A, E> = [
+  OutputAt<R, P>,
+  ErrorAt<R, P>,
+] extends [A, E]
+  ? [A, E] extends [OutputAt<R, P>, ErrorAt<R, P>]
+    ? unknown
+    : { readonly path: `the action's result type does not match path "${P}"` }
+  : { readonly path: `the action's result type does not match path "${P}"` };
 
 /**
  * The result of {@link useServerAction} (tRPC's `useAction`).
@@ -103,7 +121,8 @@ const idle: State<never, never> = { status: 'idle', data: undefined, error: null
  *
  * - `router` is the router **value**: importing it ships the schemas to the browser. Import it
  *   from the schemas-only module, never from a module that imports handlers.
- * - `path` must name the procedure the action calls; it is not inferred from `action`.
+ * - `path` must name the procedure the action calls. It is not inferred from `action`, but a
+ *   path whose output or error type differs from the action's is a type error.
  * - Import the action from the `'use server'` module; do not import `createServerActionCaller`
  *   or handlers into the client component.
  *
@@ -151,9 +170,15 @@ const idle: State<never, never> = { status: 'idle', data: undefined, error: null
  * @category hooks
  * @since 0.1.0
  */
-export const useServerAction = <Args extends ReadonlyArray<unknown>, A, E, R extends Router.Any>(
+export const useServerAction = <
+  Args extends ReadonlyArray<unknown>,
+  A,
+  E,
+  R extends Router.Any,
+  const P extends ActionPath<R>,
+>(
   action: (...args: Args) => PromiseLike<EncodedActionResult<A, E>>,
-  options: UseServerActionOptions<R>,
+  options: UseServerActionOptions<R, P> & CheckActionPath<R, P, A, E>,
 ): UseServerActionResult<Args, A, E> => {
   const [state, setState] = React.useState<State<A, E>>(idle);
   const latest = React.useRef(0);

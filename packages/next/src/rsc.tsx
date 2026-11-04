@@ -113,8 +113,7 @@ export interface RscHelpersOptions<P extends string | undefined = undefined> {
   readonly cache?: CacheFn | undefined;
   /**
    * Query key prefix of the options proxy. Client components only find the prefetched data when
-   * their provider uses the same prefix; `createNextRpcClient` has no prefix, so leave this unset
-   * when you use it.
+   * their provider uses the same prefix: pass the same `keyPrefix` to `createNextRpcClient`.
    */
   readonly keyPrefix?: P;
   /**
@@ -249,7 +248,7 @@ const isPrefetchInfinite = (queryKey: ReadonlyArray<unknown>): boolean =>
  *   typed errors.
  * - The handler layer is built once for the in-process client and once more for `caller` if you
  *   use it.
- * - `keyPrefix` must match the client provider's; `createNextRpcClient` has none.
+ * - `keyPrefix` must match the `keyPrefix` of `createNextRpcClient` (both unset by default).
  *
  * **Example** (trpc/server.tsx, server only)
  *

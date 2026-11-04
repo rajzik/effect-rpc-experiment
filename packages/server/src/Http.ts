@@ -48,7 +48,7 @@ export type Serialization = 'json' | 'ndjson' | Layer.Layer<RpcSerialization.Rpc
 export interface ServerOptions {
   /** Route of the rpc endpoint. Defaults to `"/rpc"`. */
   readonly path?: HttpRouter.PathInput | undefined;
-  /** Wire format. Defaults to `"ndjson"` (`"json"` for websockets). */
+  /** Wire format, for every protocol. Defaults to `"ndjson"`, like `httpLink` and `wsLink`. */
   readonly serialization?: Serialization | undefined;
   /** Disables the server spans `RpcServer` creates for every request. */
   readonly disableTracing?: boolean | undefined;
@@ -163,7 +163,7 @@ export const serializationLayer = (
  * - A thin wrapper over `RpcServer.layerHttp` that defaults to `protocol: "http"` and always
  *   sets `disableFatalDefects: true`, so a defect in one handler fails only that call instead of
  *   the whole connection.
- * - The serialization layer is provided (default `"ndjson"` for HTTP, `"json"` for websockets),
+ * - The serialization layer is provided (default `"ndjson"` for both protocols, matching `httpLink` / `wsLink`),
  *   and so is `handlers` when given. Whatever `handlers` does not provide stays a requirement of
  *   the returned layer, together with `HttpRouter`.
  *
@@ -207,11 +207,7 @@ export const layerHttp = <R extends Router.Any, LOut = never, LE = never, LR = n
     disableTracing: options.disableTracing,
     spanPrefix: options.spanPrefix,
     concurrency: options.concurrency,
-  }).pipe(
-    Layer.provide(
-      serializationLayer(options.serialization, protocol === 'http' ? 'ndjson' : 'json'),
-    ),
-  );
+  }).pipe(Layer.provide(serializationLayer(options.serialization)));
   const layer: Layer.Layer<never, unknown, unknown> =
     options.handlers === undefined ? server : server.pipe(Layer.provide(options.handlers));
   return layer as Layer.Layer<

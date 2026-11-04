@@ -120,6 +120,19 @@ describe('server actions', () => {
       }) => Promise<Exit.Exit<Post, ClientError<Forbidden>>>
     >();
   });
+
+  test('useServerAction rejects a path whose result type differs from the action', () => {
+    const create = actions('post.create'); // Post | Forbidden
+    // Same output (Post), different error (PostNotFound):
+    // @ts-expect-error path must be the procedure the action calls
+    useServerAction(create, { router: appRouter, path: 'post.byId' });
+    // Different output (string):
+    // @ts-expect-error path must be the procedure the action calls
+    useServerAction(create, { router: appRouter, path: 'boom' });
+    // The matching path is accepted and keeps the action's types.
+    const matching = () => useServerAction(create, { router: appRouter, path: 'post.create' });
+    expectTypeOf<ReturnType<typeof matching>['data']>().toEqualTypeOf<Post | undefined>();
+  });
 });
 
 describe('RSC helpers', () => {
@@ -144,5 +157,14 @@ describe('RSC helpers', () => {
     expectTypeOf<Proxy['post']['byId']['~types']['error']>().toEqualTypeOf<
       ClientError<PostNotFound>
     >();
+  });
+
+  test('createNextRpcClient: keyPrefix gives the same proxy type as createRscHelpers', () => {
+    const { useRpc } = createNextRpcClient(appRouter, { keyPrefix: 'blog' });
+    const rsc = createRscHelpers(appRouter, { handlers }, { keyPrefix: 'blog' });
+    expectTypeOf<ReturnType<typeof useRpc>>().toEqualTypeOf<typeof rsc.rpc>();
+    const plain = createNextRpcClient(appRouter);
+    const plainRsc = createRscHelpers(appRouter, { handlers });
+    expectTypeOf<ReturnType<typeof plain.useRpc>>().toEqualTypeOf<typeof plainRsc.rpc>();
   });
 });

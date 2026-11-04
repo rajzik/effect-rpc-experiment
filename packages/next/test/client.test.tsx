@@ -158,6 +158,53 @@ describe('createNextRpcClient', () => {
     await server.client.dispose();
   });
 
+  test('keyPrefix on both halves: prefixed keys, prefetched data found without a client fetch', async () => {
+    const fixture = makeFixture();
+    let clientFetches = 0;
+    const { RpcProvider, useRpc, HydrationBoundary } = createNextRpcClient(appRouter, {
+      keyPrefix: 'blog',
+      fetch: () => {
+        clientFetches++;
+        return Promise.resolve(new Response(null, { status: 500 }));
+      },
+    });
+    const server = createRscHelpers(
+      appRouter,
+      { handlers: fixture.handlers },
+      {
+        HydrationBoundary,
+        keyPrefix: 'blog',
+        cache: (fn) => {
+          let v: ReturnType<typeof fn> | undefined;
+          return () => (v ??= fn());
+        },
+      },
+    );
+    server.prefetch(server.rpc.post.byId.queryOptions({ id: 3 }));
+    await waitFor(() => {
+      expect(server.getQueryClient().isFetching()).toBe(0);
+    });
+    const keys: Array<ReadonlyArray<unknown>> = [];
+    const PostView = (): React.ReactElement => {
+      const rpc = useRpc();
+      const options = rpc.post.byId.queryOptions({ id: 3 });
+      keys.push(options.queryKey);
+      const { data } = useQuery(options);
+      return <p>{data instanceof Post ? data.shout() : 'loading'}</p>;
+    };
+    render(
+      <RpcProvider queryClient={makeQueryClient()}>
+        <server.HydrateClient>
+          <PostView />
+        </server.HydrateClient>
+      </RpcProvider>,
+    );
+    expect(await screen.findByText('POST 3!')).toBeDefined();
+    expect(clientFetches).toBe(0);
+    expect(keys[0]?.[0]).toEqual(['blog']);
+    await server.client.dispose();
+  });
+
   test('getQueryClient() is a browser singleton', () => {
     const { getQueryClient } = createNextRpcClient(appRouter);
     expect(getQueryClient()).toBe(getQueryClient());

@@ -337,8 +337,8 @@ export interface WsLinkOptions {
  * **Gotchas**
  *
  * - `url` must be absolute `ws:` / `wss:`; anything else throws when the link is created.
- * - The link defaults to `"ndjson"`, while `layerHttp(..., { protocol: 'websocket' })` defaults to
- *   `"json"`: set the same `serialization` on both sides.
+ * - Both the link and `layerHttp(..., { protocol: 'websocket' })` default to `"ndjson"`; if you
+ *   set `serialization` on one side, set the same value on the other.
  *
  * **Example** (One WebSocket for every call)
  *

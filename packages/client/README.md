@@ -84,7 +84,7 @@ See [Links](#links) for `wsLink` / `localLink` and [Effect client](#effect-clien
 **Common mistakes**
 
 - Don't pass a relative URL (`'/rpc'`) to `httpLink` → `new URL('/rpc', location.origin).href`.
-- Don't point `wsLink` at a `toWebHandler` endpoint → serve `layerHttp(router, { protocol: 'websocket' })` and match `serialization` (server websocket default is `"json"`, `wsLink` default is `"ndjson"`).
+- Don't point `wsLink` at a `toWebHandler` endpoint → serve `layerHttp(router, { protocol: 'websocket' })` and match `serialization` (both default to `"ndjson"`; override on both sides or neither).
 - Don't treat every rejection as a domain error → switch on `error._tag`; infrastructure tags start with `@effect-trpc/`.
 - Don't expect `RpcDefect` / `RpcInterrupted` in the `$effect` error channel → inspect the `Cause` (`Effect.exit`, `Effect.catchCause`).
 - Don't give `localLink` a handler layer without the middleware implementations → `Layer.mergeAll(handlers, AuthLive)` (missing ones are a type error).

@@ -84,10 +84,11 @@ function` per action) and a client component with `useServerAction` (§7).
   as a plain `Error`) → `await getQueryClient().prefetchQuery(…)` on pages that need them.
 - Don't pass a relative `url` to a hand-made `httpLink` on the server, or rely on the
   `localhost:$PORT` fallback behind a proxy → pass an absolute `url`.
-- Don't set `keyPrefix` in `createRscHelpers` with `createNextRpcClient` (it has no prefix) → the
-  query keys would not match.
-- Don't give `useServerAction` / `unwrapActionResult` a different `path` than the action calls →
-  the result is decoded with that path's schemas.
+- Don't set `keyPrefix` on only one of `createRscHelpers` / `createNextRpcClient` → set the same
+  `keyPrefix` on both (or neither), or the query keys do not match and the client refetches.
+- Don't give `unwrapActionResult` / `decodeActionResult` a different `path` than the action calls
+  → the result is decoded with that path's schemas. (`useServerAction` rejects a path whose
+  result type differs from the action's at compile time.)
 
 **Where to look**
 
@@ -279,7 +280,7 @@ export const { getQueryClient, rpc, HydrateClient, prefetch, caller } = createRs
   cache: `await caller.$promise.post.byId({ id: 1 })`.
 - `{ client }` instead of `{ handlers }` uses an existing client, for example `httpLink` to
   another service.
-- `keyPrefix` must match the client provider. `dehydrateOptions` are passed to `dehydrate`.
+- `keyPrefix` must equal `createNextRpcClient`'s `keyPrefix`. `dehydrateOptions` are passed to `dehydrate`.
 
 ## 6. Page — `app/page.tsx`
 

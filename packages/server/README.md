@@ -88,7 +88,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 
 - Typed errors are `Schema.TaggedError` classes declared on the procedure (or middleware `error`); anything else a handler throws or dies with is a defect.
 - Every HTTP endpoint is `protocol: "http"` (websocket only via `layerHttp({ protocol: 'websocket' })`) with `disableFatalDefects: true`; one defect never breaks later calls.
-- Default serialization is `"ndjson"` (`"json"` for websockets); clients must use the same one.
+- Default serialization is `"ndjson"` for both protocols (the same default as `httpLink` / `wsLink`); if you override it, clients must use the same one.
 - The server layer must provide `Handlers.Requirements<R>`: every handler plus every middleware implementation (`Layer.mergeAll(HandlersLive, AuthLive)`).
 - Promise caller rejections are `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; Effect caller calls fail with exactly `E`.
 - `toWebHandler` / `runServer` build the handler layer eagerly (the promise rejects on failure); `createCaller` builds it on the first call.
