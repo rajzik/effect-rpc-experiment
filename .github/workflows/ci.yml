@@ -31,6 +31,11 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # Package `exports.types` point at dist/*.d.mts, so packages must be built
+      # before typecheck and type-aware lint can resolve cross-package types.
+      - name: Build
+        run: pnpm exec vp run -r build
+
       - name: Format, lint, type-aware lint
         run: pnpm exec vp check
 
@@ -40,5 +45,3 @@ jobs:
       - name: Test
         run: pnpm exec vp run -r test
 
-      - name: Build
-        run: pnpm exec vp run -r build
