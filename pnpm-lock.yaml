@@ -141,6 +141,55 @@ importers:
         specifier: 'catalog:'
         version: 44.5.1
 
+  examples/next:
+    dependencies:
+      '@effect-trpc-examples/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@effect-trpc/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@effect-trpc/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@effect-trpc/next':
+        specifier: workspace:*
+        version: link:../../packages/next
+      '@effect-trpc/server':
+        specifier: workspace:*
+        version: link:../../packages/server
+      '@effect-trpc/tanstack-react-query':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-react-query
+      '@tanstack/react-query':
+        specifier: 'catalog:'
+        version: 5.104.1(react@19.3.0)
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.1
+      next:
+        specifier: 'catalog:'
+        version: 16.3.8(@babel/core@7.29.7)(@playwright/test@1.64.1)(@types/node@24.19.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react:
+        specifier: 'catalog:'
+        version: 19.3.0
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.3.0(react@19.3.0)
+    devDependencies:
+      '@playwright/test':
+        specifier: 'catalog:'
+        version: 1.64.1
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.3.0(@types/react@19.3.0)
+
   examples/shared:
     dependencies:
       '@effect-trpc/client':
