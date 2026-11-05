@@ -6,19 +6,19 @@ test.beforeEach(async () => {
   await resetData(rpcUrl);
 });
 
-test('SSR HTML for /tasks/1 contains the title (JS disabled)', async ({ request }) => {
-  // The raw response of the server, before any script runs.
+test('SSR HTML for /tasks/1 renders the title as a heading (JS disabled)', async ({ request }) => {
+  // The raw response of the server, before any script runs. The title alone would also match the
+  // dehydrated payload, so assert the rendered heading element.
   const response = await request.get('/tasks/1');
   expect(response.status()).toBe(200);
-  expect(await response.text()).toContain('Draft the launch plan');
+  expect(await response.text()).toMatch(/<h1[^>]*>Draft the launch plan<\/h1>/);
 });
 
 test('SSR payload of /tasks/999 carries the encoded TaskNotFound (dehydrated query cache)', async ({
   request,
 }) => {
-  // The server-rendered HTML shows the loading state; the failed query travels in the
-  // dehydrated cache of the page, encoded with the procedure's error schema. That is what
-  // `hydration.routerOptions` and the awaited loader prefetch put there.
+  // The failed query travels in the dehydrated cache of the page, encoded with the procedure's
+  // error schema. That is what `hydration.routerOptions` and the awaited loader prefetch put there.
   const response = await request.get('/tasks/999');
   expect(response.status()).toBe(200);
   const html = await response.text();
@@ -41,12 +41,23 @@ test('SSR payload of /tasks/999 carries the encoded TaskNotFound (dehydrated que
   });
 });
 
-test('/tasks/999 shows "Task #999 not found" after hydration', async ({ page, baseURL }) => {
-  // On mount the hydrated errored query is retried over /api/rpc, so this alone does not prove
-  // the SSR hand-off (the payload test above does); it proves the page ends in the typed state.
+test('/tasks/999 shows the typed error from the dehydrated cache, without a client refetch', async ({
+  page,
+  baseURL,
+}) => {
+  const byIdCalls: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && (request.postData() ?? '').includes('tasks.byId')) {
+      byIdCalls.push(request.postData() ?? '');
+    }
+  });
   const board = new TaskBoardPage(page, httpAdapter(page, baseURL!));
+  // Waits for hydration: a mount-time refetch would be issued by now.
   await board.gotoTask(999);
   await board.expectAlert('Task #999 not found');
+  // The failed prefetch travelled in the dehydrated cache and was decoded there: the client never
+  // asked the endpoint for the task again.
+  expect(byIdCalls).toEqual([]);
 });
 
 test('client navigation from list to task issues POST /api/rpc', async ({ page, baseURL }) => {
@@ -82,5 +93,16 @@ test.describe('without JavaScript', () => {
     const text = await page.locator('body').innerText();
     expect(text).toContain('Signed in as ada');
     expect(text).toContain('Publish the release notes');
+  });
+
+  test('/tasks/999 is server-rendered with "Task #999 not found" (not the loading state)', async ({
+    page,
+  }) => {
+    await page.goto('/tasks/999');
+    // With JavaScript off, the page is exactly what the server rendered: the errored query that
+    // the loader prefetched must render as its typed error, not as "Loading task…".
+    const text = await page.locator('body').innerText();
+    expect(text).toContain('Task #999 not found');
+    expect(text).not.toContain('Loading task');
   });
 });

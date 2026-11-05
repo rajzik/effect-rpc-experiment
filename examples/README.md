@@ -43,8 +43,9 @@ for `electron` it builds, then launches the built files with Playwright's `_elec
 Electron launch may download the Electron binary (`pnpm -C examples/electron exec install-electron`
 fetches it up front). Chromium for the web suites: `pnpm exec playwright install chromium`.
 
-The scripts are prefixed `example:` on purpose: `pnpm ready`, `vp run -r build` and `ci.yml` do not
-touch the apps. They run in [`.github/workflows/examples.yml`](../.github/workflows/examples.yml),
+The scripts are prefixed `example:` on purpose: `pnpm ready` and `ci.yml` lint, format and type-check
+the apps and run `examples/shared`'s unit tests, but they never build the apps or run the Playwright
+suites. Those run in [`.github/workflows/examples.yml`](../.github/workflows/examples.yml),
 one job per app.
 
 ## How `shared` is organised

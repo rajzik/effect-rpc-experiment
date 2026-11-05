@@ -1,12 +1,5 @@
-import { httpBoards, sharedScenarios, type Boards } from '@effect-trpc-examples/shared/e2e';
-import { test as base } from '@playwright/test';
+import { sharedScenarios } from '@effect-trpc-examples/shared/e2e';
 
-const test = base.extend<{ boards: Boards }>({
-  boards: async ({ browser, baseURL }, use) => {
-    const web = httpBoards(browser, baseURL!);
-    await use(web.boards);
-    await web.dispose();
-  },
-});
+import { rpcUrl, test } from './fixtures';
 
-sharedScenarios(test, { reset: 'http://localhost:3200/api/rpc' });
+sharedScenarios(test, { reset: rpcUrl });
