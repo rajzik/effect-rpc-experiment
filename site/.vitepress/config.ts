@@ -1,19 +1,23 @@
-// VitePress config for the effect-trpc reference site (deployed to GitHub Pages).
+// VitePress config for the effect-trpc reference site (GitHub Pages and Vercel).
 import { defineConfig } from 'vitepress';
 
 import { sidebar } from './sidebar';
 
 const repo = 'https://github.com/rajzik/effect-rpc-experiment';
 
+// Where the site is served: GitHub Pages serves it under the repo name, Vercel at the root
+// (`DOCS_BASE=/`, set by vercel.json). Must start and end with `/`.
+const base = process.env['DOCS_BASE'] ?? '/effect-rpc-experiment/';
+
 export default defineConfig({
-  base: '/effect-rpc-experiment/',
+  base,
   title: 'effect-trpc',
   description: 'End-to-end type-safe RPC for Effect v4, with TanStack Query and framework adapters',
   srcExclude: ['README.md'],
   cleanUrls: true,
   lastUpdated: true,
   appearance: true,
-  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/effect-rpc-experiment/logo.svg' }]],
+  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}logo.svg` }]],
   markdown: {
     theme: { light: 'github-light', dark: 'github-dark-default' },
   },

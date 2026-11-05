@@ -15,6 +15,16 @@ pnpm docs:build             # → site/.vitepress/dist; fails on dead links
 From `site/`: `pnpm docs:snippets` type-checks the samples, `pnpm docs:test` runs the site tests,
 `pnpm docs:api` regenerates `api/`.
 
+## Deploy
+
+| Target       | How                                                                                   | Base path                 |
+| ------------ | ------------------------------------------------------------------------------------- | ------------------------- |
+| GitHub Pages | `.github/workflows/docs.yml` on push to `main`                                        | `/effect-rpc-experiment/` |
+| Vercel       | `vercel.json` at the repo root: import the repo in Vercel, leave Root Directory empty | `/` (`DOCS_BASE=/`)       |
+
+`DOCS_BASE` sets the base path for any other host (`DOCS_BASE=/docs/ pnpm docs:build`). It must
+start and end with `/`. Vercel uses the root `pnpm install` and builds the packages first, as CI does.
+
 ## Layout
 
 ```

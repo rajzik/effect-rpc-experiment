@@ -1,4 +1,5 @@
-// Checks the built site (`pnpm docs:build` first): every root-relative URL carries the Pages base.
+// Checks the built site (`pnpm docs:build` first): every root-relative URL carries the base
+// (`DOCS_BASE`, as in .vitepress/config.ts).
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 import { describe, expect, it } from 'vite-plus/test';
@@ -6,7 +7,7 @@ import { describe, expect, it } from 'vite-plus/test';
 import { sidebar } from '../.vitepress/sidebar';
 
 const dist = join(import.meta.dirname, '..', '.vitepress', 'dist');
-const base = '/effect-rpc-experiment/';
+const base = process.env['DOCS_BASE'] ?? '/effect-rpc-experiment/';
 
 const htmlFiles = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
