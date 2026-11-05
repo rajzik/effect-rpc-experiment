@@ -34,7 +34,10 @@ const referenced = new Set(
 
 const snippets = walk(snippetsDir, ['node_modules'])
   .map((file) => relative(snippetsDir, file))
-  .filter((file) => /\.tsx?$/.test(file) && !file.startsWith('shared/'));
+  // shared/ holds the demo router; *.gen.ts stands in for generated files (Start's route tree).
+  .filter(
+    (file) => /\.tsx?$/.test(file) && !file.startsWith('shared/') && !file.endsWith('.gen.ts'),
+  );
 
 describe('snippets', () => {
   it('every snippet is used by a page', () => {
