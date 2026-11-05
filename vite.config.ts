@@ -58,6 +58,11 @@ export default defineConfig({
         },
       },
       {
+        // The docs theme imports its stylesheets (tokens, fonts) for their side effects.
+        files: ['site/.vitepress/**'],
+        rules: { 'import/no-unassigned-import': ['warn', { allow: ['**/*.css'] }] },
+      },
+      {
         files: ['packages/electron/**', 'packages/server/**', 'packages/test-utils/**'],
         env: { node: true },
       },
@@ -80,6 +85,7 @@ export default defineConfig({
         rules: {
           'effecttsgo/floating-effect': 'off',
           'effecttsgo/missing-layer-context': 'off',
+          'effecttsgo/missing-effect-error': 'off',
         },
       },
     ],
