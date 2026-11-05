@@ -11,6 +11,9 @@ pieces of effect-trpc:
   return type, errors and requirements inferred.
 - **`Router.make`** — nests procedures (and other routers) into a record; tags are the dot-joined
   paths (`"post.byId"`), with literal types computed at the type level.
+- **Router services** — write a router once as a plain Effect
+  `Context.Service<Self>()(id, { make })` whose `make` returns the procedures; every API that takes
+  a router takes the service class (`Router.from` normalises both).
 - **The client error model** — `ClientError<E>` keeps your typed errors separate from
   infrastructure failures (`RpcDefect`, `RpcTransportError`, `RpcInterrupted`).
 - **`Codecs`** — memoized JSON codecs for an rpc's payload, success, error and `Exit`, so
@@ -25,8 +28,8 @@ Servers, clients and the TanStack Query bridge live in `@effect-trpc/server`,
 **Use this package when**
 
 - you define the API surface: procedures (`query`, `mutation`, `subscription`, or the
-  `Procedure` builder when schemas and implementation live together) and a `Router` shared by
-  server and client;
+  `Procedure` builder when schemas and implementation live together) and a `Router` (or a router
+  service: a `Context.Service` whose `make` returns the procedures) shared by server and client;
 - you need the client error model (`ClientError<E>`, `causeToClientError`) or JSON codecs
   (`Codecs`) for a compiled rpc, without any transport.
 
@@ -37,14 +40,14 @@ with `httpLink`), for React Query (`@effect-trpc/tanstack-react-query`) or for t
 
 **Entry points**
 
-| Import path         | Exports                                                                                                                                                                                                                   | Source                                   |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `@effect-trpc/core` | `query`, `mutation`, `subscription`, `isProcedureDef`, `ProcedureDef`, `PayloadInput`, `NormalizePayload`, `inferInput` / `inferOutput` / `inferError` / `inferKind`                                                      | `src/Procedure.ts`                       |
-| `@effect-trpc/core` | `Procedure` (`input`, `output`, `error`, `middleware`, `query`, `mutation`, `subscription`, `hasHandler`; types `Procedure.HandlerContext`, `Procedure.HandlerRequirements`, `Procedure.Builder`), `ProcedureWithHandler` | `src/ProcedureBuilder.ts`                |
-| `@effect-trpc/core` | `Router` (`make`, `merge`, `getByPath`, `getRpc`, `isPath`, `childPath`, `isRouter`), `ProcedureInfo`, `inferRouterInputs` / `inferRouterOutputs` / `inferRouterErrors`                                                   | `src/Router.ts`                          |
-| `@effect-trpc/core` | `ProcedureKind` (annotation key + `"query" \| "mutation" \| "subscription"` type)                                                                                                                                         | `src/ProcedureKind.ts`                   |
-| `@effect-trpc/core` | `ClientError`, `ClientInfrastructureError`, `RpcDefect`, `RpcTransportError`, `RpcInterrupted`, `causeToClientError`, `exitToClientError`, guards                                                                         | `src/ClientError.ts`                     |
-| `@effect-trpc/core` | `Codecs` namespace (`payload`, `success`, `error`, `exit`, `encode*Sync` / `decode*Sync`)                                                                                                                                 | `src/Codecs.ts` (barrel: `src/index.ts`) |
+| Import path         | Exports                                                                                                                                                                                                                                                                               | Source                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `@effect-trpc/core` | `query`, `mutation`, `subscription`, `isProcedureDef`, `ProcedureDef`, `PayloadInput`, `NormalizePayload`, `inferInput` / `inferOutput` / `inferError` / `inferKind`                                                                                                                  | `src/Procedure.ts`                       |
+| `@effect-trpc/core` | `Procedure` (`input`, `output`, `error`, `middleware`, `query`, `mutation`, `subscription`, `hasHandler`; types `Procedure.HandlerContext`, `Procedure.HandlerRequirements`, `Procedure.Builder`), `ProcedureWithHandler`                                                             | `src/ProcedureBuilder.ts`                |
+| `@effect-trpc/core` | `Router` (`make`, `merge`, `from`, `fromService`, `getByPath`, `getRpc`, `isPath`, `childPath`, `isRouter`, `isService`; types `Router.Input`, `Router.Of`), `RouterService` (`RouterService.Any`), `ProcedureInfo`, `inferRouterInputs` / `inferRouterOutputs` / `inferRouterErrors` | `src/Router.ts`                          |
+| `@effect-trpc/core` | `ProcedureKind` (annotation key + `"query" \| "mutation" \| "subscription"` type)                                                                                                                                                                                                     | `src/ProcedureKind.ts`                   |
+| `@effect-trpc/core` | `ClientError`, `ClientInfrastructureError`, `RpcDefect`, `RpcTransportError`, `RpcInterrupted`, `causeToClientError`, `exitToClientError`, guards                                                                                                                                     | `src/ClientError.ts`                     |
+| `@effect-trpc/core` | `Codecs` namespace (`payload`, `success`, `error`, `exit`, `encode*Sync` / `decode*Sync`)                                                                                                                                                                                             | `src/Codecs.ts` (barrel: `src/index.ts`) |
 
 **Golden path** — define a router, implement `router.group` with plain `effect/rpc`, classify
 failures (apps normally use `@effect-trpc/server` + `@effect-trpc/client` for the last two steps):
@@ -100,6 +103,10 @@ console.log(await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(H
 - A `Procedure` builder procedure is a `ProcedureDef` with a `handler`: it compiles to the same rpc (tag, schemas, `ProcedureKind`) as the equivalent `query` / `mutation` / `subscription`, and `inferInput` / `inferOutput` / `inferError` are the same. Builder defaults match `query()`: `Schema.Void` / `Schema.Void` / `Schema.Never`.
 - A builder handler may fail only with the declared `error` plus the errors of middleware added **before** the terminal; its requirements are `Procedure.HandlerRequirements<typeof proc>` (as written, including middleware-provided services).
 - `.middleware(M)` on a builder procedure and `router.middleware(M)` keep the handler (value and type); `query({...})` definitions have no `handler` key (`Procedure.hasHandler` is `false`).
+- A router service's `make` is an `Effect` **value** of type `Effect<Record, never, never>`: a `make` that needs services or may fail does not satisfy `RouterService.Any` (compile error at `Router.from`, `Router.fromService`, `Router.make` and every API taking `Router.Input`). An asynchronous `make`, or one that fails or reads a service despite its type, throws `Cannot build a router from the router service "<key>": make must not require services or be asynchronous, and must not fail …`.
+- `Router.fromService` is memoized per class: `make` runs once per process, and `Router.from`, `Router.fromService` and `Router.make({ x: Svc })` all return the same router for `Svc`.
+- `Router.make` resolves router-service entries (at any depth of plain records, and inside a service's own `make`) to routers: `router.record` and its type hold an ordinary nested router there. Records without services are stored as-is.
+- Type helpers (`inferRouterInputs` / `Outputs` / `Errors`, `Router.Paths`, `Router.Rpcs`, `Router.Record`) accept a router, a router service class (`typeof AppRouter`) or a record; `Router.Of<X>` is the router type of either.
 - Every compiled rpc carries the `ProcedureKind` annotation; rpcs not built by `Router.make` read as `"query"`.
 - `Codecs.*` are memoized per rpc; `Codecs.success` of a subscription is the element codec; `*Sync` helpers throw `SchemaError` and do not support schemas with services.
 
@@ -117,6 +124,10 @@ console.log(await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(H
 - Don't call `.error(...)` twice expecting a union → the last call wins; pass `Schema.Union([A, B])`.
 - Don't add middleware after the terminal when the handler fails with the middleware's error → add `.middleware(M)` before `.query(...)`.
 - Don't put secrets in builder handlers → handler code ships wherever the procedure is imported (browser bundles too); read services inside the handler.
+- Don't read services at the top of a router service's `make` (`yield* Database` in `make`) → it is a compile error (and a runtime error if cast away); read them inside the handlers.
+- Don't make `make` a function or asynchronous → `make: Effect.succeed({ ... })`; it is run synchronously with `Effect.runSync`.
+- Don't write `type AppRouter = typeof appRouter` for a router service → the class is the type: `inferRouterInputs<typeof AppRouter>`.
+- Don't branch on "router or service" in your own adapter → call `Router.from(input)` once at the entry.
 
 **Where to look**
 
@@ -126,6 +137,8 @@ console.log(await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(H
 | `inferInput` / `inferOutput` / `inferError`, `Router.Rpcs` / `Paths`    | `test/inference.test-d.ts`                                 |
 | `Procedure` builder: compiled rpc, defaults, handlers, middleware       | `test/procedureBuilder.test.ts`                            |
 | builder handler typing, `HandlerRequirements`, parity with `query()`    | `test/procedureBuilder.test-d.ts`                          |
+| router services: `fromService`, memoization, nesting, `make` errors     | `test/routerService.test.ts`                               |
+| router-service inference, `Router.Of` / `Input`, `make` with services   | `test/routerService.test-d.ts`                             |
 | `causeToClientError` mapping and precedence, guards                     | `test/client-error.test.ts`, `test/client-error.test-d.ts` |
 | codec round-trips, memoization, middleware errors in `Codecs.error`     | `test/codecs.test.ts`, `test/codecs.test-d.ts`             |
 | end to end through `RpcTest.makeClient(router.group)`                   | `test/e2e.test.ts`                                         |
@@ -276,26 +289,76 @@ const handler = blogRouter.record.post.byId.handler;
 - `.middleware(M)` on the finished procedure and `router.middleware(M)` keep the handler.
 - `Procedure.hasHandler(u)` tells builder procedures from `query({...})` definitions.
 
+### Routers as services
+
+A router can be written once as an ordinary Effect `Context.Service` whose `make` returns the
+procedures. The class is the router everywhere: pass it to any API that takes a router, and use
+`typeof AppRouter` with the type helpers. No `as const` is needed.
+
+```ts
+import { Context, Effect, Schema } from 'effect';
+import { Procedure, query, Router } from '@effect-trpc/core';
+import type { inferRouterInputs } from '@effect-trpc/core';
+
+export class AdminRouter extends Context.Service<AdminRouter>()('AdminRouter', {
+  make: Effect.succeed({ count: Procedure.output(Schema.Finite).query(() => Effect.succeed(1)) }),
+}) {}
+
+export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+  make: Effect.succeed({
+    health: query({ success: Schema.Literal('ok') }), // plain definitions mix in
+    post: {
+      byId: Procedure.input({ id: Schema.Finite })
+        .output(Post)
+        .error(PostNotFound)
+        .query(
+          Effect.fn(function* ({ id }) {
+            const db = yield* Database; // services are read inside handlers, never in make
+            return yield* db.findPost(id);
+          }),
+        ),
+    },
+    admin: AdminRouter, // services nest like routers
+  }),
+}) {}
+
+type ByIdInput = inferRouterInputs<typeof AppRouter>['post']['byId']; // { readonly id: number }
+type Paths = Router.Paths<typeof AppRouter>; // "health" | "post.byId" | "admin.count"
+
+const router = Router.from(AppRouter); // Router.Of<typeof AppRouter>, memoized per class
+const mixed = Router.make({ app: AppRouter }); // mixed.record.app is that same router
+```
+
+- `make` is an `Effect` value with no requirements and no failure (`Effect<Record, never, never>`).
+  A `make` that needs a service is a compile error; one that is asynchronous throws a clear error
+  naming the service when the router is built.
+- `Router.fromService(Svc)` runs `make` with `Effect.runSync` once per class and compiles the
+  record with `Router.make`; `Router.from(x)` accepts a router or a service (`Router.Input`) and
+  returns the router. `Router.isService(u)` is the guard.
+
 ### Router API
 
-| API                                         | Description                                                                                                                                           |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Router.make(record)`                       | Compile a nested record of procedures / routers / records. Throws on keys containing `"."`, empty keys and the reserved keys `then`, `call`, `apply`. |
-| `router.group`                              | `RpcGroup<Router.Rpcs<typeof record>>` — tags are dot-joined paths.                                                                                   |
-| `router.procedures`                         | `ReadonlyMap<tag, { path, tag, kind, rpc }>` in definition order.                                                                                     |
-| `router.record`                             | The original record (nested routers kept as-is).                                                                                                      |
-| `router.middleware(M)`                      | New router with `M` applied to every procedure (after per-procedure middleware).                                                                      |
-| `Router.merge(a, b)`                        | Merge two routers; overlapping top-level keys throw.                                                                                                  |
-| `Router.getByPath(router, ['post','byId'])` | `Option<ProcedureInfo>`.                                                                                                                              |
-| `Router.getRpc(router, 'post.byId')`        | The compiled rpc, precisely typed (`Rpc<"post.byId", …>`).                                                                                            |
-| `Router.isPath(router, ['post'])`           | `true` for a declared namespace or procedure.                                                                                                         |
-| `Router.childPath(router, path, key)`       | Key policy shared by router proxies: introspection keys (`then`, `toJSON`, ...) resolve only when declared.                                           |
-| `Router.isRouter(u)` / `isProcedureDef(u)`  | Guards.                                                                                                                                               |
+| API                                                                | Description                                                                                                                                                             |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Router.make(record)`                                              | Compile a nested record of procedures / routers / router services / records. Throws on keys containing `"."`, empty keys and the reserved keys `then`, `call`, `apply`. |
+| `router.group`                                                     | `RpcGroup<Router.Rpcs<typeof record>>` — tags are dot-joined paths.                                                                                                     |
+| `router.procedures`                                                | `ReadonlyMap<tag, { path, tag, kind, rpc }>` in definition order.                                                                                                       |
+| `router.record`                                                    | The original record (nested routers kept as-is; router services replaced by their routers).                                                                             |
+| `router.middleware(M)`                                             | New router with `M` applied to every procedure (after per-procedure middleware).                                                                                        |
+| `Router.merge(a, b)`                                               | Merge two routers; overlapping top-level keys throw.                                                                                                                    |
+| `Router.from(input)`                                               | A router for a `Router.Input` (router or router service class).                                                                                                         |
+| `Router.fromService(Svc)`                                          | The router of a router service; runs `make` once per class.                                                                                                             |
+| `Router.getByPath(router, ['post','byId'])`                        | `Option<ProcedureInfo>`.                                                                                                                                                |
+| `Router.getRpc(router, 'post.byId')`                               | The compiled rpc, precisely typed (`Rpc<"post.byId", …>`).                                                                                                              |
+| `Router.isPath(router, ['post'])`                                  | `true` for a declared namespace or procedure.                                                                                                                           |
+| `Router.childPath(router, path, key)`                              | Key policy shared by router proxies: introspection keys (`then`, `toJSON`, ...) resolve only when declared.                                                             |
+| `Router.isRouter(u)` / `Router.isService(u)` / `isProcedureDef(u)` | Guards.                                                                                                                                                                 |
 
 Type helpers: `Router.Rpcs<R>`, `Router.Paths<R>` (`"health" | "post.byId" | …`),
-`Router.Record<R>`, `inferInput` / `inferOutput` / `inferError` / `inferKind` for a procedure
+`Router.Record<R>`, `Router.Of<X>` / `Router.Input`, `RouterService.Any`, `inferInput` / `inferOutput` / `inferError` / `inferKind` for a procedure
 (subscription output is the element type; middleware errors are included in `inferError`), and
-`inferRouterInputs` / `inferRouterOutputs` / `inferRouterErrors` for nested maps of a whole router.
+`inferRouterInputs` / `inferRouterOutputs` / `inferRouterErrors` for nested maps of a whole router
+(each router helper also accepts a router service class).
 
 Every compiled rpc carries a `ProcedureKind` annotation:
 `Context.get(rpc.annotations, ProcedureKind) // "query" | "mutation" | "subscription"`.

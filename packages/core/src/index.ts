@@ -29,6 +29,7 @@ export {
   type inferRouterInputs,
   type inferRouterOutputs,
   type ProcedureInfo,
+  type RouterService,
 } from './Router.js';
 export {
   causeToClientError,

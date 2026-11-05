@@ -13,7 +13,13 @@ import {
   Router,
   subscription,
 } from '../src/index.js';
-import type { ClientError, inferError, inferInput, inferOutput } from '../src/index.js';
+import type {
+  ClientError,
+  inferError,
+  inferInput,
+  inferOutput,
+  inferRouterInputs,
+} from '../src/index.js';
 
 class Post extends Schema.Class<Post>('Post')({
   id: Schema.Finite,
@@ -90,6 +96,28 @@ const blogRouter = Router.make({
 });
 
 const handler = blogRouter.record.post.byId.handler;
+
+class AdminRouter extends Context.Service<AdminRouter>()('AdminRouter', {
+  make: Effect.succeed({ count: Procedure.output(Schema.Finite).query(() => Effect.succeed(1)) }),
+}) {}
+
+class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+  make: Effect.succeed({
+    health: query({ success: Schema.Literal('ok') }),
+    post: {
+      byId: Procedure.input({ id: Schema.Finite })
+        .output(Post)
+        .error(PostNotFound)
+        .query(
+          Effect.fn(function* ({ id }) {
+            const db = yield* Database;
+            return yield* db.findPost(id);
+          }),
+        ),
+    },
+    admin: AdminRouter,
+  }),
+}) {}
 
 const DatabaseLive = Layer.succeed(Database)({
   findPost: (id) =>
@@ -176,5 +204,20 @@ describe('README example', () => {
     expect(decoded).toBeInstanceOf(Post);
     expect(decoded.slug).toBe('hello-world');
     expect(decoded.createdAt).toBeInstanceOf(Date);
+  });
+
+  it('routers as services', () => {
+    expectTypeOf<inferRouterInputs<typeof AppRouter>['post']['byId']>().toEqualTypeOf<{
+      readonly id: number;
+    }>();
+    expectTypeOf<Router.Paths<typeof AppRouter>>().toEqualTypeOf<
+      'health' | 'post.byId' | 'admin.count'
+    >();
+    const router = Router.from(AppRouter);
+    const mixed = Router.make({ app: AppRouter });
+    expect([...router.procedures.keys()]).toEqual(['health', 'post.byId', 'admin.count']);
+    expect(mixed.record.app).toBe(router);
+    expect(Router.fromService(AppRouter)).toBe(router);
+    expect(Router.isService(AppRouter)).toBe(true);
   });
 });

@@ -6,9 +6,13 @@
  * `@effect-trpc/client` builds a nested proxy from `router.procedures`, and the type helpers here
  * (`inferRouterInputs`, `Router.Paths`, ...) give tRPC-style inference over the whole tree.
  *
+ * A router can also be written as an Effect `Context.Service` whose `make` returns the record (a
+ * router service, see {@link RouterService}). `Router.from` turns either form into a `Router`, so
+ * every API that takes a router takes the service class too.
+ *
  * @since 0.1.0
  */
-import { Option, Predicate } from 'effect';
+import { Cause, Context, Effect, Exit, Fiber, Option, Predicate } from 'effect';
 import { RpcGroup } from 'effect/rpc';
 import type { Rpc, RpcMiddleware } from 'effect/rpc';
 import { addDefMiddleware, compileDef, isProcedureDef } from './Procedure.js';
@@ -129,13 +133,35 @@ export interface Router<Rec> {
  */
 export declare namespace Router {
   /**
-   * A router record: procedure definitions, routers or nested records, keyed by path segment.
+   * A router record: procedure definitions, routers, router services or nested records, keyed by
+   * path segment. `Router.make` resolves router services to routers, so `router.record` never
+   * holds one.
    *
    * @since 0.1.0
    */
   export type Shape = {
-    readonly [key: string]: ProcedureDef.Any | Any | Shape;
+    readonly [key: string]: ProcedureDef.Any | Any | RouterService.Any | Shape;
   };
+
+  /**
+   * What every API that takes a router accepts: a router (`Router.make`) or a router service class
+   * (see {@link RouterService}). Normalise it with `Router.from`.
+   *
+   * @since 0.1.0
+   */
+  export type Input = Any | RouterService.Any;
+
+  /**
+   * The router type of a {@link Input}: a router stays as it is, a router service maps to the
+   * router built from its `make` (what `Router.from` / `Router.fromService` return).
+   *
+   * @since 0.1.0
+   */
+  export type Of<X> = X extends RouterService.Any
+    ? Router<ServiceRecord<X>>
+    : X extends Any
+      ? X
+      : never;
 
   /**
    * Any router (use it to constrain generic helpers: `<R extends Router.Any>`).
@@ -150,26 +176,33 @@ export declare namespace Router {
   }
 
   /**
-   * The record of a router type.
+   * The record of a router type (for a router service, the record of the router built from it).
    *
    * @since 0.1.0
    */
-  export type Record<R> = R extends Router<infer Rec> ? Rec : never;
-
-  /**
-   * The union of `Rpc`s a router (or router record) compiles to, with literal tags such as
-   * `"post.byId"`. Use with `Rpc.ExtractTag`, `RpcClient.RpcClient` and other `effect/rpc` types.
-   *
-   * @since 0.1.0
-   */
-  export type Rpcs<R> = R extends Any
-    ? RpcsOf<R['record'], ''>
-    : R extends Shape
-      ? RpcsOf<R, ''>
+  export type Record<R> = R extends RouterService.Any
+    ? ServiceRecord<R>
+    : R extends Router<infer Rec>
+      ? Rec
       : never;
 
   /**
-   * The union of procedure tags (dot-joined paths) of a router or router record, e.g.
+   * The union of `Rpc`s a router, router service or router record compiles to, with literal tags
+   * such as `"post.byId"`. Use with `Rpc.ExtractTag`, `RpcClient.RpcClient` and other `effect/rpc`
+   * types.
+   *
+   * @since 0.1.0
+   */
+  export type Rpcs<R> = R extends RouterService.Any
+    ? RpcsOf<ServiceRecord<R>, ''>
+    : R extends Any
+      ? RpcsOf<R['record'], ''>
+      : R extends Shape
+        ? RpcsOf<Resolve<R>, ''>
+        : never;
+
+  /**
+   * The union of procedure tags (dot-joined paths) of a router, router service or router record, e.g.
    * `"health" | "post.byId"`.
    *
    * @since 0.1.0
@@ -200,7 +233,92 @@ export declare namespace Router {
   };
 }
 
-type RecordOf<R> = R extends Router<infer Rec> ? Rec : R;
+/**
+ * Router services: a router written as an Effect `Context.Service` class whose `make` succeeds with
+ * the router record.
+ *
+ * **When to use**
+ *
+ * Use {@link RouterService.Any} to constrain code that takes a router service, or
+ * {@link Router.Input} for code that takes a router or a router service. Write the service itself
+ * with the ordinary `Context.Service<Self>()(id, { make })`; there is no factory to learn.
+ *
+ * **Details**
+ *
+ * - `make` must be an `Effect` value (not a function) that needs no services and cannot fail:
+ *   read services inside the handlers instead. A `make` that needs services or may fail does not
+ *   satisfy {@link RouterService.Any}, so every API rejects it at compile time.
+ * - Every API builds the router with `Router.fromService`, which runs `make` once per class.
+ *
+ * **Example** (A router service)
+ *
+ * ```ts
+ * import { Context, Effect, Schema } from 'effect';
+ * import { Procedure, Router } from '@effect-trpc/core';
+ * import type { RouterService } from '@effect-trpc/core';
+ *
+ * export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+ *   make: Effect.succeed({
+ *     health: Procedure.output(Schema.Literal('ok')).query(() => Effect.succeed('ok' as const)),
+ *   }),
+ * }) {}
+ *
+ * const service: RouterService.Any = AppRouter;
+ * const paths: Router.Paths<typeof AppRouter> = 'health';
+ * ```
+ *
+ * @see {@link Router.fromService}
+ * @category type-level
+ * @since 0.1.0
+ */
+export declare namespace RouterService {
+  /**
+   * Any router service: a `Context` service class whose static `make` is an
+   * `Effect<Router.Shape, never, never>` (no requirements, no failure).
+   *
+   * @since 0.1.0
+   */
+  export type Any = Context.Key<any, any> & {
+    readonly make: Effect.Effect<Router.Shape>;
+  };
+}
+
+/** The record of the router built from a router service (nested services resolved). */
+type ServiceRecord<S> = S extends { readonly make: Effect.Effect<infer Rec, infer _E, infer _R> }
+  ? Resolve<Rec>
+  : never;
+
+/**
+ * The record type `Router.make` stores: router services (at any depth of plain records) replaced
+ * by the routers built from them. Records without services are returned unchanged.
+ */
+type Resolve<Rec> = string extends keyof Rec
+  ? Rec
+  : true extends HasService<Rec>
+    ? { readonly [K in keyof Rec]: ResolveEntry<Rec[K]> }
+    : Rec;
+
+type ResolveEntry<V> = [V] extends [RouterService.Any]
+  ? Router<ServiceRecord<V>>
+  : [V] extends [ProcedureDef.Any | Router.Any]
+    ? V
+    : Resolve<V>;
+
+type HasService<Rec> = { readonly [K in keyof Rec]-?: EntryHasService<Rec[K]> }[keyof Rec];
+
+type EntryHasService<V> = [V] extends [RouterService.Any]
+  ? true
+  : [V] extends [ProcedureDef.Any | Router.Any]
+    ? false
+    : string extends keyof V
+      ? false
+      : HasService<V>;
+
+type RecordOf<R> = R extends RouterService.Any
+  ? ServiceRecord<R>
+  : R extends Router<infer Rec>
+    ? Rec
+    : R;
 
 type InferField<
   D extends ProcedureDef.Any,
@@ -382,6 +500,195 @@ const isPlainRecord = (u: unknown): u is Router.Shape => {
   return proto === Object.prototype || proto === null;
 };
 
+/**
+ * Returns `true` when `u` is a router service: a `Context` service class (see
+ * {@link RouterService}) whose static `make` is an `Effect`.
+ *
+ * **When to use**
+ *
+ * Use in code that takes a {@link Router.Input} and must tell a router service from a router.
+ * Most code calls {@link from} instead, which handles both.
+ *
+ * **Details**
+ *
+ * - Checks the shape only: whether `make` succeeds synchronously with a record is checked when the
+ *   router is built ({@link fromService}).
+ * - A service without `make`, a router, a record or a procedure is not a router service.
+ *
+ * **Example** (Telling services and routers apart)
+ *
+ * ```ts
+ * import { Context, Effect, Schema } from 'effect';
+ * import { Procedure, Router } from '@effect-trpc/core';
+ *
+ * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+ *   make: Effect.succeed({
+ *     health: Procedure.output(Schema.String).query(() => Effect.succeed('ok')),
+ *   }),
+ * }) {}
+ * class Database extends Context.Service<Database, { readonly url: string }>()('Database') {}
+ *
+ * Router.isService(AppRouter); // true
+ * Router.isService(Database); // false: no make
+ * Router.isService(Router.fromService(AppRouter)); // false: a router
+ * ```
+ *
+ * @see {@link fromService}
+ * @category guards
+ * @since 0.1.0
+ */
+const isService = (u: unknown): u is RouterService.Any =>
+  Context.isKey(u) && Predicate.hasProperty(u, 'make') && Effect.isEffect(u.make);
+
+const serviceRouters = new WeakMap<RouterService.Any, Router.Any>();
+const resolving = new Set<RouterService.Any>();
+
+const serviceError = (svc: RouterService.Any, rule: string, cause?: unknown): Error =>
+  new Error(
+    `Cannot build a router from the router service "${svc.key}": ${rule}`,
+    cause === undefined ? undefined : { cause },
+  );
+
+const runMake = (svc: RouterService.Any): unknown => {
+  const exit = Effect.runSyncExit(svc.make);
+  if (Exit.isSuccess(exit)) return exit.value;
+  const cause = Cause.squash(exit.cause);
+  // `runSyncExit` leaves an asynchronous `make` running: stop it so it has no later effects.
+  if (Cause.isAsyncFiberError(cause)) Effect.runFork(Fiber.interrupt(cause.fiber));
+  throw serviceError(
+    svc,
+    'make must not require services or be asynchronous, and must not fail (read services inside the procedure handlers instead)',
+    cause,
+  );
+};
+
+/**
+ * Builds the router of a router service: runs its `make` synchronously and compiles the record
+ * with {@link make}.
+ *
+ * **When to use**
+ *
+ * Every API that takes a {@link Router.Input} calls it (through {@link from}), so you rarely call
+ * it yourself; use it when you need the `Router` value of a service, e.g. for
+ * {@link getRpc} or `router.group`.
+ *
+ * **Details**
+ *
+ * - Memoized per class: `make` runs once per process, however many APIs use the service, and
+ *   every call returns the same router.
+ * - Nested router services (in the record `make` returns) are resolved the same way.
+ *
+ * **Gotchas**
+ *
+ * - `make` must be an `Effect<Record, never, never>`: a `make` that needs services or may fail is a
+ *   compile error. A `make` that is asynchronous (e.g. sleeps), or that fails or reads a service
+ *   despite its type, throws an `Error` naming the service key and the rule
+ *   ("make must not require services or be asynchronous"), with the Effect failure as `cause`.
+ * - A failed `make` is not memoized: the next call runs it again.
+ *
+ * **Example** (Getting the router of a service)
+ *
+ * ```ts
+ * import { Context, Effect, Schema } from 'effect';
+ * import { Procedure, Router } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ *
+ * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+ *   make: Effect.succeed({
+ *     post: {
+ *       byId: Procedure.input({ id: Schema.Number })
+ *         .output(Post)
+ *         .query(({ id }) => Effect.succeed(new Post({ id, title: 'Hello' }))),
+ *     },
+ *   }),
+ * }) {}
+ *
+ * const router = Router.fromService(AppRouter);
+ * router.procedures.get('post.byId')?.kind; // "query"
+ * Router.fromService(AppRouter) === router; // true: memoized
+ * ```
+ *
+ * @see {@link from}
+ * @see {@link isService}
+ * @category constructors
+ * @since 0.1.0
+ */
+const fromService = <S extends RouterService.Any>(service: S): Router.Of<S> => {
+  let router = serviceRouters.get(service);
+  if (router === undefined) {
+    if (resolving.has(service)) {
+      throw serviceError(service, 'its make nests the service itself (directly or indirectly)');
+    }
+    resolving.add(service);
+    try {
+      const record = runMake(service);
+      if (!isPlainRecord(record)) {
+        throw serviceError(service, 'make must succeed with a record of procedures');
+      }
+      router = build(record);
+    } finally {
+      resolving.delete(service);
+    }
+    serviceRouters.set(service, router);
+  }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the router is built from `service.make`'s record, which is what `Router.Of<S>` describes
+  return router as unknown as Router.Of<S>;
+};
+
+/**
+ * Normalises a {@link Router.Input} to a router: returns a router unchanged and builds the router
+ * of a router service with {@link fromService}.
+ *
+ * **When to use**
+ *
+ * Call it once at the entry of any API that accepts a router (`createClient`, `toWebHandler`, an
+ * adapter of your own) so the rest of the code only deals with `Router`.
+ *
+ * **Details**
+ *
+ * - Typed as `Router.Of<X>`: the exact router type for a router, the built router type for a
+ *   service. In generic code (`<R extends Router.Input>`) the result is assignable to
+ *   `Router.Any`.
+ *
+ * **Gotchas**
+ *
+ * - Throws a `TypeError` for anything else (e.g. a plain record: wrap it in `Router.make`).
+ *
+ * **Example** (Accepting a router or a router service)
+ *
+ * ```ts
+ * import { Context, Effect, Schema } from 'effect';
+ * import { Procedure, query, Router } from '@effect-trpc/core';
+ *
+ * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+ *   make: Effect.succeed({
+ *     health: Procedure.output(Schema.String).query(() => Effect.succeed('ok')),
+ *   }),
+ * }) {}
+ * const legacyRouter = Router.make({ health: query({ success: Schema.String }) });
+ *
+ * const tagsOf = <R extends Router.Input>(input: R): ReadonlyArray<string> => [
+ *   ...Router.from(input).procedures.keys(),
+ * ];
+ *
+ * tagsOf(AppRouter); // ["health"]
+ * tagsOf(legacyRouter); // ["health"]
+ * ```
+ *
+ * @see {@link fromService}
+ * @category constructors
+ * @since 0.1.0
+ */
+const from = <const X extends Router.Input>(input: X): Router.Of<X> => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a router is its own `Router.Of`
+  if (isRouter(input)) return input as unknown as Router.Of<X>;
+  if (isService(input)) return fromService(input) as Router.Of<X>;
+  throw new TypeError(
+    'Router.from: expected a router (Router.make) or a router service (a Context.Service class whose make returns procedures)',
+  );
+};
+
 const validateKey = (key: string, path: ReadonlyArray<string>): void => {
   const where = path.length === 0 ? 'the router root' : `"${path.join('.')}"`;
   if (key.length === 0) {
@@ -416,7 +723,7 @@ const collect = (
       collect(value, path, procedures);
     } else {
       throw new Error(
-        `Invalid router entry at "${path.join('.')}": expected a procedure (query, mutation, subscription), a router or a nested record`,
+        `Invalid router entry at "${path.join('.')}": expected a procedure (query, mutation, subscription, Procedure), a router, a router service or a nested record`,
       );
     }
   }
@@ -428,16 +735,61 @@ const applyMiddleware = (
 ): Router.Shape => {
   const out: { [key: string]: ProcedureDef.Any | Router.Any | Router.Shape } = {};
   for (const key of Object.keys(record)) {
-    const value = record[key];
+    const value: unknown = record[key];
     if (isProcedureDef(value)) {
       out[key] = addDefMiddleware(value, middleware);
     } else if (isRouter(value)) {
-      out[key] = make(applyMiddleware(value.record, middleware));
-    } else if (value !== undefined) {
+      out[key] = build(applyMiddleware(value.record, middleware));
+    } else if (isPlainRecord(value)) {
       out[key] = applyMiddleware(value, middleware);
     }
   }
   return out;
+};
+
+/**
+ * Replaces router services (at any depth of plain records) by the routers built from them. Returns
+ * `record` itself when it holds no service, so routers made from ordinary records keep them as-is.
+ */
+const resolveRecord = (record: Router.Shape): Router.Shape => {
+  let out:
+    | { [key: string]: ProcedureDef.Any | Router.Any | RouterService.Any | Router.Shape }
+    | undefined;
+  for (const key of Object.keys(record)) {
+    const value: unknown = record[key];
+    const resolved = isService(value)
+      ? fromService(value)
+      : isPlainRecord(value)
+        ? resolveRecord(value)
+        : value;
+    if (resolved !== value) {
+      out ??= { ...record };
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `resolved` is a router or a resolved record here (it differs from `value`)
+      out[key] = resolved as Router.Any | Router.Shape;
+    }
+  }
+  return out ?? record;
+};
+
+/** Compiles a record into a router (untyped core of `make`). */
+const build = (input: Router.Shape): Router<Router.Shape> => {
+  const record = resolveRecord(input);
+  const procedures = new Map<string, ProcedureInfo>();
+  collect(record, [], procedures);
+  const group = RpcGroup.make(...Array.from(procedures.values(), (info) => info.rpc));
+  const router: Router<Router.Shape> = {
+    [TypeId]: TypeId,
+    record,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the group is compiled from `record`, so its rpcs are `Router.Rpcs<Rec>`
+    group: group as unknown as RpcGroup.RpcGroup<Router.Rpcs<Router.Shape>>,
+    procedures,
+    middleware: <M extends RpcMiddleware.AnyService>(middleware: M) =>
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `applyMiddleware` adds `M` to every definition, which is what `WithMiddleware` describes
+      build(applyMiddleware(record, middleware)) as unknown as Router<
+        Router.WithMiddleware<Router.Shape, M>
+      >,
+  };
+  return Object.freeze(router);
 };
 
 /**
@@ -456,12 +808,16 @@ const applyMiddleware = (
  *   keep that order.
  * - Every compiled rpc is annotated with `ProcedureKind`.
  * - The same definition may appear under several paths; nested routers are not mutated.
+ * - A router service (see {@link RouterService}) may be an entry: it is resolved with
+ *   {@link fromService}, and `router.record` (and its type) holds the resolved router there, so
+ *   every type helper sees an ordinary nested router. A record without services is stored as-is.
  *
  * **Gotchas**
  *
  * - Throws if a key is empty, contains `"."` (nest records instead), is a reserved word (`then`,
  *   `call`, `apply` — they would break proxy-based clients) or if a value is not a procedure,
- *   router or plain record.
+ *   router, router service or plain record.
+ * - A router service entry whose `make` needs services or may fail is a compile error.
  *
  * **Example** (A nested app router)
  *
@@ -495,22 +851,9 @@ const applyMiddleware = (
  * @category constructors
  * @since 0.1.0
  */
-const make = <const Rec extends Router.Shape>(record: Rec): Router<Rec> => {
-  const procedures = new Map<string, ProcedureInfo>();
-  collect(record, [], procedures);
-  const group = RpcGroup.make(...Array.from(procedures.values(), (info) => info.rpc));
-  const router: Router<Rec> = {
-    [TypeId]: TypeId,
-    record,
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the group is compiled from `record`, so its rpcs are `Router.Rpcs<Rec>`
-    group: group as unknown as RpcGroup.RpcGroup<Router.Rpcs<Rec>>,
-    procedures,
-    middleware: <M extends RpcMiddleware.AnyService>(middleware: M) =>
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `applyMiddleware` adds `M` to every definition, which is what `WithMiddleware` describes
-      make(applyMiddleware(record, middleware)) as unknown as Router<Router.WithMiddleware<Rec, M>>,
-  };
-  return Object.freeze(router);
-};
+const make = <const Rec extends Router.Shape>(record: Rec): Router<Resolve<Rec>> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `build` resolves the services in `record`, which is what `Resolve` describes
+  build(record) as unknown as Router<Resolve<Rec>>;
 
 /**
  * Merges two routers into one (tRPC's `mergeRouters`).
@@ -550,8 +893,8 @@ const merge = <A extends Router.Shape, B extends Router.Shape>(
       throw new Error(`Cannot merge routers: duplicate key "${key}"`);
     }
   }
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- keys were checked disjoint above, so the spread is exactly `Merge<A, B>`
-  return make({ ...a.record, ...b.record } as Router.Merge<A, B> & Router.Shape);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- keys were checked disjoint above and both records are resolved, so the router's record is exactly `Merge<A, B>`
+  return build({ ...a.record, ...b.record }) as unknown as Router<Router.Merge<A, B>>;
 };
 
 /**
@@ -776,8 +1119,8 @@ const childPath = (
 };
 
 /**
- * Router constructors and helpers: `make`, `merge`, `getByPath`, `getRpc`, `isPath`, `childPath`
- * and `isRouter`.
+ * Router constructors and helpers: `make`, `merge`, `from`, `fromService`, `getByPath`, `getRpc`,
+ * `isPath`, `childPath`, `isRouter` and `isService`.
  *
  * **When to use**
  *
@@ -790,11 +1133,14 @@ const childPath = (
  * | ------------------------------------------- | ------------------------------------------------ |
  * | `Router.make(record)`                       | Compile a nested record of procedures / routers. |
  * | `Router.merge(a, b)`                        | Merge two routers; overlapping keys throw.       |
+ * | `Router.from(routerOrService)`              | Normalise a `Router.Input` to a router.          |
+ * | `Router.fromService(AppRouter)`             | The router of a service (memoized per class).    |
  * | `Router.getByPath(router, ['post','byId'])` | `Option<ProcedureInfo>`.                         |
  * | `Router.getRpc(router, 'post.byId')`        | The compiled rpc, precisely typed.               |
  * | `Router.isPath(router, ['post'])`           | Is the path a namespace or procedure?            |
  * | `Router.childPath(router, path, key)`       | The key policy shared by router proxies.         |
  * | `Router.isRouter(u)`                        | Guard.                                           |
+ * | `Router.isService(u)`                       | Guard for router services.                       |
  *
  * **Example** (Defining and inspecting a router)
  *
@@ -828,9 +1174,12 @@ const childPath = (
 export const Router = {
   make,
   merge,
+  from,
+  fromService,
   getByPath,
   getRpc,
   isPath,
   childPath,
   isRouter,
+  isService,
 } as const;
