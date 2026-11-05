@@ -13,10 +13,37 @@ test('SSR HTML for /tasks/1 contains the title (JS disabled)', async ({ request 
   expect(await response.text()).toContain('Draft the launch plan');
 });
 
-test('SSR of /tasks/999 shows "Task #999 not found" after hydration (typed error survived)', async ({
-  page,
-  baseURL,
+test('SSR payload of /tasks/999 carries the encoded TaskNotFound (dehydrated query cache)', async ({
+  request,
 }) => {
+  // The server-rendered HTML shows the loading state; the failed query travels in the
+  // dehydrated cache of the page, encoded with the procedure's error schema. That is what
+  // `hydration.routerOptions` and the awaited loader prefetch put there.
+  const response = await request.get('/tasks/999');
+  expect(response.status()).toBe(200);
+  const html = await response.text();
+  const literal = /queryState:("(?:[^"\\]|\\.)*")/.exec(html)?.[1];
+  expect(literal, 'the page carries a dehydrated query cache').toBeDefined();
+  const state: unknown = JSON.parse(JSON.parse(literal!));
+  expect(state).toMatchObject({
+    queries: [
+      {
+        queryKey: [['tasks', 'byId'], { input: { id: 999 }, type: 'query' }],
+        state: {
+          status: 'error',
+          error: {
+            _tag: 'Failure',
+            cause: [{ _tag: 'Fail', error: { _tag: 'TaskNotFound', id: 999 } }],
+          },
+        },
+      },
+    ],
+  });
+});
+
+test('/tasks/999 shows "Task #999 not found" after hydration', async ({ page, baseURL }) => {
+  // On mount the hydrated errored query is retried over /api/rpc, so this alone does not prove
+  // the SSR hand-off (the payload test above does); it proves the page ends in the typed state.
   const board = new TaskBoardPage(page, httpAdapter(page, baseURL!));
   await board.gotoTask(999);
   await board.expectAlert('Task #999 not found');
