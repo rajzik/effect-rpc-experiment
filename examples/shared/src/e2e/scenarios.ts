@@ -30,7 +30,7 @@ const overdue = seedTasks().find((task) => task.isOverdue);
  * 2. a task page shows the task; a missing id shows `Task #<id> not found`;
  * 3. a guest creating a task gets `Forbidden`; a member's task appears without reload;
  * 4. an empty title shows `ValidationFailed`;
- * 5. a toggle in one window shows up live in another, while the subscription stays open;
+ * 5. a toggle in one window shows up live in another within 5 seconds, on a stream that stays open;
  * 6. `Load more` appends the next pages;
  * 7. isolation: data created by one test is gone in the next.
  */
@@ -91,13 +91,17 @@ export const sharedScenarios = <
       const actor = await boards.open('ada');
       await observer.gotoList();
       await actor.gotoList();
-      // The subscription attaches after the page rendered and a change before that is not
-      // replayed, so toggle until the observer shows it. A transport that buffers the stream until
-      // it ends never delivers: this fails after the timeout.
+      // Step 1 only establishes that the subscription is attached: it attaches after the page
+      // rendered and a change before that is not replayed, so toggle until the observer shows one.
       await expect(async () => {
         await actor.toggle(newest);
         await observer.expectLive(newest, 2_000);
       }).toPass({ timeout: 15_000 });
+      // Step 2 measures delivery on a stream known to be open: ONE distinct change, no retry,
+      // must reach the observer within 5 seconds. A transport that delivers late or buffers the
+      // stream fails here, however long the retry loop above had to run.
+      const other = seed[1]?.title ?? '';
+      await Promise.all([observer.expectLive(other, 5_000), actor.toggle(other)]);
     });
 
     test('6. load more appends the next page', async ({ boards }) => {

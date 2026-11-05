@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSubscription, type RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
 
 import type { AppRouter } from '../domain';
+import { useHydrated } from './useHydrated';
 
 /** Props of {@link LiveFeed}. */
 export interface LiveFeedProps {
@@ -16,6 +17,7 @@ export interface LiveFeedProps {
  */
 export function LiveFeed({ rpc }: LiveFeedProps) {
   const queryClient = useQueryClient();
+  const hydrated = useHydrated();
   const live = useSubscription(
     rpc.tasks.onChanged.subscriptionOptions(undefined, {
       onData: (task) => {
@@ -25,7 +27,7 @@ export function LiveFeed({ rpc }: LiveFeedProps) {
     }),
   );
   return (
-    <aside>
+    <aside data-hydrated={hydrated}>
       <p role="status">
         {live.data === undefined ? 'Waiting for changes' : `Live: ${live.data.title}`}
       </p>

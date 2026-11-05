@@ -8,6 +8,7 @@ import { useState, type FormEvent } from 'react';
 
 import type { AppRouter, Forbidden, Task, Unauthorized, ValidationFailed } from '../domain';
 import { ErrorAlert } from './errors';
+import { useHydrated } from './useHydrated';
 
 type CreateError = Forbidden | Unauthorized | ValidationFailed;
 
@@ -25,6 +26,7 @@ export interface NewTaskFormProps {
 /** Creates a task; a typed failure appears as an `alert` and the list refreshes on success. */
 export function NewTaskForm({ rpc, submit }: NewTaskFormProps) {
   const queryClient = useQueryClient();
+  const hydrated = useHydrated();
   const [title, setTitle] = useState('');
   const [submitError, setSubmitError] = useState<ClientError<CreateError> | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -64,7 +66,7 @@ export function NewTaskForm({ rpc, submit }: NewTaskFormProps) {
   };
 
   return (
-    <form onSubmit={onSubmit}>
+    <form onSubmit={onSubmit} data-hydrated={hydrated}>
       <label>
         Title{' '}
         <input name="title" value={title} onChange={(event) => setTitle(event.target.value)} />

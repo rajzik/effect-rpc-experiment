@@ -5,6 +5,7 @@ import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
 
 import type { AppRouter } from '../domain';
 import { ErrorAlert } from './errors';
+import { useHydrated } from './useHydrated';
 import { formatDate } from './format';
 import { taskDetailOptions } from './options';
 
@@ -17,17 +18,22 @@ export interface TaskDetailProps {
 /** A heading with the title, the details and `Overdue` when `task.isOverdue`. */
 export function TaskDetail({ rpc, id }: TaskDetailProps) {
   const task = useQuery(taskDetailOptions(rpc, id));
-  if (task.error !== null) return <ErrorAlert error={task.error} />;
-  if (task.data === undefined) return <p>Loading task…</p>;
+  const hydrated = useHydrated();
   const { data } = task;
   return (
-    <article>
-      <h1>{data.title}</h1>
-      {data.isOverdue && <strong>Overdue</strong>}
-      <p>{data.done ? 'Done' : 'Open'}</p>
-      <p>Assigned to {data.assignee}</p>
-      <p>Created {formatDate(data.createdAt)}</p>
-      {data.dueAt !== undefined && <p>Due {formatDate(data.dueAt)}</p>}
-    </article>
+    <div data-hydrated={hydrated}>
+      {task.error !== null && <ErrorAlert error={task.error} />}
+      {task.error === null && data === undefined && <p>Loading task…</p>}
+      {data !== undefined && (
+        <article>
+          <h1>{data.title}</h1>
+          {data.isOverdue && <strong>Overdue</strong>}
+          <p>{data.done ? 'Done' : 'Open'}</p>
+          <p>Assigned to {data.assignee}</p>
+          <p>Created {formatDate(data.createdAt)}</p>
+          {data.dueAt !== undefined && <p>Due {formatDate(data.dueAt)}</p>}
+        </article>
+      )}
+    </div>
   );
 }

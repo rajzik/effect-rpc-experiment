@@ -9,6 +9,7 @@ import type { ReactNode } from 'react';
 
 import type { AppRouter, Task } from '../domain';
 import { ErrorAlert } from './errors';
+import { useHydrated } from './useHydrated';
 import { formatDate } from './format';
 import { taskListOptions } from './options';
 
@@ -28,6 +29,7 @@ const defaultLink = (task: Task, label: string, children: ReactNode): ReactNode 
 /** `list` named "Tasks" with a row per task, plus "Load more" while more pages exist. */
 export function TaskList({ rpc, renderLink = defaultLink }: TaskListProps) {
   const queryClient = useQueryClient();
+  const hydrated = useHydrated();
   const tasks = useInfiniteQuery(taskListOptions(rpc));
   const toggle = useMutation(
     rpc.tasks.toggle.mutationOptions({
@@ -41,7 +43,7 @@ export function TaskList({ rpc, renderLink = defaultLink }: TaskListProps) {
 
   return (
     <section>
-      <ul aria-label="Tasks">
+      <ul aria-label="Tasks" data-hydrated={hydrated}>
         {items.map((task) => (
           <li key={task.id}>
             <label>

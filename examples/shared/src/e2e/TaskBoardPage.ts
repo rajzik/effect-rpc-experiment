@@ -66,25 +66,55 @@ export class TaskBoardPage {
     await this.#adapter.signIn(name);
   }
 
-  /** Opens the list page and waits for the first tasks to render. */
+  /** The new-task form. */
+  get form(): Locator {
+    return this.page.locator('form[data-hydrated]');
+  }
+
+  /**
+   * Waits until React has hydrated `target`: the components set `data-hydrated="true"` once they
+   * are interactive. Server-rendered HTML is visible (and clickable) before that, but a click then
+   * reaches no handler: a form would submit natively and a checkbox would flip without a call.
+   */
+  async #hydrated(target: Locator): Promise<void> {
+    await expect(target).toHaveAttribute('data-hydrated', 'true');
+  }
+
+  /** Opens the list page and waits until its tasks rendered and its components are hydrated. */
   async gotoList(): Promise<void> {
     await this.#adapter.gotoList();
     await expect(this.rows.first()).toBeVisible();
+    await this.#hydrated(this.list);
+    await this.#hydrated(this.form);
+    await this.#hydrated(this.page.locator('aside[data-hydrated]'));
   }
 
-  /** Opens the page of task `id`; wait for its content with `expectAlert` or the page's text. */
+  /**
+   * Opens the page of task `id` and waits until it is hydrated; wait for its content with
+   * `expectAlert` or the page's text.
+   */
   async gotoTask(id: number): Promise<void> {
     await this.#adapter.gotoTask(id);
+    await this.#hydrated(this.page.locator('[data-hydrated]').first());
   }
 
   /** Types `title` into the form and presses `Create`; does not wait for the result. */
   async createTask(title: string): Promise<void> {
+    await this.#hydrated(this.form);
     await this.page.getByRole('textbox', { name: 'Title' }).fill(title);
     await this.page.getByRole('button', { name: 'Create' }).click();
   }
 
-  /** Toggles the task titled `title` and waits until its checkbox shows the new state. */
+  /**
+   * Toggles the task titled `title` and waits until its checkbox shows the new state.
+   *
+   * The checkbox is controlled by the query data, so once hydrated it can only change after the
+   * `tasks.toggle` call succeeded and the data was updated: the new state proves the server
+   * committed the change. Hydration is awaited first, because before it a click would flip the
+   * native checkbox without sending anything.
+   */
   async toggle(title: string): Promise<void> {
+    await this.#hydrated(this.list);
     const checkbox = this.row(title).getByRole('checkbox');
     const wasDone = await checkbox.isChecked();
     await checkbox.click();
@@ -93,6 +123,7 @@ export class TaskBoardPage {
 
   /** Presses `Load more` and waits until more rows are shown. */
   async loadMore(): Promise<void> {
+    await this.#hydrated(this.list);
     const before = await this.rows.count();
     await this.page.getByRole('button', { name: 'Load more' }).click();
     await expect.poll(async () => await this.rows.count()).toBeGreaterThan(before);
