@@ -1,0 +1,108 @@
+/* Typography, radius and focus treatment in the style of effect.website. */
+
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.vp-doc h4,
+.VPHero .name,
+.VPHero .text {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+/* Modular 1.25 scale: 1 / 1.25 / 1.563 / 1.953 / 2.441 / 3.052rem */
+.vp-doc h1 {
+  font-size: 2.441rem;
+  line-height: 1.25;
+}
+.vp-doc h2 {
+  font-size: 1.953rem;
+  line-height: 1.375;
+  border-top-color: var(--vp-c-divider);
+}
+.vp-doc h3 {
+  font-size: 1.563rem;
+  line-height: 1.375;
+}
+.vp-doc h4 {
+  font-size: 1.25rem;
+  line-height: 1.375;
+}
+
+@media (min-width: 768px) {
+  .vp-doc h1 {
+    font-size: 3.052rem;
+  }
+}
+
+.vp-doc a {
+  color: var(--vp-c-text-1);
+  text-decoration: underline;
+  text-decoration-color: var(--vp-c-text-3);
+  text-underline-offset: 3px;
+  font-weight: 500;
+}
+.vp-doc a:hover {
+  text-decoration-color: var(--vp-c-text-1);
+}
+
+/* Radius on custom blocks and buttons; code blocks only once they stop running edge to edge. */
+.vp-doc .custom-block,
+.VPButton {
+  border-radius: var(--et-radius);
+}
+@media (min-width: 640px) {
+  .vp-doc div[class*='language-'],
+  .vp-code-group .tabs {
+    border-radius: var(--et-radius);
+  }
+  .vp-code-group .tabs {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  .vp-code-group div[class*='language-'] {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+  .vp-doc div[class*='language-'] {
+    border: 1px solid var(--vp-code-block-divider-color);
+  }
+}
+
+/* Muted custom blocks: a thin border instead of a coloured fill. */
+.vp-doc .custom-block {
+  border: 1px solid var(--vp-c-divider);
+}
+.vp-doc .custom-block.tip,
+.vp-doc .custom-block.info {
+  background: var(--vp-c-bg-alt);
+}
+
+/* Sidebar: active item in text colour with an emerald marker. */
+.VPSidebarItem.is-active > .item > .indicator {
+  background-color: var(--et-ring);
+  width: 2px;
+}
+.VPSidebarItem.is-active > .item .link > .text {
+  color: var(--vp-c-text-1);
+  font-weight: 600;
+}
+
+/* Focus ring. */
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--et-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Wordmark. */
+.VPNavBarTitle .title {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+/* Generated API pages: signatures and section labels. */
+.vp-doc .api-since {
+  color: var(--vp-c-text-3);
+  font-size: 0.875rem;
+}
