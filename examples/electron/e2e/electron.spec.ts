@@ -41,33 +41,36 @@ test('preload exposes nothing', async ({ launchApp }) => {
       electron: 'undefined',
       process: 'undefined',
     });
-    // Context isolation and no Node integration are what main.ts asked for (not affected by
-    // `--no-sandbox`); the behaviour above is the proof that they took effect.
+    // What main.ts asked for, on every platform (`--no-sandbox` changes the process, not these
+    // preferences): the behaviour above is the proof that context isolation took effect, and the
+    // runtime sandbox test below the proof, where it can run, that `sandbox: true` did.
     const preferences = await (
       await app.browserWindow(board.page)
     ).evaluate((window) => {
-      const { contextIsolation, nodeIntegration } =
+      const { contextIsolation, nodeIntegration, sandbox } =
         window.webContents.getLastWebPreferences() ?? {};
-      return { contextIsolation, nodeIntegration };
+      return { contextIsolation, nodeIntegration, sandbox };
     });
     expect(preferences.contextIsolation).toBe(true);
     expect(preferences.nodeIntegration).not.toBe(true);
+    expect(preferences.sandbox).toBe(true);
   }
 });
 
-test('renderer processes run in an OS sandbox', async ({ launchApp }, testInfo) => {
+test('renderer processes run in an OS sandbox', async ({ launchApp }) => {
+  // `getAppMetrics().sandboxed` is what Electron reports about the running processes (macOS and
+  // Windows only), unlike `getLastWebPreferences()`, which only echoes what main.ts requested
+  // (asserted on every platform in the test above). Skipped, not passed, where it cannot run.
+  test.skip(
+    noSandbox,
+    'launched with --no-sandbox (Linux without a setuid chrome-sandbox helper, or EXAMPLES_ELECTRON_NO_SANDBOX=1): renderers are not OS-sandboxed in this run',
+  );
+  test.skip(
+    process.platform !== 'darwin' && process.platform !== 'win32',
+    `Electron does not report the sandbox state of processes on ${process.platform}`,
+  );
   const { app, boards } = await launchApp();
   for (const name of ['ada', 'guest']) await (await boards.open(name)).gotoList();
-
-  // `getAppMetrics().sandboxed` is what Electron reports about the running processes (macOS and
-  // Windows only), unlike `getLastWebPreferences()`, which only echoes what main.ts requested.
-  if (noSandbox || (process.platform !== 'darwin' && process.platform !== 'win32')) {
-    const reason = noSandbox
-      ? 'launched with --no-sandbox (Linux without a setuid chrome-sandbox helper, or EXAMPLES_ELECTRON_NO_SANDBOX=1): renderers are not OS-sandboxed in this run'
-      : `Electron does not report the sandbox state of processes on ${process.platform}`;
-    testInfo.annotations.push({ type: 'skipped runtime sandbox assertion', description: reason });
-    return;
-  }
   const renderers = await app.evaluate(({ app: electronApp }) =>
     electronApp
       .getAppMetrics()

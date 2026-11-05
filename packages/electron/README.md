@@ -158,17 +158,28 @@ const HandlersLive = Handlers.make(appRouter, {
   clock: () => Stream.fromSchedule(Schedule.spaced('1 second')),
 });
 
-await app.whenReady();
-const server = await MainRpcServer.run(appRouter, { handlers: HandlersLive, ipcMain });
-app.on('will-quit', () => void server.dispose());
+const start = async () => {
+  const server = await MainRpcServer.run(appRouter, { handlers: HandlersLive, ipcMain });
+  app.on('will-quit', () => void server.dispose());
 
-new BrowserWindow({
-  webPreferences: {
-    preload: `${import.meta.dirname}/preload.js`,
-    contextIsolation: true,
-    sandbox: true,
-  },
-}).loadFile('index.html');
+  await new BrowserWindow({
+    webPreferences: {
+      preload: `${import.meta.dirname}/preload.js`,
+      contextIsolation: true,
+      sandbox: true,
+    },
+  }).loadFile('index.html');
+};
+
+// Not a top-level `await app.whenReady()`: a main module that is still evaluating can hang tools
+// that drive the app (Playwright's `_electron.launch`).
+app
+  .whenReady()
+  .then(start)
+  .catch((error: unknown) => {
+    console.error(error);
+    app.exit(1);
+  });
 ```
 
 **preload.ts**:

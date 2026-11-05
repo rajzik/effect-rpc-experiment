@@ -286,23 +286,34 @@ const layer = <R extends Router.Any, LOut = never, LE = never, LR = never>(
  *   },
  * });
  *
- * await app.whenReady();
- * const server = await MainRpcServer.run(appRouter, {
- *   handlers: HandlersLive,
- *   ipcMain,
- *   // Only pages of the packaged app may connect.
- *   authorize: (event) => event.senderFrame?.url.startsWith('app://') === true,
- * });
- * app.on('will-quit', () => void server.dispose());
+ * const start = async () => {
+ *   const server = await MainRpcServer.run(appRouter, {
+ *     handlers: HandlersLive,
+ *     ipcMain,
+ *     // Only pages of the packaged app may connect.
+ *     authorize: (event) => event.senderFrame?.url.startsWith('app://') === true,
+ *   });
+ *   app.on('will-quit', () => void server.dispose());
  *
- * const win = new BrowserWindow({
- *   webPreferences: {
- *     preload: fileURLToPath(new URL('./preload.js', import.meta.url)),
- *     contextIsolation: true,
- *     sandbox: true,
- *   },
- * });
- * await win.loadURL('app://bundle/index.html');
+ *   const win = new BrowserWindow({
+ *     webPreferences: {
+ *       preload: fileURLToPath(new URL('./preload.js', import.meta.url)),
+ *       contextIsolation: true,
+ *       sandbox: true,
+ *     },
+ *   });
+ *   await win.loadURL('app://bundle/index.html');
+ * };
+ *
+ * // Not a top-level `await app.whenReady()`: a main module that is still evaluating can hang
+ * // tools that drive the app (Playwright's `_electron.launch`).
+ * app
+ *   .whenReady()
+ *   .then(start)
+ *   .catch((error: unknown) => {
+ *     console.error(error);
+ *     app.exit(1);
+ *   });
  * ```
  *
  * @see {@link layer}
