@@ -106,3 +106,23 @@
   color: var(--vp-c-text-3);
   font-size: 0.875rem;
 }
+
+/* Code names in headings (API reference): monospace, no chip. */
+.vp-doc :is(h1, h2, h3, h4) code {
+  background: none;
+  padding: 0;
+  color: var(--vp-c-text-1);
+  font-size: 0.92em;
+  font-weight: 600;
+}
+.vp-doc h4 {
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--vp-c-divider);
+}
+
+/* Show `=>`, `!==`, `>=` as typed: ligatures read as different symbols in type signatures. */
+.vp-doc code,
+.vp-doc pre {
+  font-variant-ligatures: none;
+}

@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "docs:dev": "vitepress dev",
-    "docs:build": "vitepress build",
+    "docs:dev": "pnpm docs:api && vitepress dev",
+    "docs:build": "pnpm docs:api && vitepress build",
     "docs:preview": "vitepress preview",
-    "docs:test": "vp test"
+    "docs:test": "vp test",
+    "docs:api": "node scripts/gen-api.mjs"
   },
   "devDependencies": {
     "@fontsource/inter": "catalog:",

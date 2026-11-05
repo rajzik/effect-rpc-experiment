@@ -8,17 +8,18 @@
 //   node scripts/verify-jsdoc.mjs --keep          # keep packages/*/.jsdoc-examples for debugging
 //
 // Examples are type-checked against `dist/*.d.mts`, so run `vp run -r build` first.
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { bin, repoRoot, run } from './_run.mjs';
+import {
+  braceDelta,
+  docAbove,
+  docText,
+  EXPORT_RE,
+  examplesOf,
+  VALUE_KINDS,
+  walk,
+} from './jsdoc-parse.mjs';
 
 const argv = process.argv.slice(2);
 const flags = new Set(argv.filter((a) => a.startsWith('--')));
@@ -31,65 +32,8 @@ const packages = readdirSync(packagesDir)
   .filter((name) => existsSync(join(packagesDir, name, 'src')))
   .filter((name) => selected.length === 0 || selected.includes(name));
 
-const SKIP_DIRS = new Set(['internal', 'internals']);
-const EXPORT_RE =
-  /^(\s*)export\s+(?:declare\s+)?(?:default\s+)?(const|let|function|async\s+function|abstract\s+class|class|interface|type|namespace|enum)\s+([A-Za-z_$][\w$]*)/;
-const VALUE_KINDS = new Set([
-  'const',
-  'let',
-  'function',
-  'async function',
-  'class',
-  'abstract class',
-]);
-
 const problems = [];
 const report = (file, line, msg) => problems.push(`${relative(repoRoot, file)}:${line}  ${msg}`);
-
-function walk(dir) {
-  const out = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      if (!SKIP_DIRS.has(entry)) out.push(...walk(full));
-    } else if (/\.tsx?$/.test(entry) && !entry.endsWith('.d.ts')) {
-      out.push(full);
-    }
-  }
-  return out;
-}
-
-/** Returns the JSDoc block (as raw lines) that ends right above `index`, or undefined. */
-function docAbove(lines, index) {
-  let end = index - 1;
-  if (end < 0 || !lines[end].trim().endsWith('*/')) return undefined;
-  let start = end;
-  while (start >= 0 && !lines[start].trim().startsWith('/**')) {
-    if (lines[start].trim().startsWith('//')) return undefined;
-    start--;
-  }
-  if (start < 0) return undefined;
-  return lines.slice(start, end + 1);
-}
-
-/** Strips comment decoration: `/**`, `*\/`, leading ` * `. */
-const docText = (block) =>
-  block
-    .map((l) =>
-      l
-        .replace(/^\s*\/\*\*\s?/, '')
-        .replace(/\s*\*\/\s*$/, '')
-        .replace(/^\s*\* ?/, ''),
-    )
-    .join('\n');
-
-function examplesOf(text) {
-  const out = [];
-  const re = /```(tsx?)\b([^\n]*)\n([\s\S]*?)```/g;
-  let m;
-  while ((m = re.exec(text))) out.push({ lang: m[1], info: m[2].trim(), code: m[3] });
-  return out;
-}
 
 const collected = new Map(); // pkg -> [{ name, lang, code }]
 
@@ -167,13 +111,7 @@ for (const pkg of packages) {
         }
       }
       // Track brace depth outside strings/comments well enough for declaration files.
-      const stripped = line
-        .replace(/\/\/.*$/, '')
-        .replace(/'(?:\\.|[^'])*'|"(?:\\.|[^"])*"|`(?:\\.|[^`])*`/g, '');
-      for (const ch of stripped) {
-        if (ch === '{') depth++;
-        else if (ch === '}') depth = Math.max(0, depth - 1);
-      }
+      depth = Math.max(0, depth + braceDelta(line));
     });
   }
 }
