@@ -215,6 +215,7 @@ export const rpcSubscriptionOptions = (args: {
       let iterator: AsyncIterator<unknown> | undefined;
       let finished = false;
       try {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the Promise client returns an `AsyncIterable` for subscription procedures (the only ones routed here)
         const iterable = call(
           path,
           input === skipToken ? undefined : input,

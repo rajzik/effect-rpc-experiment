@@ -2,17 +2,18 @@
 // with an encoded Exit; the client decodes it to class instances with typed errors.
 import { RpcDefect, RpcInterrupted, RpcTransportError } from '@effect-trpc/core';
 import { Exit } from 'effect';
-import { describe, expect, test } from 'vite-plus/test';
-import {
-  createServerActionCaller,
-  decodeActionResult,
-  unwrapActionResult,
-  type EncodedExit,
-} from '../src/index.js';
+import { assert, describe, expect, test } from 'vite-plus/test';
+import { createServerActionCaller, decodeActionResult, unwrapActionResult } from '../src/index.js';
 import { appRouter, Forbidden, makeFixture, Post, PostNotFound } from './fixtures.js';
 
-/** What crosses the server → client boundary: plain JSON (React serializes it). */
-const overTheWire = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+/**
+ * What crosses the server → client boundary: plain JSON (React serializes it). The value must
+ * survive a JSON round trip unchanged (no class instances, `Date`s or `undefined` fields).
+ */
+const overTheWire = <T>(value: T): T => {
+  expect(JSON.parse(JSON.stringify(value))).toStrictEqual(value);
+  return value;
+};
 
 const setup = () => {
   const fixture = makeFixture();
@@ -82,19 +83,18 @@ describe('createServerActionCaller', () => {
     });
     expect(JSON.stringify(encoded)).not.toContain('stack');
     const error = await unwrapActionResult(appRouter, 'boom', encoded).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(RpcDefect);
-    expect((error as RpcDefect).message).toBe('kaboom');
+    assert.instanceOf(error, RpcDefect);
+    expect(error.message).toBe('kaboom');
     await actions.dispose();
   });
 
   test('invalid input (from the network) is rejected by the payload schema', async () => {
     const { actions, state } = setup();
-    const action = actions('post.byId') as (input: unknown) => Promise<EncodedExit>;
-    const error = await unwrapActionResult(appRouter, 'post.byId', action({ id: 'one' })).catch(
-      (e: unknown) => e,
-    );
-    expect(error).toBeInstanceOf(RpcDefect);
-    expect((error as RpcDefect).message).toContain('Invalid input for "post.byId"');
+    // @ts-expect-error -- input from the network is not type-checked: the payload schema rejects it
+    const result = actions('post.byId')({ id: 'one' });
+    const error = await unwrapActionResult(appRouter, 'post.byId', result).catch((e: unknown) => e);
+    assert.instanceOf(error, RpcDefect);
+    expect(error.message).toContain('Invalid input for "post.byId"');
     expect(state.calls).toEqual([]);
     await actions.dispose();
   });
@@ -127,8 +127,10 @@ describe('createServerActionCaller', () => {
 
   test('subscriptions and unknown paths are programming errors', () => {
     const { actions } = setup();
-    expect(() => (actions as (path: string) => unknown)('ticks')).toThrow(/subscription/);
-    expect(() => (actions as (path: string) => unknown)('nope')).toThrow(/no procedure/);
+    // @ts-expect-error -- subscriptions are not action paths
+    expect(() => actions('ticks')).toThrow(/subscription/);
+    // @ts-expect-error -- not a procedure path
+    expect(() => actions('nope')).toThrow(/no procedure/);
   });
 
   test('a rejected action call becomes RpcTransportError; malformed results RpcDefect', async () => {

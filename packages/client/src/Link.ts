@@ -393,6 +393,9 @@ export interface LocalLinkOptions<Handlers> {
   readonly handlers: Layer.Layer<Handlers, unknown>;
 }
 
+/** Placeholder for the server-to-client callback until the client side exists. */
+const ignoreMessage = (): Effect.Effect<void> => Effect.void;
+
 /**
  * An in-process link: runs the router's handlers in the same process, with no serialization
  * (values are passed by reference).
@@ -447,11 +450,12 @@ export const localLink = <Handlers>(options: LocalLinkOptions<Handlers>): Link<H
     Effect.gen(function* () {
       // The layer provides `Handlers`; `createClient` checks (via `Link<Handlers>`) that it covers
       // `Rpc.ToHandler<Rpcs> | Rpc.Middleware<Rpcs>`, which is not expressible on this generic.
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- see above: `createClient` type-checks that `Handlers` covers these services
       const context = (yield* Layer.build(
+        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `handlers` option accepts any layer error; `orDie` turns it into a defect
         Layer.orDie(options.handlers),
       )) as unknown as Context.Context<Rpc.ToHandler<Rpcs> | Rpc.Middleware<Rpcs>>;
-      let toClient: (message: RpcMessage.FromServer<Rpcs>) => Effect.Effect<void> = () =>
-        Effect.void;
+      let toClient: (message: RpcMessage.FromServer<Rpcs>) => Effect.Effect<void> = ignoreMessage;
       const server = yield* RpcServer.makeNoSerialization(group, {
         disableFatalDefects: true,
         onFromServer: (message) => toClient(message),

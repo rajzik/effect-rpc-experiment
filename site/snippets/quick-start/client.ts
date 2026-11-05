@@ -1,8 +1,8 @@
 // client.ts — call the server from any TypeScript code.
 import { Effect } from 'effect';
-import { createClient, httpLink, type Client } from '@effect-trpc/client';
+import { createClient, httpLink } from '@effect-trpc/client';
 
-import { appRouter, Post } from '@/router';
+import { appRouter, Post, PostNotFound } from '@/router';
 
 const client = createClient(appRouter, {
   link: httpLink({
@@ -21,8 +21,7 @@ try {
   await client.post.byId({ id: 404 });
 } catch (cause) {
   // ClientError<PostNotFound>: your error, or RpcDefect / RpcTransportError / RpcInterrupted
-  const error = cause as Client.Error<typeof appRouter.record.post.byId>;
-  if (error._tag === 'PostNotFound') console.log(`no post #${error.id}`);
+  if (cause instanceof PostNotFound) console.log(`no post #${cause.id}`);
 }
 // #endregion promise
 

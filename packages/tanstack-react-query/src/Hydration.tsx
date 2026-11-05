@@ -163,8 +163,10 @@ interface InfiniteDataLike {
 const isInfiniteData = (value: unknown): value is InfiniteDataLike =>
   typeof value === 'object' &&
   value !== null &&
-  Array.isArray((value as InfiniteDataLike).pages) &&
-  Array.isArray((value as InfiniteDataLike).pageParams);
+  'pages' in value &&
+  Array.isArray(value.pages) &&
+  'pageParams' in value &&
+  Array.isArray(value.pageParams);
 
 const mapData = (
   type: EncodedMarker['type'],
@@ -383,6 +385,7 @@ export const dehydrate = (
           state: {
             ...query.state,
             ...(data !== undefined && { data: encode(data) }),
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the dehydrated `error` slot holds the JSON encoding; `decodeState` restores the instance
             ...(encodedError !== undefined && { error: encodedError.error as Error }),
             // The same raw error instance: restored from `error` by `hydrate`.
             fetchFailureReason: null,
@@ -436,7 +439,8 @@ const decodeState = (
       const { data, error } = plain.state;
       const decodedError =
         marker.error !== undefined && error !== null
-          ? (decodeError(info.rpc, error, marker.error) as Error)
+          ? // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- decodes to a `Schema.TaggedError` instance (an `Error`) of the procedure or the infrastructure union
+            (decodeError(info.rpc, error, marker.error) as Error)
           : undefined;
       return [
         {
@@ -470,6 +474,7 @@ const deserializerOf = (
 const withIdentityDeserializer = <O extends { defaultOptions?: object | undefined }>(
   options: O | undefined,
 ): O =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- only `defaultOptions.deserializeData` is replaced, with a function of the same type
   ({
     ...options,
     defaultOptions: { ...options?.defaultOptions, deserializeData: identity },

@@ -311,6 +311,7 @@ export const rpcQueryOptions = (args: {
     call(path, input, callOptions(context.signal, opts?.rpc));
   return Object.assign(
     queryOptions({
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the proxy erases the rpc types; the public `queryOptions` signature restores them
       ...(opts as UndefinedInitialDataOptions<unknown, unknown, unknown, RpcQueryKey<boolean>>),
       queryKey,
       queryFn: input === skipToken ? skipToken : queryFn,

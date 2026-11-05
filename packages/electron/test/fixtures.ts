@@ -25,21 +25,21 @@ export const appRouter = Router.make({
     create: mutation({ payload: { name: Schema.String }, success: User }),
   },
   /** Emits `0 .. n-1`, then completes. */
-  ticks: subscription({ payload: { n: Schema.Number }, success: Schema.Number }),
+  ticks: subscription({ payload: { n: Schema.Finite }, success: Schema.Finite }),
   /** Emits `0 .. failAt-1`, then fails with `NotFound`. */
   tickStream: subscription({
-    payload: { failAt: Schema.Number },
-    success: Schema.Number,
+    payload: { failAt: Schema.Finite },
+    success: Schema.Finite,
     error: NotFound,
   }),
   /** Emits forever (every 5ms); records when the server stream is closed. */
-  forever: subscription({ success: Schema.Number }),
+  forever: subscription({ success: Schema.Finite }),
   /** Never completes; records start and interruption. */
   slow: query({ success: Schema.String }),
   /** Dies. */
   boom: query({ success: Schema.String }),
   /** The sender id the main process attached to the connection (`null` without one). */
-  whoami: query({ success: Schema.NullOr(Schema.Number) }),
+  whoami: query({ success: Schema.NullOr(Schema.Finite) }),
 });
 
 export type AppRouter = typeof appRouter;
@@ -58,8 +58,10 @@ interface Deferred {
   readonly resolve: () => void;
 }
 
+const noop = (): void => {};
+
 const deferred = (): Deferred => {
-  let resolve = (): void => {};
+  let resolve = noop;
   const promise = new Promise<void>((r) => (resolve = r));
   return { promise, resolve };
 };

@@ -1,7 +1,7 @@
 // Authentication end to end: a bearer token → a typed User service → typed errors on the client.
 import { Context, Effect, Layer, Schema } from 'effect';
 import { RpcMiddleware } from 'effect/rpc';
-import { mutation, query, Router, type ClientError } from '@effect-trpc/core';
+import { mutation, query, Router } from '@effect-trpc/core';
 import { createClient, httpLink } from '@effect-trpc/client';
 import { Handlers, toWebHandler } from '@effect-trpc/server';
 
@@ -71,10 +71,7 @@ const RequireAdminLive = Layer.succeed(RequireAdmin)(
 );
 
 const HandlersLive = Handlers.make(appRouter, {
-  me: () =>
-    Effect.gen(function* () {
-      return yield* CurrentUser; // provided by Authenticate
-    }),
+  me: () => CurrentUser, // a service key is an Effect of the service; provided by Authenticate
   admin: { deleteUser: () => Effect.void },
 });
 
@@ -109,8 +106,7 @@ try {
   await client.admin.deleteUser({ id: 'bob' });
 } catch (cause) {
   // Both middleware errors are in the type: ClientError<Forbidden | Unauthenticated>
-  const error = cause as ClientError<Forbidden | Unauthenticated>;
-  if (error._tag === 'Unauthenticated') console.log('sign in');
-  if (error._tag === 'Forbidden') console.log(`needs ${error.required}`);
+  if (cause instanceof Unauthenticated) console.log('sign in');
+  if (cause instanceof Forbidden) console.log(`needs ${cause.required}`);
 }
 // #endregion client

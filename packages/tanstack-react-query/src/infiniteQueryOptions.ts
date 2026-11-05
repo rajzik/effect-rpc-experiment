@@ -408,9 +408,10 @@ export const rpcInfiniteQueryOptions = (args: {
       context.pageParam === undefined ? base : { ...base, cursor: context.pageParam };
     return call(path, pageInput, callOptions(context.signal, opts?.rpc));
   };
-  const { initialCursor, ...rest } = opts ?? ({} as AnyRpcInfiniteQueryOptionsIn);
+  const { initialCursor, ...rest } = opts ?? { initialCursor: undefined };
   return Object.assign(
     infiniteQueryOptions({
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the proxy erases the rpc types; the public `infiniteQueryOptions` signature restores them
       ...(rest as UndefinedInitialDataInfiniteOptions<
         unknown,
         unknown,

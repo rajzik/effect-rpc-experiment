@@ -1,9 +1,10 @@
 import { mutation, query, Router, subscription } from '@effect-trpc/core';
 import { Handlers } from '@effect-trpc/server';
+import type { DehydratedState } from '@tanstack/react-query';
 import { Effect, Layer, Schema, Stream } from 'effect';
 
 export class Post extends Schema.Class<Post>('Post')({
-  id: Schema.Number,
+  id: Schema.Finite,
   title: Schema.String,
   createdAt: Schema.Date,
 }) {
@@ -14,7 +15,7 @@ export class Post extends Schema.Class<Post>('Post')({
 }
 
 export class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
-  id: Schema.Number,
+  id: Schema.Finite,
 }) {}
 
 export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
@@ -23,7 +24,7 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
 
 export const PostPage = Schema.Struct({
   items: Schema.Array(Post),
-  nextCursor: Schema.NullOr(Schema.Number),
+  nextCursor: Schema.NullOr(Schema.Finite),
 });
 
 export const appRouter = Router.make({
@@ -31,12 +32,12 @@ export const appRouter = Router.make({
   boom: query({ success: Schema.String }),
   post: {
     /** `id: 404` (or any unknown id) fails with `PostNotFound`. */
-    byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+    byId: query({ payload: { id: Schema.Finite }, success: Post, error: PostNotFound }),
     /** Cursor-paginated (cursor = index of the first item). */
     list: query({
       payload: {
-        cursor: Schema.optional(Schema.NullOr(Schema.Number)),
-        limit: Schema.optional(Schema.Number),
+        cursor: Schema.optional(Schema.NullOr(Schema.Finite)),
+        limit: Schema.optional(Schema.Finite),
       },
       success: PostPage,
     }),
@@ -47,12 +48,12 @@ export const appRouter = Router.make({
       error: Forbidden,
     }),
     /** No input: the number of posts. */
-    count: mutation({ success: Schema.Number }),
+    count: mutation({ success: Schema.Finite }),
     /** Echoes the `x-user` header (to check header forwarding). */
     whoami: query({ success: Schema.String }),
   },
   /** Emits `0 .. n-1`. */
-  ticks: subscription({ payload: { n: Schema.Number }, success: Schema.Number }),
+  ticks: subscription({ payload: { n: Schema.Finite }, success: Schema.Finite }),
 });
 
 export type AppRouter = typeof appRouter;
@@ -131,4 +132,19 @@ export const makeFixture = () => {
   );
   const handlers = Layer.merge(routes, lifecycle);
   return { state, handlers };
+};
+
+const isDehydratedState = (value: unknown): value is DehydratedState =>
+  typeof value === 'object' &&
+  value !== null &&
+  'queries' in value &&
+  Array.isArray(value.queries) &&
+  'mutations' in value &&
+  Array.isArray(value.mutations);
+
+/** A `DehydratedState` serialized like an RSC / SSR payload (JSON) and parsed back. */
+export const dehydratedOverTheWire = (state: DehydratedState): DehydratedState => {
+  const parsed: unknown = JSON.parse(JSON.stringify(state));
+  if (!isDehydratedState(parsed)) throw new Error('not a DehydratedState');
+  return parsed;
 };

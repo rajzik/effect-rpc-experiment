@@ -8,7 +8,7 @@
  *
  * @since 0.1.0
  */
-import { Effect, Layer, Option, Queue, Schema, Scope } from 'effect';
+import { Effect, Layer, Queue, Schema, Scope } from 'effect';
 import { RpcMessage, RpcSerialization, RpcServer } from 'effect/rpc';
 import type { Rpc, RpcGroup } from 'effect/rpc';
 import type { Router } from '@effect-trpc/core';
@@ -95,8 +95,17 @@ type ClientState = {
 
 const closed: unique symbol = Symbol('@effect-trpc/electron/closed');
 
-const isMessage = (u: unknown): u is { readonly _tag: string } =>
-  typeof u === 'object' && u !== null && typeof (u as { _tag?: unknown })._tag === 'string';
+/** A decoded client frame: tagged, with the (still unvalidated) headers of a `Request`. */
+interface TaggedMessage {
+  readonly _tag: string;
+  headers?: unknown;
+}
+
+const isMessage = (u: unknown): u is TaggedMessage =>
+  typeof u === 'object' && u !== null && '_tag' in u && typeof u._tag === 'string';
+
+/** Placeholder until `RpcServer.Protocol.make` hands over its request writer. */
+const ignoreRequest = (): Effect.Effect<void> => Effect.void;
 
 /** Drops client-sent headers named like a trusted header, then appends the trusted ones. */
 const withTrustedHeaders = (
@@ -169,10 +178,11 @@ const withTrustedHeaders = (
  */
 const make = (
   options: MessagePortServerOptions = {},
-): Effect.Effect<MessagePortServer, never, Scope.Scope> =>
-  Effect.gen(function* () {
-    const serialization = options.serialization ?? RpcSerialization.json;
-    const encodeDefect = Schema.encodeSync(serialization.codecFor(Schema.Defect()));
+): Effect.Effect<MessagePortServer, never, Scope.Scope> => {
+  const serialization = options.serialization ?? RpcSerialization.json;
+  // Used by the synchronous `send` callback, where a failed encode falls back to dropping the frame.
+  const encodeDefect = Schema.encodeSync(serialization.codecFor(Schema.Defect()));
+  return Effect.gen(function* () {
     const scope = yield* Effect.scope;
     const disconnects = yield* Queue.unbounded<number>();
     const clients = new Map<number, ClientState>();
@@ -181,7 +191,7 @@ const make = (
     let writeRequest: (
       clientId: number,
       data: RpcMessage.FromClientEncoded,
-    ) => Effect.Effect<void> = () => Effect.void;
+    ) => Effect.Effect<void> = ignoreRequest;
 
     const send = (clientId: number, response: unknown): void => {
       const client = clients.get(clientId);
@@ -226,11 +236,11 @@ const make = (
           }
           if (message._tag === 'Request') {
             // Always normalized: malformed headers from a client must not crash the server loop.
-            const request = message as { headers?: unknown };
-            request.headers = withTrustedHeaders(request.headers, trusted ?? {});
+            message.headers = withTrustedHeaders(message.headers, trusted ?? {});
           }
           // A defect while routing one message answers with a defect frame; the loop goes on.
           return Effect.catchDefect(
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- decoded frames are handed to `RpcServer` unvalidated, as effect/rpc's own socket / worker protocols do; a malformed message is a defect, answered below
             writeRequest(clientId, message as RpcMessage.FromClientEncoded),
             (defect) => Effect.sync(() => sendDefect(clientId, defect)),
           );
@@ -245,8 +255,8 @@ const make = (
         disconnects,
         send: (clientId, response) => Effect.sync(() => send(clientId, response)),
         end: () => Effect.void,
-        clientIds: Effect.sync((): ReadonlySet<number> => clientIds),
-        initialMessage: Effect.succeed(Option.none()),
+        clientIds: Effect.succeed<ReadonlySet<number>>(clientIds),
+        initialMessage: Effect.succeedNone,
         supportsAck: true,
         supportsTransferables: false,
         supportsSpanPropagation: true,
@@ -293,6 +303,7 @@ const make = (
 
     return { protocol, attach };
   });
+};
 
 /**
  * Runs an rpc server for `router` over a {@link MessagePortServer} in the current scope and
@@ -362,7 +373,8 @@ const serve = <R extends Router.Any, LOut = never, LE = never, LR = never>(
 > =>
   Effect.gen(function* () {
     const server = yield* make(options);
-    let run: Effect.Effect<never, unknown, unknown> = RpcServer.make(
+    const run = RpcServer.make(
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Router.Any` erases the group's rpcs on purpose; the return type restores them via `Handlers.Requirements<R>`
       router.group as RpcGroup.RpcGroup<Rpc.Any>,
       {
         disableFatalDefects: true,
@@ -371,17 +383,11 @@ const serve = <R extends Router.Any, LOut = never, LE = never, LR = never>(
         concurrency: options.concurrency,
       },
     ).pipe(Effect.provideService(RpcServer.Protocol, server.protocol));
-    if (options.handlers !== undefined) {
-      const context = yield* Layer.build(options.handlers);
-      run = Effect.provide(run, context);
-    }
-    yield* Effect.forkScoped(run);
+    const handlers =
+      options.handlers === undefined ? undefined : yield* Layer.build(options.handlers);
+    yield* Effect.forkScoped(handlers === undefined ? run : Effect.provide(run, handlers));
     return server;
-  }) as Effect.Effect<
-    MessagePortServer,
-    LE,
-    Scope.Scope | LR | Exclude<Handlers.Requirements<R>, LOut>
-  >;
+  });
 
 /**
  * A generic `effect/rpc` server transport over message ports.

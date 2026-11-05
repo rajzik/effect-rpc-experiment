@@ -9,17 +9,17 @@ import type { ReactNode } from 'react';
 
 // #region routers
 class Invoice extends Schema.Class<Invoice>('Invoice')({
-  id: Schema.Number,
-  cents: Schema.Number,
+  id: Schema.Finite,
+  cents: Schema.Finite,
 }) {}
-class Ticket extends Schema.Class<Ticket>('Ticket')({ id: Schema.Number, title: Schema.String }) {}
+class Ticket extends Schema.Class<Ticket>('Ticket')({ id: Schema.Finite, title: Schema.String }) {}
 
 // Both routers have an `item` procedure: without prefixes their keys would collide.
 export const billingRouter = Router.make({
-  item: query({ payload: { id: Schema.Number }, success: Invoice }),
+  item: query({ payload: { id: Schema.Finite }, success: Invoice }),
 });
 export const supportRouter = Router.make({
-  item: query({ payload: { id: Schema.Number }, success: Ticket }),
+  item: query({ payload: { id: Schema.Finite }, success: Ticket }),
 });
 // #endregion routers
 

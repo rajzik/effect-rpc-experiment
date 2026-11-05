@@ -208,12 +208,15 @@ test('types of normal usage: keyPrefix is required exactly with the keyPrefix fl
 
 test('options for the wrong procedure kind throw a helpful error', async () => {
   await using ctx = await testReactResource();
-  const rpc = ctx.optionsProxy as any;
+  const rpc = ctx.optionsProxy;
+  // @ts-expect-error - a mutation has no queryOptions
   expect(() => rpc.post.create.queryOptions({ title: 'x' })).toThrow(
     '"post.create" is a mutation; use mutationOptions() instead',
   );
+  // @ts-expect-error - not a procedure of the router
   expect(() => rpc.post.nope.queryOptions()).toThrow('"post.nope" is not a procedure');
+  // @ts-expect-error - a router node is not callable
   expect(() => rpc.post()).toThrow('is not callable');
   // the proxy is not thenable
-  expect(rpc.then).toBeUndefined();
+  expect(Reflect.get(rpc, 'then')).toBeUndefined();
 });

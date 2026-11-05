@@ -127,9 +127,11 @@ const trackResult = <T extends object>(
 ): T =>
   new Proxy(result.current, {
     get: (_target, prop) => {
-      onTrackResult(prop as keyof T);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the consumer reads the fields of `T` (a property it does not declare reads `undefined`)
+      const key = prop as keyof T;
+      onTrackResult(key);
       // Bypass the target, so that we always read the latest value.
-      return result.current[prop as keyof T];
+      return result.current[key];
     },
   });
 
@@ -263,6 +265,8 @@ export const useSubscription = <TOutput, TError>(
             case 'pending':
               // Handled by `onStarted`.
               return prev;
+            default:
+              return state.state satisfies never;
           }
         });
       },
@@ -274,6 +278,7 @@ export const useSubscription = <TOutput, TError>(
   }, [queryHash, enabled, client]);
 
   if (resultRef.current === null) resultRef.current = initialState(enabled, reset);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `current` was set just above and is never reset to `null`
   const latest = resultRef as React.RefObject<$Result>;
 
   const [state, setState] = React.useState<$Result>(() => trackResult(latest, addTrackedProp));
@@ -299,7 +304,7 @@ export const useSubscription = <TOutput, TError>(
     if (!enabled) {
       // Disabled: drop any previous state (e.g. after `enabled` flipped to false).
       updateStateRef.current(() => initialState(false, reset));
-      return;
+      return undefined;
     }
     reset();
     return () => {

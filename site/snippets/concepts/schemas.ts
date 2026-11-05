@@ -10,11 +10,11 @@ class Overloaded extends Schema.TaggedError<Overloaded>()('Overloaded', {}) {}
 
 // `payload` takes struct fields or any schema; `success` and `error` take any schema.
 export const examples = Router.make({
-  fields: query({ payload: { id: Schema.Number, tags: Schema.Array(Schema.String) } }),
+  fields: query({ payload: { id: Schema.Finite, tags: Schema.Array(Schema.String) } }),
   schema: query({ payload: Schema.Struct({ q: Schema.String }), success: Schema.String }),
   union: query({
-    payload: { id: Schema.Number },
-    success: Schema.Union([Schema.String, Schema.Number]),
+    payload: { id: Schema.Finite },
+    success: Schema.Union([Schema.String, Schema.Finite]),
     error: Schema.Union([PostNotFound, Overloaded]),
   }),
 });

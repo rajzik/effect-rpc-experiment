@@ -369,6 +369,7 @@ export const causeToClientError = <E>(
       if (isRpcClientError(error)) {
         return new RpcTransportError({ message: error.message, cause: error });
       }
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the guard above excluded RpcClientError; TS cannot narrow a generic `E`
       return error as Exclude<E, RpcClientError.RpcClientError>;
     }
   }

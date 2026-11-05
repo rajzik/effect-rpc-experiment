@@ -57,22 +57,19 @@ describe('infiniteQueryOptions', () => {
           </button>
           <button
             data-testid="invalidate"
-            onClick={() => {
-              void queryClient
-                .invalidateQueries(
-                  rpc.post.list.infiniteQueryFilter(
-                    {},
-                    {
-                      predicate: (query) => {
-                        expect(query.state.data).toEqual(query1.data);
-                        return true;
-                      },
+            onClick={async () => {
+              await queryClient.invalidateQueries(
+                rpc.post.list.infiniteQueryFilter(
+                  {},
+                  {
+                    predicate: (query) => {
+                      expect(query.state.data).toEqual(query1.data);
+                      return true;
                     },
-                  ),
-                )
-                .then(() => {
-                  invalidated = true;
-                });
+                  },
+                ),
+              );
+              invalidated = true;
             }}
           >
             invalidate

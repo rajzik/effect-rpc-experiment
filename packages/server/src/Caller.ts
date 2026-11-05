@@ -355,16 +355,20 @@ export const createCaller = <R extends Router.Any, LE = never>(
     }
   }
   // `RpcTest.makeClient` wires an in-memory RpcServer to an RpcClient: no serialization.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Router.Any` erases the group's rpcs on purpose; `Caller<R>` restores the per-procedure types at the public API
   const makeClient = RpcTest.makeClient(router.group as RpcGroup.RpcGroup<Rpc.AnyWithProps>, {
     flatten: true,
   });
   const clientLayer = Layer.effect(CallerClient)(
     Effect.map(makeClient, (flat) => {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the flat client of `Rpc.AnyWithProps` types its payload as `never`; tags and payloads come from the router (`lookup`) and are typed by `Caller<R>`
       const client = flat as unknown as FlatClient;
       return CallerClient.of({
         unary: (tag, payload, opts) =>
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/any-unknown-in-error-context -- the flat client returns an Effect for query / mutation tags (only those reach `unary`); the procedure's typed errors are erased here and restored by `Caller<R>`
           client(tag, payload, opts) as Effect.Effect<unknown, unknown>,
         stream: (tag, payload, opts) =>
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the flat client returns a Stream for subscription tags (only those reach `stream`); element and error types are restored by `Caller<R>`
           client(tag, payload, opts) as Stream.Stream<unknown, unknown>,
       });
     }),
@@ -393,6 +397,7 @@ export const createCaller = <R extends Router.Any, LE = never>(
     callOptions: CallOptions | undefined,
   ): Effect.Effect<unknown, unknown> =>
     Effect.flatMap(clientEffect, (client) =>
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the router-generic dispatcher erases each procedure's typed errors; `Caller<R>` restores them per path
       client.unary(info.tag, payload, callHeaders(callOptions)),
     );
 
@@ -414,7 +419,8 @@ export const createCaller = <R extends Router.Any, LE = never>(
   ): Effect.Effect<unknown, unknown> | Stream.Stream<unknown, unknown> =>
     info.kind === 'subscription'
       ? callStream(info, payload, callOptions)
-      : callUnary(info, payload, callOptions);
+      : // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- erased procedure errors, restored by `Caller<R>` (see `callUnary`)
+        callUnary(info, payload, callOptions);
 
   const callPromise = (
     info: ProcedureInfo,
@@ -439,9 +445,12 @@ export const createCaller = <R extends Router.Any, LE = never>(
     if (signal?.aborted === true || disposed !== undefined) {
       return Promise.reject(new RpcInterrupted());
     }
-    return runtime
-      .runPromiseExit(callUnary(info, payload, callOptions), runOptions)
-      .then(rejectWithClientError);
+    return (
+      runtime
+        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- erased procedure errors; the rejection is mapped to `ClientError<E>` and typed by `Caller<R>`
+        .runPromiseExit(callUnary(info, payload, callOptions), runOptions)
+        .then(rejectWithClientError)
+    );
   };
 
   const makeProxy = (
@@ -458,6 +467,7 @@ export const createCaller = <R extends Router.Any, LE = never>(
         return next === undefined ? undefined : makeProxy(next, call);
       },
       apply: (_target, _thisArg, args: ReadonlyArray<unknown>) =>
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- proxy arguments are untyped; `Caller<R>` types the second argument as the call options
         call(lookup(path), args[0], args[1] as PromiseCallOptions | undefined),
     });
 
@@ -485,6 +495,7 @@ export const createCaller = <R extends Router.Any, LE = never>(
       },
     },
   );
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the proxy implements every path of the router record (`$promise`, `$router`, `dispose` handled above), which is exactly the shape `Caller<R>` describes
   return root as Caller<R>;
 };
 

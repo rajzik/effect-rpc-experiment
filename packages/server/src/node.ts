@@ -132,6 +132,7 @@ export const serve = <R extends Router.Any, LE = never, LR = never>(
   router: R,
   options: NodeServeOptions<R, LE, LR>,
 ): Layer.Layer<never, LE | HttpServerError.ServeError, LR> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion -- widening only: the inferred requirements are `Exclude<LR, ...>` (a subset of `LR`) and the error `Without<LE> | ServeError`, which TypeScript cannot relate to the generic `LR` / `LE`
   HttpRouter.serve(appLayer(router, options), {
     disableLogger: true,
     disableListenLog: options.listenLog !== true,

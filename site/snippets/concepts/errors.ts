@@ -7,7 +7,7 @@ import {
 } from '@effect-trpc/core';
 import { createClient, localLink } from '@effect-trpc/client';
 
-import { appRouter, type PostNotFound } from '@/router';
+import { appRouter, PostNotFound } from '@/router';
 import { AuthLive, HandlersLive, ServerLive } from '@/server';
 
 const client = createClient(appRouter, { link: localLink({ handlers: ServerLive }) });
@@ -24,13 +24,18 @@ const describe = (error: ClientError<PostNotFound>): string => {
       return `the handler died: ${error.message}`;
     case '@effect-trpc/RpcInterrupted':
       return 'aborted';
+    default:
+      return error satisfies never; // a new error case fails to compile here
   }
 };
 
 try {
   await client.post.byId({ id: 404 });
 } catch (cause) {
-  console.log(describe(cause as ClientError<PostNotFound>));
+  // `cause` is unknown: narrow it with instanceof and the infrastructure guard.
+  if (cause instanceof PostNotFound || isClientInfrastructureError(cause)) {
+    console.log(describe(cause));
+  }
 }
 // #endregion promise
 

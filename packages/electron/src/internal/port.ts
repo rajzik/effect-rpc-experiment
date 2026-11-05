@@ -5,7 +5,7 @@
  * @internal
  * @since 0.1.0
  */
-import type { AnyPort, Frame, MessageEventLike, PortLike } from '../types.js';
+import type { AnyPort, Frame, PortLike } from '../types.js';
 
 /**
  * Frame sent (as a raw string, outside the rpc serialization) by either side right before it
@@ -36,9 +36,11 @@ export const listen = (
     closed = true;
     onClose();
   };
+  // Web ports type their listener argument as `unknown`; every message event carries `data`.
   const message = (event: unknown): void => {
     if (closed) return;
-    const data = (event as MessageEventLike).data;
+    const data =
+      typeof event === 'object' && event !== null && 'data' in event ? event.data : undefined;
     if (data === closeFrame) close();
     else onMessage(data);
   };

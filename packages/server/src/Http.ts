@@ -200,6 +200,7 @@ export const layerHttp = <R extends Router.Any, LOut = never, LE = never, LR = n
 ): Layer.Layer<never, LE, HttpRouter.HttpRouter | LR | Exclude<Handlers.Requirements<R>, LOut>> => {
   const protocol = options.protocol ?? 'http';
   const server = RpcServer.layerHttp({
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Router.Any` erases the group's rpcs on purpose; the return type below restores them via `Handlers.Requirements<R>`
     group: router.group as RpcGroup.RpcGroup<Rpc.Any>,
     path: options.path ?? defaultPath,
     protocol,
@@ -208,13 +209,7 @@ export const layerHttp = <R extends Router.Any, LOut = never, LE = never, LR = n
     spanPrefix: options.spanPrefix,
     concurrency: options.concurrency,
   }).pipe(Layer.provide(serializationLayer(options.serialization)));
-  const layer: Layer.Layer<never, unknown, unknown> =
-    options.handlers === undefined ? server : server.pipe(Layer.provide(options.handlers));
-  return layer as Layer.Layer<
-    never,
-    LE,
-    HttpRouter.HttpRouter | LR | Exclude<Handlers.Requirements<R>, LOut>
-  >;
+  return options.handlers === undefined ? server : server.pipe(Layer.provide(options.handlers));
 };
 
 /**

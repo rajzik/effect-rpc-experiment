@@ -19,10 +19,10 @@ export const appRouter = Router.make({
   user: userRouter, // a router inside a router
   admin: {
     stats: {
-      count: query({ success: Schema.Number }), // tag "admin.stats.count"
+      count: query({ success: Schema.Finite }), // tag "admin.stats.count"
     },
   },
-  ticks: subscription({ payload: { every: Schema.Number }, success: Schema.Number }),
+  ticks: subscription({ payload: { every: Schema.Finite }, success: Schema.Finite }),
 });
 // #endregion nesting
 
@@ -44,7 +44,7 @@ class Audit extends RpcMiddleware.Service<Audit>()('Audit') {}
 
 const adminRouter = Router.make({
   // per procedure
-  purge: mutation({ success: Schema.Number }).middleware(Audit),
+  purge: mutation({ success: Schema.Finite }).middleware(Audit),
   // …or for every procedure of a router: added after `Audit`, so it wraps it and runs first
 }).middleware(Auth);
 // inferError of `purge` now includes Unauthorized.

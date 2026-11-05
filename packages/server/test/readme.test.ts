@@ -41,7 +41,7 @@ const appRouter = Router.make({
     byId: query({ payload: { id: Schema.String }, success: User, error: NotFound }),
     create: mutation({ payload: { name: Schema.String }, success: User }),
     me: query({ success: User }).middleware(Auth),
-    list: subscription({ payload: { count: Schema.Number }, success: User }),
+    list: subscription({ payload: { count: Schema.Finite }, success: User }),
   },
 });
 

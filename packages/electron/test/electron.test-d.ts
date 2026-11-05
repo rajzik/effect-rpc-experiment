@@ -20,6 +20,16 @@ import {
 } from '../src/index.js';
 import { appRouter, makeHandlers, type AppRouter, type NotFound, type User } from './fixtures.js';
 
+declare const ipcMainLike: IpcMainLike;
+
+// The README's main-process and preload calls, typed against the real Electron modules.
+const main = (ipc: typeof ipcMain) =>
+  MainRpcServer.run(appRouter, { handlers: makeHandlers().handlers, ipcMain: ipc });
+const preload = (ipc: typeof ipcRenderer, bridge: typeof contextBridge) => {
+  bridge.exposeInMainWorld('effectTrpcChannel', 'effect-trpc');
+  return installPreloadBridge({ ipcRenderer: ipc });
+};
+
 describe('structural types accept the real Electron / DOM / Node objects', () => {
   it('main process: ipcMain, IpcMainEvent, MessagePortMain', () => {
     expectTypeOf<typeof ipcMain>().toExtend<IpcMainLike>();
@@ -40,13 +50,7 @@ describe('structural types accept the real Electron / DOM / Node objects', () =>
   });
 
   it('the README calls type-check with the real Electron modules', () => {
-    const main = (ipc: typeof ipcMain) =>
-      MainRpcServer.run(appRouter, { handlers: makeHandlers().handlers, ipcMain: ipc });
     expectTypeOf(main).returns.resolves.toHaveProperty('dispose');
-    const preload = (ipc: typeof ipcRenderer, bridge: typeof contextBridge) => {
-      bridge.exposeInMainWorld('effectTrpcChannel', 'effect-trpc');
-      return installPreloadBridge({ ipcRenderer: ipc });
-    };
     expectTypeOf(preload).returns.toEqualTypeOf<() => void>();
     expectTypeOf(rendererLink()).toEqualTypeOf<Link>();
   });
@@ -67,10 +71,10 @@ describe('public API types', () => {
   it('MainRpcServer.layer keeps unprovided handler requirements', () => {
     const complete = MainRpcServer.layer(appRouter, {
       handlers: makeHandlers().handlers,
-      ipcMain: null as unknown as IpcMainLike,
+      ipcMain: ipcMainLike,
     });
-    expectTypeOf(complete).toEqualTypeOf<Layer.Layer<never, never>>();
-    const missing = MainRpcServer.layer(appRouter, { ipcMain: null as unknown as IpcMainLike });
+    expectTypeOf(complete).toEqualTypeOf<Layer.Layer<never>>();
+    const missing = MainRpcServer.layer(appRouter, { ipcMain: ipcMainLike });
     expectTypeOf(missing).toEqualTypeOf<
       Layer.Layer<never, never, Handlers.Requirements<AppRouter>>
     >();
@@ -78,7 +82,7 @@ describe('public API types', () => {
 
   it('MainRpcServer.run requires a complete handlers layer', () => {
     // @ts-expect-error -- `handlers` is required
-    void MainRpcServer.run(appRouter, { ipcMain: null as unknown as IpcMainLike });
+    void MainRpcServer.run(appRouter, { ipcMain: ipcMainLike });
     expectTypeOf(MainRpcServer.senderId).returns.toEqualTypeOf<number | undefined>();
   });
 });

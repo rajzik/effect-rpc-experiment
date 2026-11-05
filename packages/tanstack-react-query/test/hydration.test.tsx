@@ -8,7 +8,7 @@ import { QueryClientProvider, useQuery, type DehydratedState } from '@tanstack/r
 import { cleanup, render } from '@testing-library/react';
 import { Effect, Schema } from 'effect';
 import * as React from 'react';
-import { describe, expect, test } from 'vite-plus/test';
+import { assert, describe, expect, test } from 'vite-plus/test';
 import {
   createHydrationHelpers,
   createRpcContext,
@@ -28,6 +28,7 @@ const serverState = async (keyPrefix?: string) => {
   const fixture = makeFixture();
   const client = createClient(appRouter, { link: localLink({ handlers: fixture.handlers }) });
   const queryClient = makeQueryClient();
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `keyPrefix: boolean` flags accept a set or missing prefix; the conditional spread is not provable to the options type
   const rpc = createRpcOptionsProxy<AppRouter, { keyPrefix: boolean }>({
     client,
     queryClient,
@@ -45,7 +46,8 @@ const serverState = async (keyPrefix?: string) => {
   const state = helpers.dehydrate(queryClient, keyPrefix === undefined ? {} : { keyPrefix });
   await client.dispose();
   queryClient.clear();
-  return { state, json: JSON.parse(JSON.stringify(state)) as DehydratedState, todos };
+  const json: DehydratedState = JSON.parse(JSON.stringify(state));
+  return { state, json, todos };
 };
 
 const keyOf = (state: DehydratedState, fragment: string) =>
@@ -111,10 +113,10 @@ describe('hydrate', () => {
 
     function Post1() {
       const rpc = useRpc();
-      const query = useQuery({ ...rpc.post.byId.queryOptions({ id: 1 }), staleTime: Infinity });
-      seen.push(query.data);
-      if (!query.data) return <>...</>;
-      return <pre>{`${query.data.shout()}|${query.data.createdAt.toISOString()}`}</pre>;
+      const post = useQuery({ ...rpc.post.byId.queryOptions({ id: 1 }), staleTime: Infinity });
+      seen.push(post.data);
+      if (!post.data) return <>...</>;
+      return <pre>{`${post.data.shout()}|${post.data.createdAt.toISOString()}`}</pre>;
     }
 
     const utils = render(
@@ -164,8 +166,8 @@ describe('hydrate', () => {
       ['post', 'byId'],
       { input: { id: 1 }, type: 'query' },
     ]);
-    expect(post).toBeInstanceOf(Post);
-    expect((post as Post).createdAt).toBeInstanceOf(Date);
+    assert(post instanceof Post);
+    expect(post.createdAt).toBeInstanceOf(Date);
     const error = queryClient.getQueryState([
       ['tenant-1'],
       ['post', 'byId'],
@@ -208,8 +210,8 @@ describe('hydrate', () => {
     await server.prefetchQuery(rpcB.item.queryOptions());
     const helpersA = createHydrationHelpers(routerA, { keyPrefix: 'a' });
     const helpersB = createHydrationHelpers(routerB, { keyPrefix: 'b' });
-    const stateA = JSON.parse(JSON.stringify(helpersA.dehydrate(server))) as DehydratedState;
-    const stateB = JSON.parse(JSON.stringify(helpersB.dehydrate(server))) as DehydratedState;
+    const stateA: DehydratedState = JSON.parse(JSON.stringify(helpersA.dehydrate(server)));
+    const stateB: DehydratedState = JSON.parse(JSON.stringify(helpersB.dehydrate(server)));
     // Each state holds only its own router's query (never encoded with the other's schema).
     expect(stateA.queries.map((q) => q.queryKey[0])).toEqual([['a']]);
     expect(stateB.queries.map((q) => q.queryKey[0])).toEqual([['b']]);
@@ -240,7 +242,8 @@ describe('hydrate', () => {
     expect(keyOf(state, 'byId')?.state.data).toMatchObject({ wrapped: { title: 'Post 2' } });
 
     const target = makeQueryClient();
-    helpers.hydrate(target, JSON.parse(JSON.stringify(state)) as DehydratedState, {
+    const json: DehydratedState = JSON.parse(JSON.stringify(state));
+    helpers.hydrate(target, json, {
       defaultOptions: { deserializeData: (data: { wrapped: unknown }) => data.wrapped },
     });
     expect(target.getQueryData(['plain'])).toBe('value');

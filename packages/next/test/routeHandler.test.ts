@@ -26,11 +26,18 @@ const rpcRequest = (
     body: `${JSON.stringify({ _tag: 'Request', id: '1', tag, payload, headers: [] })}\n`,
   });
 
+const isFrame = (value: unknown): value is Frame =>
+  typeof value === 'object' && value !== null && '_tag' in value && typeof value._tag === 'string';
+
 const readFrames = async (response: Response): Promise<ReadonlyArray<Frame>> =>
   (await response.text())
     .split('\n')
     .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as Frame);
+    .map((line): Frame => {
+      const frame: unknown = JSON.parse(line);
+      if (!isFrame(frame)) throw new Error(`not an rpc frame: ${line}`);
+      return frame;
+    });
 
 const exitOf = (frames: ReadonlyArray<Frame>): unknown =>
   frames.find((frame) => frame._tag === 'Exit')?.exit;
@@ -167,9 +174,7 @@ describe('createRouteHandler', () => {
     // the first build fails, the second one succeeds
     const failingOnce = Layer.suspend(() =>
       attempts++ === 0
-        ? (Layer.effectDiscard(
-            Effect.die(new Error('database down')),
-          ) as unknown as typeof handlers)
+        ? handlers.pipe(Layer.provide(Layer.effectDiscard(Effect.die(new Error('database down')))))
         : handlers,
     );
     await using route = createRouteHandler(appRouter, { handlers: failingOnce });

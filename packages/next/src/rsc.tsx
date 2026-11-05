@@ -212,17 +212,21 @@ const isTransportError = (error: unknown): error is RpcTransportError =>
 const dieOnTransportError = (result: unknown): unknown =>
   Stream.isStream(result)
     ? Stream.catchIf(result, isTransportError, (error) => Stream.die(error))
-    : Effect.catchIf(result as Effect.Effect<unknown, unknown>, isTransportError, (error) =>
-        Effect.die(error),
-      );
+    : Effect.isEffect(result)
+      ? // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- `client.$effect` is walked untyped here; `Caller<R>` restores each procedure's error type
+        Effect.catchIf(result, isTransportError, (error) => Effect.die(error))
+      : result;
 
 /** Wraps a node of `client.$effect`: children are wrapped, calls go through `dieOnTransportError`. */
-const wrapEffectNode = (node: unknown): unknown =>
+const wrapEffectNode = <T,>(node: T): T =>
   typeof node === 'function' || (typeof node === 'object' && node !== null)
     ? new Proxy(node, {
-        get: (target, key) => wrapEffectNode(Reflect.get(target, key)),
-        apply: (target, thisArg, args: ReadonlyArray<unknown>) =>
-          dieOnTransportError(Reflect.apply(target as (...a: never) => unknown, thisArg, args)),
+        get: (target, key): unknown => wrapEffectNode(Reflect.get(target, key)),
+        // the `apply` trap only runs for function targets
+        apply: (target, thisArg, args: ReadonlyArray<unknown>): unknown =>
+          typeof target === 'function'
+            ? dieOnTransportError(Reflect.apply(target, thisArg, args))
+            : undefined,
       })
     : node;
 
@@ -231,8 +235,10 @@ const wrapEffectNode = (node: unknown): unknown =>
  * runtime (the handler layer is built once, and released once) and the client's `headers`.
  */
 const callerFromClient = <R extends Router.Any>(router: R, client: Client<R>): Caller<R> => {
-  const effectRoot = wrapEffectNode(client.$effect) as object;
-  return new Proxy(Object.create(null) as object, {
+  const effectRoot = wrapEffectNode(client.$effect);
+  const target: object = Object.create(null);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the proxy implements `$promise`, `$router`, `dispose` and every procedure path of `client.$effect`, which is the shape `Caller<R>` describes
+  return new Proxy(target, {
     get: (_target, key) => {
       switch (key) {
         case '$promise':
@@ -462,13 +468,16 @@ export function createRscHelpers<
     client = source.client;
   } else {
     client = createClient(router, {
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- passes the public `handlers` layer through unchanged: its construction error is `unknown` by design, matching `localLink`'s own option
       link: localLink({ handlers: source.handlers }),
       ...(source.headers !== undefined && { headers: source.headers }),
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `middleware` option accepts any layer error, as `createClient`'s own option does
       ...(source.middleware !== undefined && { middleware: source.middleware }),
     });
     caller = callerFromClient(router, client);
   }
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `KeyPrefixOptions<PrefixFlags<P>>` is a conditional type on a generic flag that no literal can satisfy; `keyPrefix` is passed exactly when `P` is a string
   const rpc = createRpcOptionsProxy<R, PrefixFlags<P>>({
     client,
     queryClient: getQueryClient,
@@ -493,6 +502,7 @@ export function createRscHelpers<
   const prefetch = (prefetchOptions: PrefetchableOptions): void => {
     const queryClient = getQueryClient();
     if (isPrefetchInfinite(prefetchOptions.queryKey)) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the key says these options came from `infiniteQueryOptions()`, which builds TanStack infinite query options
       void queryClient.prefetchInfiniteQuery(prefetchOptions as never);
     } else {
       void queryClient.prefetchQuery(prefetchOptions);

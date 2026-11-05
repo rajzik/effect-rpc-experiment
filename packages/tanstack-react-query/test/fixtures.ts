@@ -4,7 +4,7 @@ import { Handlers } from '@effect-trpc/server';
 import { Effect, Queue, Schema, Stream } from 'effect';
 
 export class Post extends Schema.Class<Post>('Post')({
-  id: Schema.Number,
+  id: Schema.Finite,
   title: Schema.String,
   createdAt: Schema.Date,
 }) {
@@ -15,7 +15,7 @@ export class Post extends Schema.Class<Post>('Post')({
 }
 
 export class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
-  id: Schema.Number,
+  id: Schema.Finite,
 }) {}
 
 export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
@@ -24,7 +24,7 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
 
 export const PostPage = Schema.Struct({
   items: Schema.Array(Post),
-  nextCursor: Schema.NullOr(Schema.Number),
+  nextCursor: Schema.NullOr(Schema.Finite),
 });
 
 export const appRouter = Router.make({
@@ -37,15 +37,15 @@ export const appRouter = Router.make({
   post: {
     /** `id: 404` fails with `PostNotFound`, `id: 403` with `Forbidden`. */
     byId: query({
-      payload: { id: Schema.Number },
+      payload: { id: Schema.Finite },
       success: Post,
       error: Schema.Union([PostNotFound, Forbidden]),
     }),
     /** Cursor-paginated (cursor = index of the first item). */
     list: query({
       payload: {
-        cursor: Schema.optional(Schema.NullOr(Schema.Number)),
-        limit: Schema.optional(Schema.Number),
+        cursor: Schema.optional(Schema.NullOr(Schema.Finite)),
+        limit: Schema.optional(Schema.Finite),
       },
       success: PostPage,
     }),
@@ -54,16 +54,16 @@ export const appRouter = Router.make({
     /** Fails with `Forbidden` when the title is `"forbidden"`. */
     create: mutation({ payload: { title: Schema.String }, success: Post, error: Forbidden }),
     /** No input (tRPC issue 2540). Returns the number of posts. */
-    reset: mutation({ success: Schema.Number }),
+    reset: mutation({ success: Schema.Finite }),
     /** Emits every created post. */
     onCreated: subscription({ success: Post }),
   },
   /** Emits `offset + n` for every `ctx.emit(n)`; never completes on its own. */
-  events: subscription({ payload: { offset: Schema.Number }, success: Schema.Number }),
+  events: subscription({ payload: { offset: Schema.Finite }, success: Schema.Finite }),
   /** Emits `0 .. n-1`, then fails with `PostNotFound` when `fail` is set, else completes. */
   ticks: subscription({
-    payload: { n: Schema.Number, fail: Schema.optional(Schema.Boolean) },
-    success: Schema.Number,
+    payload: { n: Schema.Finite, fail: Schema.optional(Schema.Boolean) },
+    success: Schema.Finite,
     error: PostNotFound,
   }),
 });
@@ -143,36 +143,30 @@ export const makeFixture = () => {
             }),
       reset: () => Effect.sync(() => state.posts.length),
       onCreated: () =>
-        Stream.callback<Post>((queue) =>
-          Effect.acquireRelease(
-            Effect.sync(() => {
-              const listener = (post: Post): void => {
-                Queue.offerUnsafe(queue, post);
-              };
-              state.emitter.on('created', listener);
-              return listener;
-            }),
-            (listener) => Effect.sync(() => state.emitter.off('created', listener)),
-          ),
-        ),
+        Stream.callback<Post>((queue) => {
+          const listener = (post: Post): void => {
+            Queue.offerUnsafe(queue, post);
+          };
+          return Effect.acquireRelease(
+            Effect.sync(() => state.emitter.on('created', listener)),
+            () => Effect.sync(() => state.emitter.off('created', listener)),
+          );
+        }),
     },
     events: ({ offset }) =>
-      Stream.callback<number>((queue) =>
-        Effect.acquireRelease(
-          Effect.sync(() => {
-            const listener = (n: number): void => {
-              Queue.offerUnsafe(queue, n + offset);
-            };
-            state.emitter.on('data', listener);
-            return listener;
-          }),
-          (listener) =>
+      Stream.callback<number>((queue) => {
+        const listener = (n: number): void => {
+          Queue.offerUnsafe(queue, n + offset);
+        };
+        return Effect.acquireRelease(
+          Effect.sync(() => state.emitter.on('data', listener)),
+          () =>
             Effect.sync(() => {
               state.emitter.off('data', listener);
               state.closed.push(offset);
             }),
-        ),
-      ),
+        );
+      }),
     ticks: ({ n, fail }) =>
       Stream.range(0, n - 1).pipe(
         Stream.concat(fail === true ? Stream.fail(new PostNotFound({ id: n })) : Stream.empty),

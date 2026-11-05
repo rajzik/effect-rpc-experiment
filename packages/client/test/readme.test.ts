@@ -13,7 +13,7 @@ import {
 import { serveGroup, type TestServer } from './servers.js';
 
 export class Post extends Schema.Class<Post>('Post')({
-  id: Schema.Number,
+  id: Schema.Finite,
   title: Schema.String,
   createdAt: Schema.Date,
 }) {
@@ -23,15 +23,15 @@ export class Post extends Schema.Class<Post>('Post')({
 }
 
 export class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
-  id: Schema.Number,
+  id: Schema.Finite,
 }) {}
 
 export const appRouter = Router.make({
   post: {
-    byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+    byId: query({ payload: { id: Schema.Finite }, success: Post, error: PostNotFound }),
     create: mutation({ payload: { title: Schema.String }, success: Post }),
   },
-  countdown: subscription({ payload: { from: Schema.Number }, success: Schema.Number }),
+  countdown: subscription({ payload: { from: Schema.Finite }, success: Schema.Finite }),
 });
 
 const handlers = appRouter.group.toLayer({
@@ -76,6 +76,7 @@ describe('README', () => {
     try {
       await client.post.byId({ id: 404 });
     } catch (cause) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- mirrors the README golden path: a Promise call rejects with exactly `Client.Error<D>`
       const error = cause as Client.Error<typeof appRouter.record.post.byId>;
       switch (error._tag) {
         case 'PostNotFound':

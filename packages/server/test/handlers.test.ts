@@ -105,15 +105,19 @@ describe('Handlers.make', () => {
 
   it('throws for a missing handler at runtime (untyped callers)', () => {
     const router = Router.make({ a: query({ success: Schema.String }), b: { c: query({}) } });
-    const nested: unknown = { a: () => Effect.succeed('a'), b: {} };
-    expect(() => Handlers.make(router, nested as Handlers.From<typeof router>)).toThrow(
-      'Missing handler for procedure "b.c"',
-    );
+    expect(() =>
+      Handlers.make(router, {
+        a: () => Effect.succeed('a'),
+        // @ts-expect-error -- deliberately missing the `b.c` handler
+        b: {},
+      }),
+    ).toThrow('Missing handler for procedure "b.c"');
   });
 
   it('fails the layer when an Effect-built record misses a handler', async () => {
     const router = Router.make({ a: query({ success: Schema.String }) });
-    const incomplete = {} as unknown as { readonly a: () => Effect.Effect<string> };
+    // An untyped (e.g. JavaScript) caller can hand over an incomplete record.
+    const incomplete: { readonly a: () => Effect.Effect<string> } = JSON.parse('{}');
     const layer = Handlers.make(router, Effect.succeed(incomplete));
     const exit = await Effect.runPromiseExit(Layer.build(layer).pipe(Effect.scoped));
     expect(Exit.isFailure(exit)).toBe(true);

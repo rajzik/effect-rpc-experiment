@@ -16,7 +16,7 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { afterEach, describe, expect, test, vi } from 'vite-plus/test';
 import { createRscHelpers, makeQueryClient, type CacheFn } from '../src/index.js';
-import { appRouter, makeFixture, Post, PostNotFound } from './fixtures.js';
+import { appRouter, dehydratedOverTheWire, makeFixture, Post, PostNotFound } from './fixtures.js';
 
 afterEach(() => {
   cleanup();
@@ -25,17 +25,18 @@ afterEach(() => {
 
 /** A fake `React.cache`: one value per function and "request" (scope). */
 const requestScopes = () => {
-  let scope = new Map<unknown, unknown>();
-  const cache: CacheFn =
-    <T,>(fn: () => T) =>
-    (): T => {
-      if (!scope.has(fn)) scope.set(fn, fn());
-      return scope.get(fn) as T;
+  let scope: object = {};
+  const cache: CacheFn = <T,>(fn: () => T) => {
+    let cached: { readonly scope: object; readonly value: T } | undefined;
+    return (): T => {
+      if (cached?.scope !== scope) cached = { scope, value: fn() };
+      return cached.value;
     };
+  };
   return {
     cache,
     nextRequest: (): void => {
-      scope = new Map();
+      scope = {};
     },
   };
 };
@@ -75,7 +76,7 @@ describe('createRscHelpers', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(state.calls).toEqual(['post.byId']);
     const dehydrated = dehydrate();
-    const json = JSON.parse(JSON.stringify(dehydrated)) as DehydratedState;
+    const json = dehydratedOverTheWire(dehydrated);
     expect(json.queries[0]?.state.data).toEqual({
       id: 1,
       title: 'Hello world',
@@ -102,7 +103,7 @@ describe('createRscHelpers', () => {
     const data = getQueryClient().getQueryData(options.queryKey);
     expect(data?.pages).toHaveLength(1);
     expect(data?.pages[0]?.items[0]).toBeInstanceOf(Post);
-    const json = JSON.parse(JSON.stringify(dehydrate())) as DehydratedState;
+    const json = dehydratedOverTheWire(dehydrate());
     expect(json.queries[0]?.state.data).toMatchObject({
       pages: [{ items: [{ id: 1, createdAt: '2026-01-02T03:04:05.000Z' }], nextCursor: 1 }],
     });
@@ -133,7 +134,7 @@ describe('createRscHelpers', () => {
     prefetch(rpc.post.byId.queryOptions({ id: 404 }));
     prefetch(rpc.boom.queryOptions());
     await settled(getQueryClient());
-    const json = JSON.parse(JSON.stringify(dehydrate())) as DehydratedState;
+    const json = dehydratedOverTheWire(dehydrate());
     const browser = new QueryClient();
     hydrate(appRouter, browser, json);
     const notFound = browser.getQueryState(rpc.post.byId.queryKey({ id: 404 }));

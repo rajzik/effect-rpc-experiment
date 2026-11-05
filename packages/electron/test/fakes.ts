@@ -20,6 +20,7 @@ export class FakePortMain extends EventEmitter implements PortMainLike {
     super();
   }
   postMessage(message: string): void {
+    // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a Node `worker_threads` port, not a window: its second argument is the transfer list and there is no target origin
     this.port.postMessage(message);
   }
   start(): void {

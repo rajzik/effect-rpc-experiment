@@ -24,7 +24,7 @@ afterEach(cleanup);
 // ---- 1. server/router.ts ----------------------------------------------------------------------
 
 class Post extends Schema.Class<Post>('Post')({
-  id: Schema.Number,
+  id: Schema.Finite,
   title: Schema.String,
   createdAt: Schema.Date,
 }) {
@@ -33,7 +33,7 @@ class Post extends Schema.Class<Post>('Post')({
   }
 }
 class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
-  id: Schema.Number,
+  id: Schema.Finite,
 }) {}
 class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
   reason: Schema.String,
@@ -41,7 +41,7 @@ class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
 
 const appRouter = Router.make({
   post: {
-    byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+    byId: query({ payload: { id: Schema.Finite }, success: Post, error: PostNotFound }),
     create: mutation({ payload: { title: Schema.String }, success: Post, error: Forbidden }),
   },
 });
@@ -69,13 +69,14 @@ let requestHeaders = new Headers();
 /** `next/headers`' `headers()`. */
 const headers = async (): Promise<Headers> => requestHeaders;
 /** `React.cache` scoped to one request. */
-let scope = new Map<unknown, unknown>();
-const cache =
-  <T,>(fn: () => T) =>
-  (): T => {
-    if (!scope.has(fn)) scope.set(fn, fn());
-    return scope.get(fn) as T;
+let scope: object = {};
+const cache = <T,>(fn: () => T) => {
+  let cached: { readonly scope: object; readonly value: T } | undefined;
+  return (): T => {
+    if (cached?.scope !== scope) cached = { scope, value: fn() };
+    return cached.value;
   };
+};
 
 // ---- 2. app/api/rpc/[[...rpc]]/route.ts ---------------------------------------------------------
 
@@ -104,9 +105,14 @@ const { getQueryClient, rpc, HydrateClient, prefetch, caller } = createRscHelper
 // ---- 6. app/page.tsx + app/post-view.tsx --------------------------------------------------------
 
 function PostView({ id }: { id: number }) {
-  const rpc = useRpc();
-  const { data } = useSuspenseQuery(rpc.post.byId.queryOptions({ id }));
+  const { data } = useSuspenseQuery(useRpc().post.byId.queryOptions({ id }));
   return <h1>{data.headline}</h1>;
+}
+
+/** A client component that is not prefetched on the server: it fetches over `httpLink`. */
+function Lazy() {
+  const { data } = useSuspenseQuery(useRpc().post.byId.queryOptions({ id: 1 }));
+  return <p>lazy {data.headline}</p>;
 }
 
 function Page() {
@@ -155,7 +161,7 @@ describe('README', () => {
   });
 
   test('page.tsx: server prefetch is hydrated as a Post instance without a client fetch', async () => {
-    scope = new Map();
+    scope = {};
     browserFetches = 0;
     // a Next server render: prefetch starts in Page, HydrateClient dehydrates (pending)
     render(
@@ -193,11 +199,6 @@ describe('README', () => {
 
   test('client components can also call the route handler over httpLink', async () => {
     browserFetches = 0;
-    function Lazy() {
-      const rpc = useRpc();
-      const { data } = useSuspenseQuery(rpc.post.byId.queryOptions({ id: 1 }));
-      return <p>lazy {data.headline}</p>;
-    }
     render(
       <RpcProvider queryClient={undefined}>
         <React.Suspense fallback={<p>loading</p>}>

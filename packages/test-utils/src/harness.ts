@@ -327,6 +327,7 @@ export const testServerAndClient = async <R extends Router.Any, LE = never>(
   }
   const { url, port } = server.value;
   const client = makeHttpClient(router, url, options);
+  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `handlers` / `middleware` options accept any layer error
   const caller = createCaller(router, { handlers: callerLayer(options) });
   const handler = web.value.handler;
   const dispose = onceDispose([

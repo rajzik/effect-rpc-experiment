@@ -17,6 +17,9 @@ import {
 } from '../src/index.js';
 import { appRouter, Forbidden, makeFixture, Post } from './fixtures.js';
 
+/** A server action request that never reaches the server. */
+const failingFetch = (): Promise<never> => Promise.reject(new TypeError('Failed to fetch'));
+
 afterEach(cleanup);
 
 describe('useServerAction', () => {
@@ -71,7 +74,7 @@ describe('useServerAction', () => {
     const fixture = makeFixture();
     const actions = createServerActionCaller(appRouter, { handlers: fixture.handlers });
     const real = actions('post.create');
-    const broken: typeof real = () => Promise.reject(new TypeError('Failed to fetch'));
+    const broken: typeof real = failingFetch;
     const { result } = renderHook(() =>
       useServerAction(broken, { router: appRouter, path: 'post.create' }),
     );

@@ -34,8 +34,9 @@ describe('built site', () => {
   });
 
   it('every sidebar and nav link has a page', () => {
-    const links = Object.values(sidebar).flatMap((groups) =>
-      (groups as ReadonlyArray<{ items?: ReadonlyArray<{ link?: string }> }>).flatMap((group) =>
+    const sections = Array.isArray(sidebar) ? [sidebar] : Object.values(sidebar);
+    const links = sections.flatMap((section) =>
+      (Array.isArray(section) ? section : section.items).flatMap((group) =>
         (group.items ?? []).map((item) => item.link ?? ''),
       ),
     );

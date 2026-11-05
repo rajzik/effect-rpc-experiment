@@ -432,7 +432,7 @@ const applyMiddleware = (
     if (isProcedureDef(value)) {
       out[key] = addDefMiddleware(value, middleware);
     } else if (isRouter(value)) {
-      out[key] = (value as Router<Router.Shape>).middleware(middleware) as Router.Any;
+      out[key] = make(applyMiddleware(value.record, middleware));
     } else if (value !== undefined) {
       out[key] = applyMiddleware(value, middleware);
     }
@@ -502,9 +502,12 @@ const make = <const Rec extends Router.Shape>(record: Rec): Router<Rec> => {
   const router: Router<Rec> = {
     [TypeId]: TypeId,
     record,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the group is compiled from `record`, so its rpcs are `Router.Rpcs<Rec>`
     group: group as unknown as RpcGroup.RpcGroup<Router.Rpcs<Rec>>,
     procedures,
-    middleware: (middleware) => make(applyMiddleware(record, middleware)) as any,
+    middleware: <M extends RpcMiddleware.AnyService>(middleware: M) =>
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `applyMiddleware` adds `M` to every definition, which is what `WithMiddleware` describes
+      make(applyMiddleware(record, middleware)) as unknown as Router<Router.WithMiddleware<Rec, M>>,
   };
   return Object.freeze(router);
 };
@@ -547,6 +550,7 @@ const merge = <A extends Router.Shape, B extends Router.Shape>(
       throw new Error(`Cannot merge routers: duplicate key "${key}"`);
     }
   }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- keys were checked disjoint above, so the spread is exactly `Merge<A, B>`
   return make({ ...a.record, ...b.record } as Router.Merge<A, B> & Router.Shape);
 };
 
@@ -646,6 +650,7 @@ const getRpc = <R extends Router.Any, const Tag extends Router.Paths<R>>(
   if (info === undefined) {
     throw new Error(`Unknown procedure "${String(tag)}"`);
   }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `procedures` is keyed by tag, so this is the rpc compiled for `Tag`
   return info.rpc as unknown as Rpc.ExtractTag<Router.Rpcs<R>, Tag>;
 };
 

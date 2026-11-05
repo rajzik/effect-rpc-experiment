@@ -261,6 +261,7 @@ export const createNextRpcClient = <
   // The flags only shape the proxy's types; at runtime the context provider accepts an optional
   // `keyPrefix` (it only forwards a defined one), so widen its props to that.
   const context = createRpcContext<R, FeatureFlags>();
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- widening the provider's props only: an optional `keyPrefix` is what it handles at runtime (see above)
   const ContextProvider = context.RpcProvider as unknown as React.FC<{
     readonly client: Client<R>;
     readonly queryClient: QueryClient;
@@ -288,6 +289,7 @@ export const createNextRpcClient = <
         ...(options.fetch !== undefined && { fetch: options.fetch }),
       }),
       ...(options.headers !== undefined && { headers: options.headers }),
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `middleware` option accepts any layer error, as `createClient`'s own option does
       ...(options.middleware !== undefined && { middleware: options.middleware }),
     });
 
@@ -311,6 +313,7 @@ export const createNextRpcClient = <
 
   return {
     RpcProvider,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the context was created with the widened `FeatureFlags`; `PrefixFlags<P>` is the flag set `options.keyPrefix` actually selects
     useRpc: context.useRpc as () => RpcOptionsProxy<R, PrefixFlags<P>>,
     useRpcClient: context.useRpcClient,
     HydrationBoundary,

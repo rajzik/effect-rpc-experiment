@@ -5,7 +5,7 @@ import { Handlers } from '@effect-trpc/server';
 import { MainRpcServer } from '@effect-trpc/electron/main';
 
 // #region sender
-const router = Router.make({ whoami: query({ success: Schema.NullOr(Schema.Number) }) });
+const router = Router.make({ whoami: query({ success: Schema.NullOr(Schema.Finite) }) });
 
 // MainRpcServer sets the sender header to the renderer's webContents.id. The page cannot spoof
 // it: the server replaces whatever the renderer sent.

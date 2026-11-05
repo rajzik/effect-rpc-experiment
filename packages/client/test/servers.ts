@@ -39,6 +39,7 @@ export const serveGroup = async <Rpcs extends Rpc.Any>(
   );
   // The generic `Rpcs` leaves unresolved `Exclude<...>` requirements; they are all provided above.
   const runtime = ManagedRuntime.make(
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the unresolved requirements are provided above
     ServerLive as unknown as Layer.Layer<HttpServer.HttpServer, unknown>,
   );
   const base = await runtime.runPromise(

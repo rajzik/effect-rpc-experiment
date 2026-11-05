@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "effect-tsgo vp check",
-    "lint": "effect-tsgo vp lint",
+    "check": "effect-tsgo vp check --deny-warnings",
+    "lint": "effect-tsgo vp lint --deny-warnings",
     "fmt": "vp fmt",
     "test": "vp run -r test",
     "build": "vp run -r build",
-    "ready": "effect-tsgo vp check && vp run typecheck && vp run -r test && vp run -r build && node scripts/verify-jsdoc.mjs",
+    "ready": "effect-tsgo vp check --deny-warnings && vp run typecheck && vp run -r test && vp run -r build && node scripts/verify-jsdoc.mjs",
     "docs:check": "node scripts/verify-jsdoc.mjs",
     "docs:dev": "pnpm -C site docs:dev",
     "docs:build": "pnpm -C site docs:build"

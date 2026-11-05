@@ -3,7 +3,7 @@ import { RpcMiddleware } from 'effect/rpc';
 import { mutation, query, Router, subscription } from '../src/index.js';
 
 export class Post extends Schema.Class<Post>('Post')({
-  id: Schema.Number,
+  id: Schema.Finite,
   title: Schema.String,
   createdAt: Schema.Date,
 }) {
@@ -16,7 +16,7 @@ export class Post extends Schema.Class<Post>('Post')({
 }
 
 export class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
-  id: Schema.Number,
+  id: Schema.Finite,
 }) {}
 
 export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
@@ -32,7 +32,7 @@ export class AuthMiddleware extends RpcMiddleware.Service<AuthMiddleware>()('Aut
 export class LogMiddleware extends RpcMiddleware.Service<LogMiddleware>()('LogMiddleware') {}
 
 export const byId = query({
-  payload: { id: Schema.Number },
+  payload: { id: Schema.Finite },
   success: Post,
   error: Schema.Union([PostNotFound, Forbidden]),
 });
@@ -44,7 +44,7 @@ export const create = mutation({
 });
 
 export const onPost = subscription({
-  payload: { since: Schema.Number },
+  payload: { since: Schema.Finite },
   success: Post,
   error: Forbidden,
 });
@@ -52,7 +52,7 @@ export const onPost = subscription({
 export const health = query({ success: Schema.Literal('ok') });
 
 export const adminRouter = Router.make({
-  stats: { count: query({ success: Schema.Number }) },
+  stats: { count: query({ success: Schema.Finite }) },
 });
 
 export const appRouter = Router.make({

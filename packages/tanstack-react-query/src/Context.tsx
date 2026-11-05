@@ -198,6 +198,7 @@ export const createRpcContext = <
     const keyPrefix = props.keyPrefix;
     const value = React.useMemo(
       () =>
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `RpcProviderProps` already requires `keyPrefix` exactly when `TFeatureFlags` does; only the generic flag check is erased
         createRpcOptionsProxy<R, FeatureFlags>({
           client,
           queryClient,

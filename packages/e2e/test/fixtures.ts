@@ -25,7 +25,7 @@ export const appRouter = Router.make({
     byId: query({ payload: { id: Schema.String }, success: User, error: NotFound }),
     create: mutation({ payload: { name: Schema.String }, success: User }),
     /** Emits `count` users, then completes. */
-    list: subscription({ payload: { count: Schema.Number }, success: User }),
+    list: subscription({ payload: { count: Schema.Finite }, success: User }),
   },
   /** Always dies. */
   boom: query({ success: Schema.String }),

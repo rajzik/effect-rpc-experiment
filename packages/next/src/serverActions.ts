@@ -246,8 +246,10 @@ const encodeExit = (
 ): EncodedActionResult<never, never> => {
   const safe = Exit.isSuccess(exit) ? exit : Exit.failCause(safeCause(exit.cause));
   try {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the rpc's exit codec encodes to the `EncodedExit` shape; `Schema.Json` is its erased type
     return Codecs.encodeExitSync(info.rpc, safe) as EncodedExit;
   } catch {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- as above: the exit codec encodes to `EncodedExit`
     return Codecs.encodeExitSync(
       info.rpc,
       Exit.die(new Error(`effect-trpc: the result of "${info.tag}" could not be encoded`)),
@@ -261,8 +263,9 @@ const encodeExit = (
  */
 const decodeInput = (info: ProcedureInfo, input: unknown): Exit.Exit<unknown, unknown> => {
   const schema = info.rpc.payloadSchema;
-  const asType = Schema.decodeUnknownExit(Schema.toType(schema) as Schema.Codec<unknown>)(input);
+  const asType = Schema.decodeUnknownExit(Schema.toType(schema))(input);
   if (Exit.isSuccess(asType)) return asType;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Rpc.AnyWithProps` erases the payload schema to `Schema.Top`; procedure payload schemas are decoded without services everywhere (the rpc codecs in `@effect-trpc/core` assume the same)
   const asEncoded = Schema.decodeUnknownExit(schema as Schema.Codec<unknown>)(input);
   return Exit.isSuccess(asEncoded) ? asEncoded : asType;
 };
@@ -273,6 +276,7 @@ type EffectFn = (
 ) => Effect.Effect<unknown, unknown>;
 
 const procedureOf = (caller: unknown, path: ReadonlyArray<string>): EffectFn =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `path` comes from `router.procedures` and the caller implements every procedure path, so each node is a namespace and the leaf the procedure's effect function
   path.reduce<unknown>((node, key) => (node as Record<string, unknown>)[key], caller) as EffectFn;
 
 /**
@@ -381,10 +385,8 @@ export const createServerActionCaller = <R extends Router.Any, LE = never>(
         const headers =
           options.headers === undefined
             ? undefined
-            : yield* Effect.tryPromise({
-                try: async () => await options.headers?.(),
-                catch: (cause) => cause,
-              }).pipe(Effect.orDie);
+            : yield* Effect.promise(async () => await options.headers?.());
+        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the router-generic dispatcher erases each procedure's typed errors; `encodeExit` encodes them with the procedure's own codec
         return yield* procedureOf(caller, info.path)(
           decoded.value,
           headers === undefined ? undefined : { headers },
@@ -418,6 +420,7 @@ export const createServerActionCaller = <R extends Router.Any, LE = never>(
       },
     );
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Object.defineProperties` below completes the function with `nested`, `caller` and `dispose`
   const self = ((path: string) => actionAt(path)) as unknown as {
     -readonly [K in keyof ServerActionCaller<R>]: ServerActionCaller<R>[K];
   };
@@ -426,6 +429,7 @@ export const createServerActionCaller = <R extends Router.Any, LE = never>(
     caller: { value: caller, enumerable: true },
     dispose: { value: () => caller.dispose(), enumerable: true },
   });
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `self` now has every member, and `actionAt` serves exactly the action paths `ServerActionCaller<R>` accepts
   return self as ServerActionCaller<R>;
 };
 
@@ -523,6 +527,7 @@ export const decodeActionResult = <R extends Router.Any, const P extends ActionP
   const exit: Exit.Exit<unknown, unknown> = result.ok
     ? Exit.succeed(result.value)
     : Exit.fail(result.error);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion -- decoded by the exit codec of the procedure at `path`, so the value and error have its types
   return exit as Exit.Exit<OutputAt<R, P>, ClientError<ErrorAt<R, P>>>;
 };
 
@@ -606,6 +611,7 @@ export const unwrapActionResult = async <R extends Router.Any, const P extends A
     });
   }
   const result = decodeResult(router, path, value);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- decoded by the success codec of the procedure at `path`
   if (result.ok) return result.value as OutputAt<R, P>;
   throw result.error;
 };

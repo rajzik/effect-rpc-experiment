@@ -418,13 +418,16 @@ const normalizePayload = (payload: PayloadInput | undefined): Schema.Top =>
 
 /** @internal Compiles any definition (used by `Router`). */
 export const compileDef = (def: ProcedureDef.Any, tag: string): Rpc.AnyWithProps =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every `ProcedureDef` is created by this module as a `ProcedureDefImpl`
   (def as ProcedureDefImpl).toRpc(tag);
 
 /** @internal Adds middleware to any definition (used by `Router`). */
 export const addDefMiddleware = (
   def: ProcedureDef.Any,
   middleware: RpcMiddleware.AnyService,
-): ProcedureDef.Any => (def as ProcedureDefImpl).middleware(middleware);
+): ProcedureDef.Any =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every `ProcedureDef` is created by this module as a `ProcedureDefImpl`
+  (def as ProcedureDefImpl).middleware(middleware);
 
 // Returns `any`: the builders below assign the precise `ProcedureDef<...>` type.
 const define = (

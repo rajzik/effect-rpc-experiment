@@ -3,11 +3,11 @@ import { mutation, Router, subscription } from '@effect-trpc/core';
 import { createCaller, Handlers } from '@effect-trpc/server';
 
 // #region define
-class Tick extends Schema.Class<Tick>('Tick')({ n: Schema.Number, at: Schema.Date }) {}
-class TooFast extends Schema.TaggedError<TooFast>()('TooFast', { every: Schema.Number }) {}
+class Tick extends Schema.Class<Tick>('Tick')({ n: Schema.Finite, at: Schema.Date }) {}
+class TooFast extends Schema.TaggedError<TooFast>()('TooFast', { every: Schema.Finite }) {}
 
 const router = Router.make({
-  ticks: subscription({ payload: { every: Schema.Number }, success: Tick, error: TooFast }),
+  ticks: subscription({ payload: { every: Schema.Finite }, success: Tick, error: TooFast }),
   chat: {
     send: mutation({ payload: { text: Schema.String } }),
     messages: subscription({ success: Schema.String }),

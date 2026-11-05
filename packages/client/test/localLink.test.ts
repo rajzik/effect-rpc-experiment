@@ -108,8 +108,10 @@ describe('localLink: Effect client ($effect)', () => {
     expect(error).toBeInstanceOf(NotFound);
     const handled = await Effect.runPromise(
       client.$effect.user.byId({ id: 'secret' }).pipe(
-        Effect.catchTag('Forbidden', (e) => Effect.succeed(`forbidden: ${e.reason}`)),
-        Effect.catchTag('NotFound', () => Effect.succeed('missing')),
+        Effect.catchTags({
+          Forbidden: (e) => Effect.succeed(`forbidden: ${e.reason}`),
+          NotFound: () => Effect.succeed('missing'),
+        }),
       ),
     );
     expect(handled).toBe('forbidden: private');
@@ -194,9 +196,13 @@ describe('localLink: headers and middleware', () => {
 
 describe('createClient: proxy and lifecycle', () => {
   it('throws a clear error for unknown paths and namespaces', () => {
-    const client = makeClient() as unknown as Record<string, Record<string, () => unknown>>;
-    expect(() => client.user?.nope?.()).toThrow('Unknown procedure "user.nope"');
-    expect(() => (client.user as unknown as () => unknown)()).toThrow(
+    // `Reflect` reaches paths and calls the typed `Client` does not allow.
+    const client = makeClient();
+    expect(() => Reflect.apply(Reflect.get(client.user, 'nope'), undefined, [])).toThrow(
+      'Unknown procedure "user.nope"',
+    );
+    const namespace: string = 'user';
+    expect(() => Reflect.apply(Reflect.get(client, namespace), undefined, [])).toThrow(
       '"user" is a router namespace, not a procedure',
     );
   });
@@ -207,7 +213,7 @@ describe('createClient: proxy and lifecycle', () => {
     expect(await Promise.resolve(client.user)).toBe(client.user);
     expect(client.user.byId).toBe(client.user.byId);
     expect(client.$router).toBe(appRouter);
-    expect((client as unknown as Record<string, unknown>).toJSON).toBeUndefined();
+    expect(Reflect.get(client, 'toJSON')).toBeUndefined();
   });
 
   it('rejects routers with reserved top-level keys', async () => {

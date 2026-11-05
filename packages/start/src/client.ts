@@ -236,6 +236,7 @@ export const createServerClient = <R extends Router.Any>(
   options: ServerClientOptions<R>,
 ): Client<R> =>
   createClient(router, {
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- passes the public `handlers` layer through unchanged: its construction error is `unknown` by design, matching `localLink`'s own option
     link: localLink({ handlers: options.handlers }),
     ...(options.headers !== undefined && { headers: options.headers }),
     ...middlewareOf(options),
@@ -364,6 +365,7 @@ export const createIsomorphicClient = <R extends Router.Any>(
   const middleware = middlewareOf(options);
   return isServer
     ? createServerClient(router, {
+        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- passes the public `handlers` layer through unchanged: its construction error is `unknown` by design, matching `localLink`'s own option
         handlers: options.server.handlers,
         ...(options.server.headers !== undefined && { headers: options.server.headers }),
         ...middleware,

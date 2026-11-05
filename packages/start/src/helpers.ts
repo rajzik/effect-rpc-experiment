@@ -156,6 +156,7 @@ export const createStartHydration = (
     routerOptions: (queryClient) => ({
       dehydrate: () => ({ queryState: JSON.stringify(dehydrate(queryClient)) }),
       hydrate: ({ queryState }) => {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `queryState` is the JSON.stringify of this router's own `dehydrate` output (see `dehydrate` above)
         hydrate(queryClient, JSON.parse(queryState) as DehydratedState);
       },
     }),
@@ -326,6 +327,7 @@ export const createStartHelpers = <
   const rpc = (queryClient: QueryClient): RpcOptionsProxy<R, TFeatureFlags> => {
     let proxy = proxies.get(queryClient);
     if (proxy === undefined) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `KeyPrefixOptions<TFeatureFlags>` is a conditional type on a generic flag that no literal can satisfy; `StartHelpersOptions` already enforces it at the public API
       proxy = createRpcOptionsProxy<R, TFeatureFlags>({
         client: options.client,
         queryClient,

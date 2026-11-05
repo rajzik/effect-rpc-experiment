@@ -47,7 +47,7 @@ export const appRouter = Router.make({
       error: Schema.Union([NotFound, Forbidden]),
     }),
     create: mutation({ payload: { name: Schema.String }, success: User }),
-    list: subscription({ payload: { count: Schema.Number }, success: User }),
+    list: subscription({ payload: { count: Schema.Finite }, success: User }),
     me: query({ success: User }).middleware(Trace).middleware(Auth),
   },
   debug: {
@@ -57,9 +57,9 @@ export const appRouter = Router.make({
     requestId: query({ success: Schema.String }),
     badOutput: query({ success: Schema.Int }),
     ping: mutation({ success: Schema.Literal('pong') }),
-    nullable: subscription({ success: Schema.NullOr(Schema.Number) }),
-    failMidStream: subscription({ success: Schema.Number, error: NotFound }),
-    infinite: subscription({ success: Schema.Number }),
+    nullable: subscription({ success: Schema.NullOr(Schema.Finite) }),
+    failMidStream: subscription({ success: Schema.Finite, error: NotFound }),
+    infinite: subscription({ success: Schema.Finite }),
   },
 });
 

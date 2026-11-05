@@ -93,9 +93,11 @@ export const makeHttpClient = <R extends Router.Any, LE>(
     ...(options.serialization === undefined ? {} : { serialization: options.serialization }),
   });
   // `CreateClientOptions<R>` is a conditional type that stays unresolved for a generic `R`.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- for a concrete `R` these fields are exactly `CreateClientOptions<R>`
   const clientOptions = {
     link,
     ...(options.headers === undefined ? {} : { headers: options.headers }),
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `middleware` option accepts any layer error
     ...(options.middleware === undefined ? {} : { middleware: options.middleware }),
   } as unknown as CreateClientOptions<R>;
   return createClient(router, clientOptions);
@@ -109,7 +111,8 @@ export const callerLayer = <R extends Router.Any, LE>(
   // `createCaller` report a missing client middleware at call time.
   options.middleware === undefined
     ? options.handlers
-    : Layer.merge(options.handlers, options.middleware);
+    : // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `handlers` / `middleware` options accept any layer error
+      Layer.merge(options.handlers, options.middleware);
 
 /**
  * Runs the finalizers in order, each exactly once (even if an earlier one fails), and rethrows

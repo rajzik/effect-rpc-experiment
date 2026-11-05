@@ -96,7 +96,7 @@ describe('full stack: HTTP → options proxy → React', () => {
     const rpc = createRpcOptionsProxy({ client: ctx.client, queryClient: serverQc });
     await serverQc.prefetchQuery(rpc.user.byId.queryOptions({ id: 'ssr' }));
     await serverQc.prefetchQuery(rpc.user.byId.queryOptions({ id: 'ghost' }));
-    const payload = JSON.parse(JSON.stringify(dehydrate(serverQc))) as ReturnType<typeof dehydrate>;
+    const payload: ReturnType<typeof dehydrate> = JSON.parse(JSON.stringify(dehydrate(serverQc)));
     const encoded = payload.queries.find((q) => JSON.stringify(q.queryKey).includes('"ssr"'));
     expect(encoded?.state.data).toEqual({
       id: 'ssr',

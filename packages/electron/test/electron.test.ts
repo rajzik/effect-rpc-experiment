@@ -5,8 +5,12 @@ import { createClient, RpcDefect, RpcInterrupted, RpcTransportError } from '@eff
 import { MainRpcServer, rendererLink } from '../src/index.js';
 import { FakeWindow, makeIpcRenderer, MessageChannel, openPorts, tick } from './fakes.js';
 import { appRouter, createdAt, NotFound, User } from './fixtures.js';
-import { drain, rejectionOf, within } from './helpers.js';
+import { drain, instanceOf, rejectionOf, within } from './helpers.js';
 import { startApp, type App } from './setup.js';
+
+/** Resolves when the main process closes the peer of `port` (the renderer side sees `close`). */
+const closedOnRendererSide = (port: MessagePort): Promise<void> =>
+  new Promise((resolve) => port.once('close', () => resolve()));
 
 let app: App | undefined;
 afterEach(async () => {
@@ -29,8 +33,7 @@ describe('renderer link → preload bridge → main-process server', () => {
     app = await startApp();
     const { client } = app.renderer(1);
     const error = await rejectionOf(client.user.byId({ id: 'ghost' }));
-    expect(error).toBeInstanceOf(NotFound);
-    expect((error as NotFound).id).toBe('ghost');
+    expect(instanceOf(error, NotFound).id).toBe('ghost');
     const viaEffect = await Effect.runPromise(
       Effect.flip(client.$effect.user.byId({ id: 'ghost' })),
     );
@@ -76,8 +79,7 @@ describe('renderer link → preload bridge → main-process server', () => {
     app = await startApp();
     const { client } = app.renderer(1);
     const defect = await rejectionOf(client.boom());
-    expect(defect).toBeInstanceOf(RpcDefect);
-    expect((defect as RpcDefect).message).toContain('kaboom');
+    expect(instanceOf(defect, RpcDefect).message).toContain('kaboom');
     await expect(client.user.byId({ id: '1' })).resolves.toBeInstanceOf(User);
     expect(app.ipcMain.connections).toHaveLength(1);
   });
@@ -109,8 +111,7 @@ describe('renderer link → preload bridge → main-process server', () => {
     await within(Promise.all([app.probe.started, app.probe.streamStarted]));
     app.ipcMain.connections[0]?.close();
     const error = await within(pending);
-    expect(error).toBeInstanceOf(RpcTransportError);
-    expect((error as RpcTransportError).message).toContain('closed');
+    expect(instanceOf(error, RpcTransportError).message).toContain('closed');
     expect((await within(stream)).error).toBeInstanceOf(RpcTransportError);
     await within(Promise.all([app.probe.interrupted, app.probe.streamClosed]));
     // later calls fail fast instead of hanging
@@ -154,8 +155,7 @@ describe('renderer link → preload bridge → main-process server', () => {
       link: rendererLink<MessagePort>({ window, MessageChannel, connectTimeout: '30 millis' }),
     });
     const error = await within(rejectionOf(client.user.byId({ id: '1' })));
-    expect(error).toBeInstanceOf(RpcTransportError);
-    expect((error as RpcTransportError).message).toContain('preload bridge');
+    expect(instanceOf(error, RpcTransportError).message).toContain('preload bridge');
     await client.dispose();
   });
 
@@ -168,8 +168,6 @@ describe('renderer link → preload bridge → main-process server', () => {
     expect(app.ipcMain.listenerCount('app-rpc')).toBe(1);
 
     // The main process closes every port it rejects; the renderer side sees `close`.
-    const closedOnRendererSide = (port: MessagePort): Promise<void> =>
-      new Promise((resolve) => port.once('close', () => resolve()));
     const send = (url: string, transfer: Array<MessagePort>): void => {
       makeIpcRenderer(app!.ipcMain, 9, url).postMessage('app-rpc', null, transfer);
     };

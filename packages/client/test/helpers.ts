@@ -25,14 +25,9 @@ export const drain = async <A>(
 export const within = <A>(promise: Promise<A>, ms = 2000): Promise<A> =>
   new Promise<A>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
+    promise
+      .then(resolve, (error: unknown) => {
         reject(error instanceof Error ? error : new Error(String(error)));
-      },
-    );
+      })
+      .finally(() => clearTimeout(timer));
   });

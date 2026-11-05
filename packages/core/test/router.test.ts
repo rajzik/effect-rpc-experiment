@@ -87,7 +87,7 @@ describe('Router.make', () => {
     for (const reserved of ['then', 'call', 'apply']) {
       expect(() => Router.make({ [reserved]: health })).toThrow(/reserved/);
     }
-    expect(() => Router.make({ post: { bad: 42 } } as unknown as Router.Shape)).toThrow(
+    expect(() => Reflect.apply(Router.make, undefined, [{ post: { bad: 42 } }])).toThrow(
       /Invalid router entry at "post\.bad"/,
     );
   });
@@ -162,8 +162,9 @@ describe('Router.getByPath / isRouter / definitions', () => {
     const rpc = Router.getRpc(appRouter, 'post.byId');
     expect(rpc._tag).toBe('post.byId');
     expect(rpc).toBe(appRouter.procedures.get('post.byId')?.rpc);
-    const getRpcUntyped: (router: Router.Any, tag: string) => unknown = Router.getRpc as never;
-    expect(() => getRpcUntyped(appRouter, 'nope')).toThrow(/Unknown procedure "nope"/);
+    expect(() => Reflect.apply(Router.getRpc, undefined, [appRouter, 'nope'])).toThrow(
+      /Unknown procedure "nope"/,
+    );
   });
 
   it('recognizes routers and definitions', () => {
@@ -180,13 +181,13 @@ describe('Router.getByPath / isRouter / definitions', () => {
     expect(def.payloadSchema).toBe(Schema.Void);
     expect(def.successSchema).toBe(Schema.Void);
     expect(def.errorSchema).toBe(Schema.Never);
-    const sub = subscription({ success: Schema.Number });
+    const sub = subscription({ success: Schema.Finite });
     expect(sub.kind).toBe('subscription');
     expect(sub.payloadSchema).toBe(Schema.Void);
   });
 
   it('accepts a payload schema as well as struct fields', () => {
-    const def = query({ payload: Schema.Struct({ id: Schema.Number }) });
+    const def = query({ payload: Schema.Struct({ id: Schema.Finite }) });
     const router = Router.make({ def });
     expect(Schema.is(router.procedures.get('def')!.rpc.payloadSchema)({ id: 1 })).toBe(true);
   });

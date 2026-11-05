@@ -120,6 +120,8 @@ export declare namespace Handlers {
 
 type AnyHandler = (...args: ReadonlyArray<never>) => unknown;
 
+const isHandler = (u: unknown): u is AnyHandler => typeof u === 'function';
+
 const isRecord = (u: unknown): u is { readonly [key: string]: unknown } =>
   typeof u === 'object' && u !== null;
 
@@ -134,30 +136,40 @@ const flatten = (router: Router.Any, nested: unknown): { readonly [tag: string]:
     for (const segment of info.path) {
       node = isRecord(node) && Object.hasOwn(node, segment) ? node[segment] : undefined;
     }
-    if (typeof node !== 'function') {
+    if (!isHandler(node)) {
       throw new Error(`Missing handler for procedure "${info.tag}"`);
     }
-    out[info.tag] = node as AnyHandler;
+    out[info.tag] = node;
   }
   return out;
 };
 
+type FlatHandlers = { readonly [tag: string]: AnyHandler };
+
+/** Narrows `build` to its Effect branch; a handler record is never an Effect. */
+const isBuildEffect = <H, EX, RX>(
+  build: H | Effect.Effect<H, EX, RX>,
+): build is Effect.Effect<H, EX, RX> => Effect.isEffect(build);
+
 /** Flattens a nested record, or an Effect producing one (a missing handler is then a defect). */
-const flattenBuild = (router: Router.Any, build: unknown): unknown =>
-  Effect.isEffect(build)
-    ? Effect.flatMap(build, (nested) =>
-        Effect.try({ try: () => flatten(router, nested), catch: (cause) => cause }).pipe(
-          Effect.orDie,
-        ),
-      )
+const flattenBuild = <H, EX, RX>(
+  router: Router.Any,
+  build: H | Effect.Effect<H, EX, RX>,
+): FlatHandlers | Effect.Effect<FlatHandlers, EX, RX> =>
+  isBuildEffect(build)
+    ? Effect.flatMap(build, (nested) => Effect.sync(() => flatten(router, nested)))
     : flatten(router, build);
 
-const toLayer = (router: Router.Any, handlers: unknown): Layer.Layer<never, unknown, unknown> =>
-  (
-    router.group as unknown as {
-      readonly toLayer: (build: unknown) => Layer.Layer<never, unknown, unknown>;
-    }
-  ).toLayer(handlers);
+/**
+ * `RpcGroup#toLayer` with its handler type erased; the caller states the layer type it restores.
+ */
+const toLayer = <A, E, R>(router: Router.Any, handlers: unknown): Layer.Layer<A, E, R> => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- deliberate erasure: the public `make` / `flat` signatures type-check the handlers against the router (`H extends Handlers.From<R>` / `Handlers.Flat<R>`), which fixes the provided handlers, error and services named by `A`, `E`, `R`
+  const group = router.group as unknown as {
+    readonly toLayer: (build: unknown) => Layer.Layer<A, E, R>;
+  };
+  return group.toLayer(handlers);
+};
 
 /**
  * Implements every procedure of a router from a nested handler record mirroring the router
@@ -219,11 +231,10 @@ const make = <R extends Router.Any, H extends Handlers.From<R>, EX = never, RX =
   router: R,
   build: H | Effect.Effect<H, EX, RX>,
 ): Layer.Layer<Handlers.Provides<R>, EX, Exclude<RX, Scope.Scope> | Handlers.Services<R, H>> =>
-  toLayer(router, flattenBuild(router, build)) as Layer.Layer<
-    Handlers.Provides<R>,
-    EX,
-    Exclude<RX, Scope.Scope> | Handlers.Services<R, H>
-  >;
+  toLayer<Handlers.Provides<R>, EX, Exclude<RX, Scope.Scope> | Handlers.Services<R, H>>(
+    router,
+    flattenBuild(router, build),
+  );
 
 /**
  * Implements every procedure of a router from a tag-keyed handler record
@@ -258,11 +269,11 @@ const flat = <R extends Router.Any, H extends Handlers.Flat<R>, EX = never, RX =
   EX,
   Exclude<RX, Scope.Scope> | RpcGroup.HandlersServices<Router.Rpcs<R>, H>
 > =>
-  toLayer(router, build) as Layer.Layer<
+  toLayer<
     Handlers.Provides<R>,
     EX,
     Exclude<RX, Scope.Scope> | RpcGroup.HandlersServices<Router.Rpcs<R>, H>
-  >;
+  >(router, build);
 
 /**
  * Identity helper that type-checks (and contextually types) a nested handler record against a

@@ -19,7 +19,7 @@ import { createRpcContext, type RpcOptionsProxy } from '../src/index.js';
 import { waitFor } from './helpers.js';
 
 class ExportStatus extends Schema.Class<ExportStatus>('ExportStatus')({
-  id: Schema.Number,
+  id: Schema.Finite,
   name: Schema.String,
   ready: Schema.Boolean,
 }) {}
@@ -35,7 +35,7 @@ type ExportRouter = ReturnType<typeof makeExportRouter>;
 const issues = makeExportRouter();
 const discussions = Router.merge(
   makeExportRouter(),
-  Router.make({ pin: mutation({ payload: { id: Schema.Number }, success: Schema.Void }) }),
+  Router.make({ pin: mutation({ payload: { id: Schema.Finite }, success: Schema.Void }) }),
 );
 const appRouter = Router.make({ github: { issues, discussions } });
 type AppRouter = typeof appRouter;

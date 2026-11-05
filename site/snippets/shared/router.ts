@@ -6,7 +6,7 @@ import { mutation, query, Router, subscription } from '@effect-trpc/core';
 
 // Domain data: a Schema.Class arrives on the client as a real `Post` instance.
 export class Post extends Schema.Class<Post>('Post')({
-  id: Schema.Number,
+  id: Schema.Finite,
   title: Schema.String,
   createdAt: Schema.Date,
 }) {
@@ -17,12 +17,12 @@ export class Post extends Schema.Class<Post>('Post')({
 
 export class PostPage extends Schema.Class<PostPage>('PostPage')({
   items: Schema.Array(Post),
-  nextCursor: Schema.NullOr(Schema.Number),
+  nextCursor: Schema.NullOr(Schema.Finite),
 }) {}
 
 // Typed errors: Schema.TaggedError classes, narrowed on `_tag`.
 export class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
-  id: Schema.Number,
+  id: Schema.Finite,
 }) {}
 export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
   reason: Schema.String,
@@ -42,10 +42,10 @@ export class Auth extends RpcMiddleware.Service<Auth, { provides: CurrentUser }>
 export const appRouter = Router.make({
   health: query({ success: Schema.Literal('ok') }),
   post: {
-    byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+    byId: query({ payload: { id: Schema.Finite }, success: Post, error: PostNotFound }),
     // A `cursor` in the input enables `infiniteQueryOptions`.
     list: query({
-      payload: { cursor: Schema.optional(Schema.NullOr(Schema.Number)) },
+      payload: { cursor: Schema.optional(Schema.NullOr(Schema.Finite)) },
       success: PostPage,
     }),
     create: mutation({

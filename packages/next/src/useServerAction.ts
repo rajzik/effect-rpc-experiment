@@ -191,6 +191,7 @@ export const useServerAction = <
       let outcome: Outcome<A, E>;
       try {
         const encoded = await action(...args);
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- decoded by the codecs of the procedure at `path`, and `CheckActionPath` ties `A` / `E` to that procedure's types
         outcome = decodeActionResultInternal(router, path, encoded) as Outcome<A, E>;
       } catch (cause) {
         outcome = {

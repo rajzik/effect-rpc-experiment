@@ -14,7 +14,12 @@ import {
   createRootRouteWithContext,
   createRouter,
 } from '@tanstack/react-router';
-import type {} from '@tanstack/react-start'; // loads the `server` route option (types only)
+// The empty type-only import is the point: it loads `@tanstack/react-start`'s module augmentation
+// (the `server` route option) without importing any runtime code.
+// oxlint-disable-next-line import/no-empty-named-blocks, unicorn/require-module-specifiers -- side-effect-free type import that only brings in the `server` route option augmentation
+import type {} from '@tanstack/react-start';
+import { absurd } from 'effect/Function';
+import * as React from 'react';
 import { createIsomorphicClient, createStartHandler, createStartHelpers } from '../src/index.js';
 import { appRouter, makeFixture, type PostNotFound } from './fixtures.js';
 
@@ -53,7 +58,7 @@ const PostRouteImport = createFileRoute('/posts/$postId')({
   component: PostPage,
 });
 
-export function PostPage() {
+export function PostPage(): React.ReactElement {
   const { postId } = PostRouteImport.useParams();
   const { data: post } = useSuspenseQuery(useRpc().post.byId.queryOptions({ id: Number(postId) }));
   return <h1>{post.shout()}</h1>;
@@ -79,10 +84,12 @@ export const describeError = (error: ClientError<PostNotFound>): string => {
       return error.message;
     case '@effect-trpc/RpcInterrupted':
       return 'Cancelled';
+    default:
+      return absurd(error);
   }
 };
 
-export function DraftPage() {
+export function DraftPage(): React.ReactElement {
   const { postId } = DraftRouteImport.useParams();
   const query = useQuery(useRpc().post.byId.queryOptions({ id: Number(postId) }));
   if (query.error !== null) return <p>{describeError(query.error)}</p>;
@@ -90,16 +97,19 @@ export function DraftPage() {
 }
 
 // src/routeTree.gen.ts (what the generator emits) -------------------------------------------------
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- like the generator's `as any`: the route tree is typed via `FileRoutesByPath` below
 export const RpcRoute = RpcRouteImport.update({
   id: '/api/rpc/$',
   path: '/api/rpc/$',
   getParentRoute: () => rootRoute,
 } as never);
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- like the generator's `as any`: the route tree is typed via `FileRoutesByPath` below
 export const PostRoute = PostRouteImport.update({
   id: '/posts/$postId',
   path: '/posts/$postId',
   getParentRoute: () => rootRoute,
 } as never);
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- like the generator's `as any`: the route tree is typed via `FileRoutesByPath` below
 export const DraftRoute = DraftRouteImport.update({
   id: '/drafts/$postId',
   path: '/drafts/$postId',
@@ -142,7 +152,7 @@ export const getRouter = (queryClient: QueryClient, initialPath = '/') =>
     // Schema-aware SSR hand-off of the QueryClient cache (dehydrate on the server, hydrate in
     // the browser)
     ...hydration.routerOptions(queryClient),
-    Wrap: ({ children }) => (
+    Wrap: ({ children }): React.ReactElement => (
       <QueryClientProvider client={queryClient}>
         <RpcProvider client={client} queryClient={queryClient}>
           {children}

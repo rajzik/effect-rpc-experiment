@@ -5,7 +5,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { Effect, Schema, Stream } from 'effect';
 
 export class Post extends Schema.Class<Post>('Post')({
-  id: Schema.Number,
+  id: Schema.Finite,
   title: Schema.String,
   createdAt: Schema.Date,
 }) {
@@ -16,7 +16,7 @@ export class Post extends Schema.Class<Post>('Post')({
 }
 
 export class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
-  id: Schema.Number,
+  id: Schema.Finite,
 }) {}
 
 export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
@@ -25,7 +25,7 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
 
 export const PostPage = Schema.Struct({
   items: Schema.Array(Post),
-  nextCursor: Schema.NullOr(Schema.Number),
+  nextCursor: Schema.NullOr(Schema.Finite),
 });
 
 export const appRouter = Router.make({
@@ -33,12 +33,12 @@ export const appRouter = Router.make({
   boom: query({ success: Schema.String }),
   post: {
     /** `id: 404` (or any unknown id) fails with `PostNotFound`. */
-    byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+    byId: query({ payload: { id: Schema.Finite }, success: Post, error: PostNotFound }),
     /** Cursor-paginated (cursor = index of the first item). */
     list: query({
       payload: {
-        cursor: Schema.optional(Schema.NullOr(Schema.Number)),
-        limit: Schema.optional(Schema.Number),
+        cursor: Schema.optional(Schema.NullOr(Schema.Finite)),
+        limit: Schema.optional(Schema.Finite),
       },
       success: PostPage,
     }),
@@ -46,7 +46,7 @@ export const appRouter = Router.make({
     create: mutation({ payload: { title: Schema.String }, success: Post, error: Forbidden }),
   },
   /** Emits `count` posts. */
-  feed: subscription({ payload: { count: Schema.Number }, success: Post }),
+  feed: subscription({ payload: { count: Schema.Finite }, success: Post }),
 });
 
 export type AppRouter = typeof appRouter;
@@ -134,13 +134,38 @@ export interface Frame {
   readonly exit?: unknown;
 }
 
+const isFrame = (value: unknown): value is Frame =>
+  typeof value === 'object' && value !== null && '_tag' in value && typeof value._tag === 'string';
+
 /** Parses an NDJSON response body into rpc frames. */
 export const readFrames = async (response: Response): Promise<ReadonlyArray<Frame>> =>
   (await response.text())
     .split('\n')
     .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as Frame);
+    .map((line): Frame => {
+      const frame: unknown = JSON.parse(line);
+      if (!isFrame(frame)) throw new Error(`not an rpc frame: ${line}`);
+      return frame;
+    });
 
 /** The encoded exit of the single `Exit` frame. */
 export const exitOf = (frames: ReadonlyArray<Frame>): unknown =>
   frames.find((frame) => frame._tag === 'Exit')?.exit;
+
+/** The `_tag` of an encoded value (`undefined` when it has none). */
+export const tagOf = (value: unknown): unknown =>
+  typeof value === 'object' && value !== null && '_tag' in value ? value._tag : undefined;
+
+/** Parses a JSON payload of the router's SSR hand-off (`{ queryState: string }`). */
+export const parseRouterPayload = (json: string): { readonly queryState: string } => {
+  const payload: unknown = JSON.parse(json);
+  if (
+    typeof payload !== 'object' ||
+    payload === null ||
+    !('queryState' in payload) ||
+    typeof payload.queryState !== 'string'
+  ) {
+    throw new Error(`not a router payload: ${json}`);
+  }
+  return { queryState: payload.queryState };
+};

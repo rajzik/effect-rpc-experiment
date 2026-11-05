@@ -1,6 +1,6 @@
 // `createIsomorphicClient`: in-process on the server, `httpLink` in the browser.
 import type { Client } from '@effect-trpc/client';
-import { afterEach, describe, expect, test, vi } from 'vite-plus/test';
+import { afterEach, assert, describe, expect, test, vi } from 'vite-plus/test';
 import {
   createBrowserClient,
   createIsomorphicClient,
@@ -39,8 +39,8 @@ const expectInstances = async (client: Client<AppRouter>) => {
   expect(post).toBeInstanceOf(Post);
   expect(post.shout()).toBe('HELLO WORLD!');
   const error = await client.post.byId({ id: 404 }).catch((e: unknown) => e);
-  expect(error).toBeInstanceOf(PostNotFound);
-  expect((error as PostNotFound)._tag).toBe('PostNotFound');
+  assert.instanceOf(error, PostNotFound);
+  expect(error._tag).toBe('PostNotFound');
 };
 
 describe('createIsomorphicClient', () => {

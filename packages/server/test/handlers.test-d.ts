@@ -8,7 +8,7 @@ import { ada, appRouter, Forbidden, NotFound, User } from './fixtures.js';
 const router = Router.make({
   user: {
     byId: query({ payload: { id: Schema.String }, success: User, error: NotFound }),
-    feed: subscription({ success: Schema.Number }),
+    feed: subscription({ success: Schema.Finite }),
   },
 });
 

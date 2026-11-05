@@ -19,7 +19,7 @@ class NotFound extends Schema.TaggedError<NotFound>()('NotFound', { id: Schema.S
 const appRouter = Router.make({
   user: {
     byId: query({ payload: { id: Schema.String }, success: User, error: NotFound }),
-    ticks: subscription({ payload: { n: Schema.Number }, success: Schema.Number }),
+    ticks: subscription({ payload: { n: Schema.Finite }, success: Schema.Finite }),
   },
   boom: query({ success: Schema.String }),
 });

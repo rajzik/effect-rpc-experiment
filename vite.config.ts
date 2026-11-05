@@ -47,6 +47,10 @@ export default defineConfig({
       // same trade-off as `typescript/no-unsafe-type-assertion` (a warning here too).
       'effecttsgo/any-unknown-in-error-context': 'warn',
       'effecttsgo/unsafe-effect-type-assertion': 'warn',
+      // Branding every Schema.Class (`Schema.Class<A, { readonly brand: unique symbol }>`) adds a
+      // type argument to every domain class users copy from docs and tests; structural
+      // compatibility of decoded classes is fine for this library.
+      'effecttsgo/schema-class-missing-brand': 'off',
     },
     overrides: [
       {

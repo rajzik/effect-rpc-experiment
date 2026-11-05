@@ -48,18 +48,18 @@ export const appRouter = Router.make({
     }),
     create: mutation({ payload: { name: Schema.String }, success: User }),
     /** Mutation without input (tRPC issue 2540: calling with `undefined`). */
-    reset: mutation({ success: Schema.Number }),
+    reset: mutation({ success: Schema.Finite }),
   },
   /** Emits `0 .. n-1`, then completes. */
-  ticks: subscription({ payload: { n: Schema.Number }, success: Schema.Number }),
+  ticks: subscription({ payload: { n: Schema.Finite }, success: Schema.Finite }),
   /** Emits `0 .. failAt-1`, then fails with `NotFound`. */
   tickStream: subscription({
-    payload: { failAt: Schema.Number },
-    success: Schema.Number,
+    payload: { failAt: Schema.Finite },
+    success: Schema.Finite,
     error: NotFound,
   }),
   /** Emits forever (every 5ms); records when the server stream is closed. */
-  forever: subscription({ success: Schema.Number }),
+  forever: subscription({ success: Schema.Finite }),
   /** Never completes; records start and interruption. */
   slow: query({ success: Schema.String }),
   /** Dies. */
@@ -90,9 +90,9 @@ interface ProbeHooks {
 
 export const makeProbe = (): Probe & ProbeHooks => {
   const state = { started: 0, interrupted: 0, streamClosed: 0 };
-  let start = (): void => {};
-  let interrupt = (): void => {};
-  let closeStream = (): void => {};
+  let start: (() => void) | undefined;
+  let interrupt: (() => void) | undefined;
+  let closeStream: (() => void) | undefined;
   const started = new Promise<void>((resolve) => (start = resolve));
   const interrupted = new Promise<void>((resolve) => (interrupt = resolve));
   const streamClosed = new Promise<void>((resolve) => (closeStream = resolve));
@@ -103,15 +103,15 @@ export const makeProbe = (): Probe & ProbeHooks => {
     state,
     start: () => {
       state.started++;
-      start();
+      start?.();
     },
     interrupt: () => {
       state.interrupted++;
-      interrupt();
+      interrupt?.();
     },
     closeStream: () => {
       state.streamClosed++;
-      closeStream();
+      closeStream?.();
     },
   };
 };

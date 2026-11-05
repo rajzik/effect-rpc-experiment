@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vite-plus/test';
 import { connectMessageType, installPreloadBridge, type IpcRendererLike } from '../src/preload.js';
 import { FakeWindow, tick } from './fakes.js';
 
+/** A fresh port to transfer with a handshake message. */
+const port = () => new MessageChannel().port2;
+
 const recorder = () => {
   const calls: Array<{ channel: string; message: unknown; ports: number }> = [];
   const ipcRenderer: IpcRendererLike<MessagePort> = {
@@ -17,7 +20,6 @@ describe('installPreloadBridge', () => {
     const window = new FakeWindow();
     const { calls, ipcRenderer } = recorder();
     const uninstall = installPreloadBridge({ ipcRenderer, window });
-    const port = () => new MessageChannel().port2;
     const connect = { type: connectMessageType, channel: 'effect-trpc' };
     window.postMessage(connect, '*', [port()]);
     window.postMessage({ type: connectMessageType, channel: 'other' }, '*', [port()]);

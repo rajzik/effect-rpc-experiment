@@ -35,11 +35,7 @@ import {
   type RpcMutationOptions,
 } from './mutationOptions.js';
 import { rpcQueryOptions, type RpcQueryOptions } from './queryOptions.js';
-import {
-  rpcSubscriptionOptions,
-  type RpcSubscriptionOptions,
-  type RpcSubscriptionOptionsIn,
-} from './subscriptionOptions.js';
+import { rpcSubscriptionOptions, type RpcSubscriptionOptions } from './subscriptionOptions.js';
 
 /**
  * The `pathKey()` / `pathFilter()` helpers, available on the root, every router node and every
@@ -386,19 +382,6 @@ export type RpcOptionsProxyOptions<
   readonly client: Client<R>;
 };
 
-type UtilName =
-  | 'pathKey'
-  | 'pathFilter'
-  | 'queryOptions'
-  | 'queryKey'
-  | 'queryFilter'
-  | 'infiniteQueryOptions'
-  | 'infiniteQueryKey'
-  | 'infiniteQueryFilter'
-  | 'mutationOptions'
-  | 'mutationKey'
-  | 'subscriptionOptions';
-
 const procedureUtils: Readonly<Record<string, ProcedureKind>> = {
   queryOptions: 'query',
   infiniteQueryOptions: 'query',
@@ -552,7 +535,9 @@ export const createRpcOptionsProxy = <
 
   const call: ProcedureCaller = (path, input, callOptions) => {
     let node: unknown = client;
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `path` comes from the router-driven proxy, so every segment is a namespace of `client`
     for (const segment of path) node = (node as Record<string, unknown>)[segment];
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the full path names a procedure, which the Promise client exposes as a function
     return (node as (input: unknown, options: unknown) => unknown)(input, callOptions);
   };
 
@@ -570,9 +555,10 @@ export const createRpcOptionsProxy = <
   const queryClient = (): QueryClient | undefined =>
     opts.queryClient === undefined ? undefined : unwrapLazyArg(opts.queryClient);
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the proxy resolves paths from `client.$router` (an `R`) and dispatches on the util name, so it implements `RpcOptionsProxy<R>`
   return createRecursiveProxy(router, (fullPath, args) => {
     const path = fullPath.slice(0, -1);
-    const util = fullPath[fullPath.length - 1] as UtilName | undefined;
+    const util: string | undefined = fullPath[fullPath.length - 1];
     const [arg1, arg2] = args as ReadonlyArray<any>;
     const kind = util === undefined ? undefined : procedureUtils[util];
     if (util !== undefined && kind !== undefined) assertKind(path, util, kind);
@@ -625,7 +611,7 @@ export const createRpcOptionsProxy = <
       case 'subscriptionOptions':
         return rpcSubscriptionOptions({
           client,
-          opts: arg2 as RpcSubscriptionOptionsIn<unknown, unknown> | undefined,
+          opts: arg2,
           path,
           input: arg1,
           call,

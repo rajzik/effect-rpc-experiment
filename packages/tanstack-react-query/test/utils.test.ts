@@ -132,7 +132,7 @@ describe('createRpcOptionsProxy — router keys', () => {
       expect(options.queryKey).toEqual([['nested', 'toString'], { type: 'query' }]);
       expect(await new QueryClient().fetchQuery(options)).toBe('str');
       // Undeclared introspection keys still resolve to `undefined`.
-      expect((rpc.nested as unknown as { then?: unknown }).then).toBeUndefined();
+      expect(Reflect.get(rpc.nested, 'then')).toBeUndefined();
     } finally {
       await client.dispose();
     }

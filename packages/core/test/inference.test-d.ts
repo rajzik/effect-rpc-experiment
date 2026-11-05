@@ -119,7 +119,7 @@ describe('router inference', () => {
 
   it('merge and readonly (as const) records keep exact paths', () => {
     const a = Router.make({ x: query({ success: Schema.String }) } as const);
-    const b = Router.make({ y: { z: query({ payload: { n: Schema.Number } }) } });
+    const b = Router.make({ y: { z: query({ payload: { n: Schema.Finite } }) } });
     const merged = Router.merge(a, b);
     expectTypeOf<Router.Paths<typeof merged>>().toEqualTypeOf<'x' | 'y.z'>();
     type Z = Rpc.ExtractTag<Router.Rpcs<typeof merged>, 'y.z'>;
@@ -146,7 +146,7 @@ describe('router inference', () => {
 
   it('Schema.Class payloads are kept as-is (not treated as struct fields)', () => {
     class NewPost extends Schema.Class<NewPost>('NewPost')({ title: Schema.String }) {}
-    const def = query({ payload: NewPost, success: Schema.Number });
+    const def = query({ payload: NewPost, success: Schema.Finite });
     expectTypeOf<inferInput<typeof def>>().toEqualTypeOf<NewPost>();
     const router = Router.make({ def });
     type DefRpc = Rpc.ExtractTag<Router.Rpcs<typeof router>, 'def'>;

@@ -7,14 +7,14 @@ import { rejection } from './fixtures.js';
 import { call, exitFrame } from './wire.js';
 
 class InsufficientFunds extends Schema.TaggedError<InsufficientFunds>()('InsufficientFunds', {
-  missing: Schema.Number,
+  missing: Schema.Finite,
 }) {}
 class AccountLocked extends Schema.TaggedError<AccountLocked>()('AccountLocked', {}) {}
 
 const router = Router.make({
   withdraw: mutation({
-    payload: { amount: Schema.Number },
-    success: Schema.Number,
+    payload: { amount: Schema.Finite },
+    success: Schema.Finite,
     error: Schema.Union([InsufficientFunds, AccountLocked]),
   }),
   throws: query({ success: Schema.String }),

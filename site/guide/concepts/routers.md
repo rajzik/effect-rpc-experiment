@@ -16,7 +16,7 @@ All three take the same options:
 
 | Option    | Default        | Notes                                                            |
 | --------- | -------------- | ---------------------------------------------------------------- |
-| `payload` | `Schema.Void`  | struct fields (`{ id: Schema.Number }`) or any schema            |
+| `payload` | `Schema.Void`  | struct fields (`{ id: Schema.Finite }`) or any schema            |
 | `success` | `Schema.Void`  | for a subscription, the schema of one element                    |
 | `error`   | `Schema.Never` | usually a `Schema.TaggedError` class or a `Schema.Union` of them |
 

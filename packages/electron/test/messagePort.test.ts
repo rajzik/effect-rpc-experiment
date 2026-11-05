@@ -10,11 +10,11 @@ import {
 } from '../src/index.js';
 import { FakePortMain, tick } from './fakes.js';
 import { appRouter, makeHandlers, NotFound, User } from './fixtures.js';
-import { drain, rejectionOf, within } from './helpers.js';
+import { drain, instanceOf, rejectionOf, within } from './helpers.js';
 
 /** Runs `MessagePortServer.serve` in a scope that the test closes afterwards. */
 const startServer = async () => {
-  const scope = Effect.runSync(Scope.make());
+  const scope = Scope.makeUnsafe();
   const { handlers, probe } = makeHandlers();
   const server: Server = await Effect.runPromise(
     MessagePortServer.serve(appRouter, { handlers }).pipe(Scope.provide(scope)),
@@ -27,7 +27,7 @@ const startServer = async () => {
 
 let cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const f of cleanup.reverse()) await f();
+  for (const f of cleanup.toReversed()) await f();
   cleanup = [];
 });
 
@@ -87,8 +87,7 @@ describe('messagePortLink ⇄ MessagePortServer (no Electron)', () => {
     );
     await expect(first.whoami()).resolves.toBeNull();
     const error = await rejectionOf(second.whoami());
-    expect(error).toBeInstanceOf(RpcDefect);
-    expect((error as RpcDefect).message).toContain('already used');
+    expect(instanceOf(error, RpcDefect).message).toContain('already used');
   });
 
   it('answers malformed frames with a defect and keeps serving other clients', async () => {
@@ -174,7 +173,7 @@ describe('messagePortLink ⇄ MessagePortServer (no Electron)', () => {
         };
       },
     });
-    const scope = Effect.runSync(Scope.make());
+    const scope = Scope.makeUnsafe();
     cleanup.push(() => Effect.runPromise(Scope.close(scope, Exit.void)));
     const server = await Effect.runPromise(
       MessagePortServer.serve(appRouter, {

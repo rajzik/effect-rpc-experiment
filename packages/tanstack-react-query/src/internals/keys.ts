@@ -118,6 +118,7 @@ export const getQueryKeyInternal = (opts: {
   const key = ((): RpcQueryKeyWithoutPrefix => {
     if ((input === undefined || input === skipToken) && type === 'any') {
       // `[]` (not `[[]]`) for the root, so that it matches every query (`invalidateQueries()`).
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the root key `[]` is the one key outside the tuple type; TanStack matches it as a prefix of every key
       return path.length > 0 ? [path] : ([] as unknown as RpcQueryKeyWithoutPrefix);
     }
     if (type === 'infinite' && isObject(input) && ('direction' in input || 'cursor' in input)) {
@@ -155,6 +156,7 @@ export const getMutationKeyInternal = (opts: {
 
 /** Resolves a lazy argument (`QueryClient | (() => QueryClient)`). */
 export const unwrapLazyArg = <T>(valueOrLazy: T | (() => T)): T =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `T` is never a function here (a `QueryClient`), so a function is the lazy form
   typeof valueOrLazy === 'function' ? (valueOrLazy as () => T)() : valueOrLazy;
 
 /** The `.rpc` metadata of an options object. */

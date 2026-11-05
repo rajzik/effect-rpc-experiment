@@ -26,6 +26,8 @@ const describeError = (error: ClientError<PostNotFound>): string => {
       return error.message;
     case '@effect-trpc/RpcInterrupted':
       return 'Cancelled';
+    default:
+      return error satisfies never;
   }
 };
 

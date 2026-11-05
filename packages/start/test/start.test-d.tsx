@@ -5,6 +5,7 @@ import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { createFileRoute, type AnyRoute, type Register } from '@tanstack/react-router';
 import type { RouteMethodHandlerFn } from '@tanstack/react-start';
+import { absurd } from 'effect/Function';
 import { describe, expectTypeOf, test } from 'vite-plus/test';
 import {
   createBrowserClient,
@@ -24,6 +25,21 @@ import {
 } from './fixtures.js';
 
 declare const queryClient: QueryClient;
+
+// typed error handling by `_tag` (exhaustive: `error` is `never` in `default`)
+const describeError = (error: ClientError<PostNotFound>): string => {
+  switch (error._tag) {
+    case 'PostNotFound':
+      return `no post ${error.id}`;
+    case '@effect-trpc/RpcDefect':
+    case '@effect-trpc/RpcTransportError':
+      return error.message;
+    case '@effect-trpc/RpcInterrupted':
+      return 'cancelled';
+    default:
+      return absurd(error);
+  }
+};
 
 describe('createStartHandler', () => {
   test('is assignable to a Start server route method handler (POST and GET)', () => {
@@ -86,18 +102,6 @@ describe('createStartHelpers', () => {
     expectTypeOf(rpc(queryClient).post.byId['~types'].error).toEqualTypeOf<
       ClientError<PostNotFound>
     >();
-    // typed error handling by `_tag`
-    const describeError = (error: ClientError<PostNotFound>): string => {
-      switch (error._tag) {
-        case 'PostNotFound':
-          return `no post ${error.id}`;
-        case '@effect-trpc/RpcDefect':
-        case '@effect-trpc/RpcTransportError':
-          return error.message;
-        case '@effect-trpc/RpcInterrupted':
-          return 'cancelled';
-      }
-    };
     expectTypeOf(describeError).returns.toBeString();
   });
 

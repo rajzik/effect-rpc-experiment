@@ -13,6 +13,7 @@ import {
   Post,
   PostNotFound,
   readFrames,
+  tagOf,
   rpcRequest,
 } from './fixtures.js';
 
@@ -103,8 +104,7 @@ describe('createStartHandler', () => {
     const results = await Promise.all(
       urls.map(async (url) => {
         const response = await handler({ request: rpcRequest(url, 'post.byId', { id: 3 }) });
-        const exit = exitOf(await readFrames(response)) as { readonly _tag: string };
-        return [url, response.status, exit._tag];
+        return [url, response.status, tagOf(exitOf(await readFrames(response)))];
       }),
     );
     expect(results).toEqual(urls.map((url) => [url, 200, 'Success']));

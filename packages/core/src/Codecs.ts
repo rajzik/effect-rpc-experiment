@@ -299,7 +299,10 @@ const memo = (build: (rpc: Rpc.AnyWithProps) => Schema.Top) => {
   return (rpc: Rpc.Any): AnyCodec => {
     let codec = cache.get(rpc);
     if (codec === undefined) {
-      codec = Schema.toCodecJson(build(rpc as Rpc.AnyWithProps)) as unknown as AnyCodec;
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every runtime Rpc carries its schemas (`Rpc.AnyWithProps`)
+      const schema = build(rpc as Rpc.AnyWithProps);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erased to the untyped JSON codec; typed again by `exit` / `decodeExitSync`
+      codec = Schema.toCodecJson(schema) as unknown as AnyCodec;
       cache.set(rpc, codec);
     }
     return codec;
@@ -517,6 +520,7 @@ export const error = <R extends Rpc.Any>(rpc: R): ErrorCodec<R> => errorCodec(rp
  * @since 0.1.0
  */
 export const exit = <R extends Rpc.Any>(rpc: R): ExitCodec<R> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the cached codec is built from `rpc`'s own schemas, so it has `R`'s types
   exitCodec(rpc) as unknown as ExitCodec<R>;
 
 type Encode = (input: unknown) => Schema.Json;
@@ -939,4 +943,5 @@ export const decodeExitSync = <R extends Rpc.Any>(
   rpc: R,
   json: unknown,
 ): Exit.Exit<ExitSuccessType<R>, ErrorType<R>> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- decoded by `rpc`'s own exit codec, so the value has `R`'s types
   decoderOf(exitCodec(rpc))(json) as Exit.Exit<ExitSuccessType<R>, ErrorType<R>>;

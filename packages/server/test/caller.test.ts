@@ -98,7 +98,7 @@ describe('createCaller — router keys', () => {
       expect(await keyCaller.$promise.toJSON()).toBe('json');
       expect(await keyCaller.$promise.nested.name()).toBe('name');
       // Undeclared introspection keys still resolve to `undefined` (the caller is not a thenable).
-      expect((keyCaller.$promise.nested as unknown as { then?: unknown }).then).toBeUndefined();
+      expect(Reflect.get(keyCaller.$promise.nested, 'then')).toBeUndefined();
     } finally {
       await keyCaller.dispose();
     }
@@ -221,16 +221,14 @@ describe('createCaller — middleware and headers', () => {
 
 describe('createCaller — proxy', () => {
   it('throws for unknown paths', () => {
-    const untyped = caller as unknown as {
-      readonly user: { readonly nope: () => unknown };
-      readonly $promise: { readonly user: () => unknown };
-    };
-    expect(() => untyped.user.nope()).toThrow('Unknown procedure "user.nope"');
-    expect(() => untyped.$promise.user()).toThrow('Unknown procedure "user"');
+    // @ts-expect-error -- `user.nope` is not a procedure of the router
+    expect(() => caller.user.nope()).toThrow('Unknown procedure "user.nope"');
+    // @ts-expect-error -- `user` is a namespace, not a procedure
+    expect(() => caller.$promise.user()).toThrow('Unknown procedure "user"');
   });
 
   it('is not thenable and exposes the router', () => {
-    expect((caller as unknown as { then?: unknown }).then).toBeUndefined();
+    expect(Reflect.get(caller, 'then')).toBeUndefined();
     expect(caller.$router).toBe(appRouter);
   });
 

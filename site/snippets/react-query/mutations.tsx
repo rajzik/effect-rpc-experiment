@@ -23,7 +23,8 @@ export function CreatePost() {
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        create.mutate({ title: new FormData(event.currentTarget).get('title') as string });
+        const title = new FormData(event.currentTarget).get('title');
+        if (typeof title === 'string') create.mutate({ title });
       }}
     >
       <input name="title" />

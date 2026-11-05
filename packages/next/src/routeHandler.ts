@@ -96,6 +96,10 @@ const json = (status: number, body: unknown, headers?: Record<string, string>): 
 const trimTrailingSlash = (path: string): string =>
   path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
 
+/** `trimTrailingSlash` for a mount path: the result still starts with `/`. */
+const trimMountPath = (path: `/${string}`): `/${string}` =>
+  path.length > 1 && path.endsWith('/') ? `/${path.slice(1, -1)}` : path;
+
 const isAtOrBelow = (pathname: string, prefix: string): boolean =>
   pathname === prefix || pathname.startsWith(`${prefix}/`);
 
@@ -209,7 +213,7 @@ export const createRouteHandler = <R extends Router.Any, LE = never>(
   router: R,
   options: RouteHandlerOptions<R, LE>,
 ): RouteHandler => {
-  const path = trimTrailingSlash(options.path ?? defaultPath) as `/${string}`;
+  const path = trimMountPath(options.path ?? defaultPath);
   const prefixes =
     options.basePath === undefined || options.basePath === '/'
       ? [path]

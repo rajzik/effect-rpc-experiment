@@ -82,7 +82,7 @@ load the `effecttsgo` plugin. Package manager: pnpm (see `packageManager` in `pa
 
 ```bash
 pnpm install                 # install (honours pnpm-workspace.yaml catalog + overrides)
-pnpm check                   # format + lint + type-check (Oxfmt, Oxlint + Effect rules, tsgolint)
+pnpm check                   # format + lint + type-check; lint warnings fail (--deny-warnings)
 pnpm check --fix             # fix formatting and autofixable lint
 pnpm exec vp run typecheck   # tsgo --build across all packages (project references)
 pnpm exec vp run -r test     # Vitest 5 in every package (runtime + type tests)

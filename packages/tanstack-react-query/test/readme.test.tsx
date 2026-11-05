@@ -29,7 +29,7 @@ import { waitFor } from './helpers.js';
 // ---- 1. Define the router -------------------------------------------------------------------
 
 export class Post extends Schema.Class<Post>('Post')({
-  id: Schema.Number,
+  id: Schema.Finite,
   title: Schema.String,
   createdAt: Schema.Date,
 }) {
@@ -39,46 +39,48 @@ export class Post extends Schema.Class<Post>('Post')({
 }
 
 export class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
-  id: Schema.Number,
+  id: Schema.Finite,
 }) {}
 
 export const appRouter = Router.make({
   post: {
-    byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }),
+    byId: query({ payload: { id: Schema.Finite }, success: Post, error: PostNotFound }),
     // a `cursor` in the input enables `infiniteQueryOptions`
     list: query({
-      payload: { cursor: Schema.optional(Schema.NullOr(Schema.Number)) },
+      payload: { cursor: Schema.optional(Schema.NullOr(Schema.Finite)) },
       success: Schema.Struct({
         items: Schema.Array(Post),
-        nextCursor: Schema.NullOr(Schema.Number),
+        nextCursor: Schema.NullOr(Schema.Finite),
       }),
     }),
     create: mutation({ payload: { title: Schema.String }, success: Post }),
   },
-  countdown: subscription({ payload: { from: Schema.Number }, success: Schema.Number }),
+  countdown: subscription({ payload: { from: Schema.Finite }, success: Schema.Finite }),
 });
 export type AppRouter = typeof appRouter;
 
 // (server side, not in the README)
-const posts = [new Post({ id: 1, title: 'First', createdAt: new Date('2026-05-01T00:00:00Z') })];
+const serverPosts = [
+  new Post({ id: 1, title: 'First', createdAt: new Date('2026-05-01T00:00:00Z') }),
+];
 const handlers = Handlers.make(appRouter, {
   post: {
     byId: ({ id }) => {
-      const post = posts.find((p) => p.id === id);
+      const post = serverPosts.find((p) => p.id === id);
       return post === undefined ? Effect.fail(new PostNotFound({ id })) : Effect.succeed(post);
     },
     list: ({ cursor }) =>
       Effect.sync(() => {
         const start = cursor ?? 0;
         return {
-          items: posts.slice(start, start + 1),
-          nextCursor: start + 1 < posts.length ? start + 1 : null,
+          items: serverPosts.slice(start, start + 1),
+          nextCursor: start + 1 < serverPosts.length ? start + 1 : null,
         };
       }),
     create: ({ title }) =>
       Effect.sync(() => {
-        const post = new Post({ id: posts.length + 1, title, createdAt: new Date() });
-        posts.push(post);
+        const post = new Post({ id: serverPosts.length + 1, title, createdAt: new Date() });
+        serverPosts.push(post);
         return post;
       }),
   },
@@ -230,7 +232,7 @@ describe('README', () => {
 
   test('SSR: dehydrated Post instances render on the client', async () => {
     const client = makeClient();
-    const state = JSON.parse(JSON.stringify(await loadPostPage(client, 1))) as DehydratedState;
+    const state: DehydratedState = JSON.parse(JSON.stringify(await loadPostPage(client, 1)));
     await client.dispose();
     const utils = render(
       <App>

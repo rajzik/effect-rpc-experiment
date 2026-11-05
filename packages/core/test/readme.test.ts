@@ -14,7 +14,7 @@ import {
 import type { ClientError, inferError, inferInput, inferOutput } from '../src/index.js';
 
 class Post extends Schema.Class<Post>('Post')({
-  id: Schema.Number,
+  id: Schema.Finite,
   title: Schema.String,
   createdAt: Schema.Date,
 }) {
@@ -23,7 +23,7 @@ class Post extends Schema.Class<Post>('Post')({
   }
 }
 class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
-  id: Schema.Number,
+  id: Schema.Finite,
 }) {}
 class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
   reason: Schema.String,
@@ -32,7 +32,7 @@ class Unauthorized extends Schema.TaggedError<Unauthorized>()('Unauthorized', {}
 class Auth extends RpcMiddleware.Service<Auth>()('Auth', { error: Unauthorized }) {}
 
 const byId = query({
-  payload: { id: Schema.Number },
+  payload: { id: Schema.Finite },
   success: Post,
   error: Schema.Union([PostNotFound, Forbidden]),
 });

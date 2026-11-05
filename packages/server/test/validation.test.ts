@@ -47,8 +47,8 @@ describe('input validation (input.test.ts)', () => {
   });
 
   it('the in-process caller validates input and rejects with RpcDefect', async () => {
-    const invalid = { id: 42 } as unknown as { readonly id: string };
-    const error = await rejection(caller.$promise.user.byId(invalid));
+    // @ts-expect-error -- deliberately invalid input (`id` must be a string)
+    const error = await rejection(caller.$promise.user.byId({ id: 42 }));
     expect(error).toBeInstanceOf(RpcDefect);
     expect(await caller.$promise.health()).toBe('ok');
   });

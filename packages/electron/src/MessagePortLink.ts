@@ -100,19 +100,19 @@ export const messagePortProtocolClient = (
   port: PortLike,
   options: MessagePortLinkOptions = {},
 ): Effect.Effect<RpcClient.Protocol['Service'], never, Scope.Scope> =>
-  RpcClient.Protocol.make((writeResponse, clientIds) =>
-    Effect.gen(function* () {
+  RpcClient.Protocol.make((writeResponse, clientIds) => {
+    const broadcast = (response: RpcMessage.FromServerEncoded): Effect.Effect<void> =>
+      Effect.forEach(Array.from(clientIds), (clientId) => writeResponse(clientId, response), {
+        discard: true,
+      });
+
+    return Effect.gen(function* () {
       const serialization = options.serialization ?? RpcSerialization.json;
       const parser = serialization.makeUnsafe();
       const requestClients = new Map<string | number, number>();
       let currentError: RpcClientError.RpcClientError | undefined;
       let connected = false;
       const inbox = yield* Queue.unbounded<unknown>();
-
-      const broadcast = (response: RpcMessage.FromServerEncoded): Effect.Effect<void> =>
-        Effect.forEach(Array.from(clientIds), (clientId) => writeResponse(clientId, response), {
-          discard: true,
-        });
 
       const fail = (error: RpcClientError.RpcClientError): Effect.Effect<void> => {
         currentError ??= error;
@@ -122,10 +122,11 @@ export const messagePortProtocolClient = (
 
       const route = (response: unknown): Effect.Effect<void> => {
         if (typeof response !== 'object' || response === null) return Effect.void;
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- frames decoded by the rpc serialization are trusted to be server messages, as in effect/rpc's own socket / worker protocols; `RpcClient` validates their contents
         const message = response as RpcMessage.FromServerEncoded;
         if (message._tag === 'Pong') return Effect.void;
-        if (Object.hasOwn(message, 'requestId')) {
-          const requestId = (message as { readonly requestId: string | number }).requestId;
+        if ('requestId' in message) {
+          const requestId = message.requestId;
           const clientId = requestClients.get(requestId);
           if (clientId === undefined) return Effect.void;
           if (message._tag === 'Exit') requestClients.delete(requestId);
@@ -208,8 +209,8 @@ export const messagePortProtocolClient = (
         supportsTransferables: false,
         codecFor: serialization.codecFor,
       };
-    }),
-  );
+    });
+  });
 
 const acquirePort = (source: PortSource, used: { value: boolean }): Effect.Effect<PortLike> => {
   if (typeof source !== 'function') {

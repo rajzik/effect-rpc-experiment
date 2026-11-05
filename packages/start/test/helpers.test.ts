@@ -22,9 +22,20 @@ afterEach(async () => {
   await Promise.all(clients.splice(0).map((c) => c.dispose()));
 });
 
+const isDehydratedState = (value: unknown): value is DehydratedState =>
+  typeof value === 'object' &&
+  value !== null &&
+  'queries' in value &&
+  Array.isArray(value.queries) &&
+  'mutations' in value &&
+  Array.isArray(value.mutations);
+
 /** Serializes like an SSR payload. */
-const overTheWire = (state: DehydratedState): DehydratedState =>
-  JSON.parse(JSON.stringify(state)) as DehydratedState;
+const overTheWire = (state: DehydratedState): DehydratedState => {
+  const parsed: unknown = JSON.parse(JSON.stringify(state));
+  if (!isDehydratedState(parsed)) throw new Error('not a DehydratedState');
+  return parsed;
+};
 
 describe('createStartHelpers', () => {
   test('loader-style ensureQueryData returns a Post instance; the proxy is memoized per QueryClient', async () => {

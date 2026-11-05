@@ -21,6 +21,8 @@ const describeError = (error: ClientError<PostNotFound | Forbidden>): string => 
       return 'transport';
     case '@effect-trpc/RpcInterrupted':
       return 'interrupted';
+    default:
+      return error satisfies never;
   }
 };
 

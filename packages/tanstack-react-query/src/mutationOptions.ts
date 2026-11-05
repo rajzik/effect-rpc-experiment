@@ -210,7 +210,7 @@ export const rpcMutationOptions = (args: {
   const { call, queryClient, path, prefix, opts, overrides } = args;
   const mutationKey = getMutationKeyInternal({ path, prefix });
   const mutationFn: MutationFunction = (input) =>
-    call(path, input, callOptions(undefined, opts?.rpc)) as Promise<unknown>;
+    Promise.resolve(call(path, input, callOptions(undefined, opts?.rpc)));
   const base = { ...opts, mutationKey, mutationFn, rpc: createRpcOptionsResult(path) };
   if (queryClient === undefined) {
     if (overrides !== undefined) {
@@ -227,7 +227,9 @@ export const rpcMutationOptions = (args: {
   return {
     ...base,
     onSuccess: (...successArgs: ReadonlyArray<unknown>) => {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- TanStack calls `onSuccess` with the arguments it declares; they are forwarded unchanged
       const own = opts?.onSuccess as AnyOnSuccess | undefined;
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- as above, for the `setMutationDefaults` callback
       const fallback = defaults.onSuccess as AnyOnSuccess | undefined;
       const originalFn = () =>
         own === undefined ? fallback?.(...successArgs) : own(...successArgs);

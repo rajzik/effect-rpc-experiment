@@ -23,7 +23,7 @@ export async function loadPostPage(client: Client<AppRouter>, id: number) {
 
 // SSR without the network: the same client shape over localLink.
 const serverClient = createClient(appRouter, { link: localLink({ handlers: ServerLive }) });
-export const state = await loadPostPage(serverClient, 1);
+export const dehydratedState = await loadPostPage(serverClient, 1);
 // #endregion server
 
 // #region client
@@ -39,5 +39,5 @@ export function PostPage({ state, id }: { state: DehydratedState; id: number }) 
 
 // #region imperative
 const browserQueryClient = new QueryClient();
-hydrate(browserQueryClient, JSON.parse(JSON.stringify(state)));
+hydrate(browserQueryClient, JSON.parse(JSON.stringify(dehydratedState)));
 // #endregion imperative

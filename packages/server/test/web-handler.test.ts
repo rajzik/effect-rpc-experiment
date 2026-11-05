@@ -129,7 +129,12 @@ describe('toWebHandler', () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     await web.dispose();
     const frames = await readFrames(await pending);
-    const exit = exitFrame(frames) as { _tag: string; cause: ReadonlyArray<{ _tag: string }> };
+    const exit = Schema.decodeUnknownSync(
+      Schema.Struct({
+        _tag: Schema.String,
+        cause: Schema.Array(Schema.Struct({ _tag: Schema.String })),
+      }),
+    )(exitFrame(frames));
     expect(exit._tag).toBe('Failure');
     expect(exit.cause.map((reason) => reason._tag)).toContain('Interrupt');
     expect(exit.cause.every((reason) => reason._tag === 'Interrupt')).toBe(true);

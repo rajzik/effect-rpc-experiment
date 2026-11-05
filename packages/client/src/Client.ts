@@ -210,6 +210,8 @@ const reservedClientKeys: ReadonlySet<string> = new Set<ReservedClientKey>([
   'withHeaders',
 ]);
 
+const isReservedClientKey = (key: string): key is ReservedClientKey => reservedClientKeys.has(key);
+
 /**
  * The Effect client of a router: `client.$effect.post.byId(input)`.
  *
@@ -416,6 +418,7 @@ const effectCall = (
   Effect.gen(function* () {
     const resolved = yield* resolveHeaders(headers, options?.headers);
     const call = yield* getCall(shared, info);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/any-unknown-in-error-context -- query/mutation rpcs (the only ones routed here) return an Effect; the domain error union is erased here and restored by `Client<R>`
     return yield* call(input, { headers: resolved }) as Effect.Effect<unknown, unknown>;
   }).pipe(Effect.mapError(toTransportError));
 
@@ -430,6 +433,7 @@ const streamCall = (
     Effect.gen(function* () {
       const resolved = yield* resolveHeaders(headers, options?.headers);
       const call = yield* getCall(shared, info);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- subscription rpcs (the only ones routed here) return a Stream
       return call(input, { headers: resolved }) as Stream.Stream<unknown, unknown>;
     }),
   ).pipe(Stream.mapError(toTransportError));
@@ -443,12 +447,15 @@ const promiseCall = (
 ): Promise<unknown> => {
   if (shared.disposed) return Promise.reject(disposedError());
   if (isAborted(signal)) return Promise.reject(new RpcInterrupted());
-  return shared.runtime
-    .runPromiseExit(effect, signal === undefined ? undefined : { signal })
-    .then((exit) => {
-      if (Exit.isSuccess(exit)) return exit.value;
-      throw causeToClientError(exit.cause);
-    });
+  return (
+    shared.runtime
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the erased domain error is turned into `ClientError` by `causeToClientError` below
+      .runPromiseExit(effect, signal === undefined ? undefined : { signal })
+      .then((exit) => {
+        if (Exit.isSuccess(exit)) return exit.value;
+        throw causeToClientError(exit.cause);
+      })
+  );
 };
 
 const iterableCall = (
@@ -531,12 +538,15 @@ const makeFacade = <R extends Router.Any>(
     const info = Option.getOrUndefined(Router.getByPath(shared.router, path));
     if (info === undefined) throw new Error(describeUnknown(shared, path));
     const input = args[0];
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the public `Client<R>` signature only accepts `ProcedureCallOptions` here
     const options = args[1] as ProcedureCallOptions | undefined;
     if (info.kind === 'subscription') {
       const stream = streamCall(shared, headers, info, input, options);
       return mode === 'effect' ? stream : iterableCall(stream, options?.signal);
     }
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the domain error union is erased in the proxy and restored by `Client<R>`
     const effect = effectCall(shared, headers, info, input, options);
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the domain error union is erased in the proxy and restored by `Client<R>`
     return mode === 'effect' ? effect : promiseCall(shared, effect, options?.signal);
   };
 
@@ -558,7 +568,8 @@ const makeFacade = <R extends Router.Any>(
     return proxy;
   };
 
-  const effectRoot: unknown = new Proxy(Object.create(null) as object, {
+  const effectTarget: object = Object.create(null);
+  const effectRoot: unknown = new Proxy(effectTarget, {
     get: (_target, prop) => child('effect', [], prop),
   });
 
@@ -578,11 +589,13 @@ const makeFacade = <R extends Router.Any>(
     [Symbol.asyncDispose]: dispose,
   };
 
-  return new Proxy(Object.create(null) as object, {
+  const rootTarget: object = Object.create(null);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the proxy resolves paths from `shared.router` (an `R`), so it implements `Client<R>`
+  return new Proxy(rootTarget, {
     get: (_target, prop) => {
       if (prop === Symbol.asyncDispose) return dispose;
-      if (typeof prop === 'string' && reservedClientKeys.has(prop)) {
-        return methods[prop as ReservedClientKey];
+      if (typeof prop === 'string' && isReservedClientKey(prop)) {
+        return methods[prop];
       }
       return child('promise', [], prop);
     },
@@ -707,16 +720,21 @@ export const createClient = <R extends Router.Any>(
     }
   }
   // `Link<Handlers>` is only a type-level check (done by `CreateClientOptions`).
-  const link = options.link as Link;
   const middleware: Layer.Layer<never, unknown> | undefined = options.middleware;
-  const makeClient = link.makeClient(
-    router.group as RpcGroup.RpcGroup<Rpc.Any>,
-  ) as unknown as Effect.Effect<AnyRpcClient, never, Scope.Scope>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `RpcGroup.Any` erases the rpc union; any `Rpc.Any` group is accepted by links
+  const group = router.group as RpcGroup.RpcGroup<Rpc.Any>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erased to the untyped tag-keyed client; `makeFacade` restores types via `Client<R>`
+  const makeClient = options.link.makeClient(group) as unknown as Effect.Effect<
+    AnyRpcClient,
+    never,
+    Scope.Scope
+  >;
   const clientLayer = Layer.effect(RpcClientService)(makeClient);
   const runtime = ManagedRuntime.make(
     middleware === undefined
       ? clientLayer
-      : clientLayer.pipe(Layer.provide(Layer.orDie(middleware))),
+      : // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `middleware` option accepts any layer error; `orDie` turns it into a defect
+        clientLayer.pipe(Layer.provide(Layer.orDie(middleware))),
   );
   const shared: Shared = { router, runtime, disposed: false, disposing: undefined };
   return makeFacade<R>(shared, options.headers === undefined ? [] : [options.headers]);

@@ -104,7 +104,9 @@ export const installPreloadBridge = <Port = PortLike>(
 ): (() => void) => {
   const channel = options.channel ?? defaultChannel;
   const target =
-    options.window ?? (globalThis as { readonly window?: WindowLike<Port> | undefined }).window;
+    options.window ??
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reads the optional renderer global without depending on DOM lib types; `undefined` (no renderer) is handled below and `Port` is the caller's declared port type
+    (globalThis as { readonly window?: WindowLike<Port> | undefined }).window;
   if (target === undefined) {
     throw new Error('installPreloadBridge: no window (pass `window` outside a renderer)');
   }

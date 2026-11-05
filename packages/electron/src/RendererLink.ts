@@ -37,6 +37,9 @@ export interface RendererLinkOptions<Port = PortLike> extends MessagePortLinkOpt
   readonly connectTimeout?: MessagePortLinkOptions['connectTimeout'];
 }
 
+/** The optional `MessageChannel` global of a renderer. */
+type ChannelGlobal<Port> = { readonly MessageChannel?: MessageChannelLike<Port> | undefined };
+
 /**
  * The renderer-side link. Every client (`createClient(router, { link: rendererLink() })`) opens
  * a `MessageChannel`, hands one end to the main process through the preload bridge
@@ -110,14 +113,13 @@ export const rendererLink = <Port = PortLike>(options: RendererLinkOptions<Port>
   return messagePortLink(
     () => {
       const target =
-        options.window ?? (globalThis as { readonly window?: WindowLike<Port> | undefined }).window;
+        options.window ??
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reads the optional renderer global without depending on DOM lib types; `undefined` (no renderer) is handled below and `Port` is the caller's declared port type
+        (globalThis as { readonly window?: WindowLike<Port> | undefined }).window;
       const Channel =
         options.MessageChannel ??
-        (
-          globalThis as unknown as {
-            readonly MessageChannel?: MessageChannelLike<Port> | undefined;
-          }
-        ).MessageChannel;
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- same as `window`: the optional `MessageChannel` global, typed with the caller's `Port`
+        (globalThis as unknown as ChannelGlobal<Port>).MessageChannel;
       if (target === undefined || Channel === undefined) {
         throw new Error('rendererLink: no window / MessageChannel (pass them outside a renderer)');
       }

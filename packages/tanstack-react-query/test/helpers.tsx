@@ -31,16 +31,18 @@ export const testReactResource = async <const P extends string | undefined = und
   const client: Client<AppRouter> =
     server?.client ?? createClient(appRouter, { link: localLink({ handlers: fixture.handlers }) });
   const queryClient = makeQueryClient();
-  const keyPrefix = opts.keyPrefix as any;
+  const keyPrefix = opts.keyPrefix;
   const { RpcProvider, useRpc, useRpcClient } = createRpcContext<AppRouter, Flags>();
   const keyPrefixProps: { keyPrefix?: string } = keyPrefix === undefined ? {} : { keyPrefix };
   // `keyPrefix` is optional or required depending on `P`: erase that for the generic harness.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `keyPrefixProps` sets `keyPrefix` exactly when `P` is a string, as `Flags` requires
   const Provider = RpcProvider as unknown as React.FC<{
     readonly client: Client<AppRouter>;
     readonly queryClient: QueryClient;
     readonly keyPrefix?: string;
     readonly children?: React.ReactNode;
   }>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- as above: `keyPrefix` is a string exactly when `Flags` requires it
   const optionsProxy: RpcOptionsProxy<AppRouter, Flags> = createRpcOptionsProxy<AppRouter, Flags>({
     client,
     queryClient,

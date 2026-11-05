@@ -1,7 +1,7 @@
 // The README's TanStack Start wiring, run through real `@tanstack/react-router` objects: the
 // server route handler, a route loader with `ensureQueryData`, and the router-level SSR
 // dehydrate → hydrate of the QueryClient.
-import { afterAll, describe, expect, test } from 'vite-plus/test';
+import { afterAll, assert, describe, expect, test } from 'vite-plus/test';
 import {
   client,
   describeError,
@@ -15,6 +15,7 @@ import {
 import {
   createdAt,
   makeQueryClient,
+  parseRouterPayload,
   Post,
   PostNotFound,
   rpcRequest,
@@ -33,9 +34,11 @@ describe('README: TanStack Start app', () => {
     if (handlers === undefined || typeof handlers === 'function') throw new Error('no handlers');
     const post = handlers.POST;
     if (typeof post !== 'function') throw new Error('no POST handler');
-    const response = (await post({
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- only `request` is passed: `createStartHandler` reads nothing else; the rest of Start's handler context needs the Start runtime
+    const response = await post({
       request: rpcRequest('http://localhost:3000/api/rpc/$', 'post.byId', { id: 1 }),
-    } as never)) as Response;
+    } as never);
+    assert.instanceOf(response, Response);
     expect(response.status).toBe(200);
     expect(exitOf(await readFrames(response))).toMatchObject({
       _tag: 'Success',
@@ -53,14 +56,12 @@ describe('README: TanStack Start app', () => {
     expect(loaded).toBeInstanceOf(Post);
 
     // the router payload crosses the wire as JSON
-    const payload = JSON.parse(JSON.stringify(await serverRouter.options.dehydrate?.())) as {
-      queryState: string;
-    };
+    const payload = parseRouterPayload(JSON.stringify(await serverRouter.options.dehydrate?.()));
 
     // browser: a fresh QueryClient is hydrated before rendering
     const browserQc = makeQueryClient();
     const browserRouter = getRouter(browserQc, '/posts/1');
-    await browserRouter.options.hydrate?.(payload as never);
+    await browserRouter.options.hydrate?.(payload);
     const post = browserQc.getQueryData(rpc(browserQc).post.byId.queryKey({ id: 1 }));
     expect(post).toBeInstanceOf(Post);
     expect(post?.shout()).toBe('HELLO WORLD!');
@@ -72,12 +73,10 @@ describe('README: TanStack Start app', () => {
     const serverRouter = getRouter(serverQc, '/drafts/404');
     await serverRouter.load();
     expect(serverRouter.state.matches.map((m) => m.routeId)).toContain(DraftRoute.id);
-    const payload = JSON.parse(JSON.stringify(await serverRouter.options.dehydrate?.())) as {
-      queryState: string;
-    };
+    const payload = parseRouterPayload(JSON.stringify(await serverRouter.options.dehydrate?.()));
 
     const browserQc = makeQueryClient();
-    await getRouter(browserQc, '/drafts/404').options.hydrate?.(payload as never);
+    await getRouter(browserQc, '/drafts/404').options.hydrate?.(payload);
     const state = browserQc.getQueryState(rpc(browserQc).post.byId.queryKey({ id: 404 }));
     expect(state?.status).toBe('error');
     expect(state?.error).toBeInstanceOf(PostNotFound);

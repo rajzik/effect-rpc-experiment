@@ -17,13 +17,13 @@ import { appRouter, makeFixture, Post, PostNotFound, type AppRouter } from './fi
 import { makeQueryClient, testReactResource, waitFor } from './helpers.js';
 
 /** The fields that changed between consecutive results. */
-const diff = (list: ReadonlyArray<Record<string, unknown>>) =>
-  list.map((item, index) => {
+const diff = (list: ReadonlyArray<object>) =>
+  list.map((item, index): object => {
     if (index === 0) return item;
     const prev = list[index - 1]!;
-    const changed: Record<string, unknown> = {};
-    for (const key in item) if (item[key] !== prev[key]) changed[key] = item[key];
-    return changed;
+    return Object.fromEntries(
+      Object.entries(item).filter(([key, value]) => value !== Reflect.get(prev, key)),
+    );
   });
 
 describe('useSubscription', () => {
@@ -204,7 +204,7 @@ describe('useSubscription', () => {
     expect(ctx.state.closed).toEqual([10]);
     expect(results[0]?.status).toBe('connecting');
     expect(results[0]?.data).toBeUndefined();
-    expect(diff(results as never)).toEqual([
+    expect(diff(results)).toEqual([
       { data: undefined, error: null, reset: expect.any(Function), status: 'connecting' },
       { status: 'pending' },
     ]);

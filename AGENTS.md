@@ -29,6 +29,10 @@ binding, so always lint through the wrapper: `pnpm check` / `pnpm lint` (= `effe
 Keep `vite-plus` on a release whose bundled `oxlint` / `oxlint-tsgolint` versions `@effect/tsgo`
 supports (see its README) and bump both together.
 
+Warnings fail the lint (`--deny-warnings`). Fix the code; when a flagged construct is intentional
+(proxy type erasure), disable that one line with a reason:
+`// oxlint-disable-next-line <rule> -- <why it is sound>`. No file-wide disables.
+
 Lint and format configuration live ONLY in the root `vite.config.ts`. Package `vite.config.ts`
 files configure `pack` and `test`. Do not add `.oxlintrc.json`, `vitest.config.ts` or
 `tsdown.config.ts`.
