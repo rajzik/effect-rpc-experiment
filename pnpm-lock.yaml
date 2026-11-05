@@ -229,6 +229,9 @@ importers:
 
   examples/start:
     dependencies:
+      '@effect-trpc-examples/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@effect-trpc/client':
         specifier: workspace:*
         version: link:../../packages/client
@@ -241,12 +244,18 @@ importers:
       '@effect-trpc/start':
         specifier: workspace:*
         version: link:../../packages/start
+      '@effect-trpc/tanstack-react-query':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-react-query
+      '@tanstack/react-query':
+        specifier: 'catalog:'
+        version: 5.104.1(react@19.3.0)
       '@tanstack/react-router':
         specifier: 'catalog:'
         version: 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-start':
         specifier: 'catalog:'
-        version: 1.168.60(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)
+        version: 1.168.60(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)
       effect:
         specifier: 'catalog:'
         version: 4.0.1
@@ -257,6 +266,9 @@ importers:
         specifier: 'catalog:'
         version: 19.3.0(react@19.3.0)
     devDependencies:
+      '@playwright/test':
+        specifier: 'catalog:'
+        version: 1.64.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
@@ -266,9 +278,6 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.3.0(@types/react@19.3.0)
-      vite:
-        specifier: npm:@voidzero-dev/vite-plus-core@1.4.0
-        version: '@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2)'
 
   packages/client:
     dependencies:
@@ -462,7 +471,7 @@ importers:
         version: 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-start':
         specifier: 'catalog:'
-        version: 1.168.60(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)
+        version: 1.168.60(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)
       '@types/react':
         specifier: 'catalog:'
         version: 19.3.0
@@ -586,7 +595,7 @@ importers:
         version: 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-start':
         specifier: 'catalog:'
-        version: 1.168.60(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)
+        version: 1.168.60(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
@@ -4438,14 +4447,14 @@ snapshots:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
-  '@tanstack/react-start-rsc@0.1.59(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)':
+  '@tanstack/react-start-rsc@0.1.59(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)':
     dependencies:
       '@tanstack/react-router': 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/router-core': 1.171.34
       '@tanstack/router-utils': 1.162.3
       '@tanstack/start-client-core': 1.170.34
       '@tanstack/start-fn-stubs': 1.162.0
-      '@tanstack/start-plugin-core': 1.171.49(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(rollup@4.67.5)
+      '@tanstack/start-plugin-core': 1.171.49(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(rollup@4.67.5)
       '@tanstack/start-storage-context': 1.167.36
       pathe: 2.0.3
       react: 19.3.0
@@ -4474,15 +4483,15 @@ snapshots:
     transitivePeerDependencies:
       - crossws
 
-  '@tanstack/react-start@1.168.60(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)':
+  '@tanstack/react-start@1.168.60(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)':
     dependencies:
       '@tanstack/react-router': 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-start-client': 1.168.39(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@tanstack/react-start-rsc': 0.1.59(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)
+      '@tanstack/react-start-rsc': 0.1.59(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)
       '@tanstack/react-start-server': 1.167.46(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/router-utils': 1.162.3
       '@tanstack/start-client-core': 1.170.34
-      '@tanstack/start-plugin-core': 1.171.49(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(rollup@4.67.5)
+      '@tanstack/start-plugin-core': 1.171.49(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(rollup@4.67.5)
       '@tanstack/start-server-core': 1.169.39
       pathe: 2.0.3
       react: 19.3.0
@@ -4530,7 +4539,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@tanstack/router-plugin@1.168.42(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(rollup@4.67.5)':
+  '@tanstack/router-plugin@1.168.42(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(rollup@4.67.5)':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/template': 7.29.7
@@ -4539,7 +4548,7 @@ snapshots:
       '@tanstack/router-generator': 1.167.40
       '@tanstack/router-utils': 1.162.3
       chokidar: 5.0.0
-      unplugin: 3.4.0(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(rollup@4.67.5)
+      unplugin: 3.4.0(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(rollup@4.67.5)
       zod: 4.6.5
     optionalDependencies:
       '@tanstack/react-router': 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -4576,7 +4585,7 @@ snapshots:
 
   '@tanstack/start-fn-stubs@1.162.0': {}
 
-  '@tanstack/start-plugin-core@1.171.49(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(rollup@4.67.5)':
+  '@tanstack/start-plugin-core@1.171.49(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(rollup@4.67.5)':
     dependencies:
       '@babel/code-frame': 7.29.7
       '@babel/core': 7.29.7
@@ -4584,7 +4593,7 @@ snapshots:
       '@jridgewell/remapping': 2.3.5
       '@tanstack/router-core': 1.171.34
       '@tanstack/router-generator': 1.167.40
-      '@tanstack/router-plugin': 1.168.42(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(rollup@4.67.5)
+      '@tanstack/router-plugin': 1.168.42(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(rollup@4.67.5)
       '@tanstack/router-utils': 1.162.3
       '@tanstack/start-server-core': 1.169.39
       exsolve: 1.1.3
@@ -5837,12 +5846,13 @@ snapshots:
       unist-util-is: 6.0.1
       unist-util-visit-parents: 6.1.0
 
-  unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(rollup@4.67.5):
+  unplugin@3.4.0(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(rollup@4.67.5):
     dependencies:
       '@jridgewell/remapping': 2.3.5
       picomatch: 4.0.7
       webpack-virtual-modules: 0.6.2
     optionalDependencies:
+      esbuild: 0.21.5
       rollup: 4.67.5
       vite: '@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2)'
 

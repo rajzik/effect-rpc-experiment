@@ -5,13 +5,17 @@
   "type": "module",
   "scripts": {
     "example:build": "vp build",
-    "example:start": "vp preview --port 3100 --strictPort"
+    "example:start": "vp preview",
+    "example:test": "playwright test"
   },
   "dependencies": {
+    "@effect-trpc-examples/shared": "workspace:*",
     "@effect-trpc/client": "workspace:*",
     "@effect-trpc/core": "workspace:*",
     "@effect-trpc/server": "workspace:*",
     "@effect-trpc/start": "workspace:*",
+    "@effect-trpc/tanstack-react-query": "workspace:*",
+    "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
     "effect": "catalog:",
@@ -19,9 +23,9 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@playwright/test": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
-    "@types/react-dom": "catalog:",
-    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0"
+    "@types/react-dom": "catalog:"
   }
 }
