@@ -58,6 +58,10 @@ const legacyById = query({
   error: Schema.Union([PostNotFound, Forbidden]),
 });
 
+const narrowsToAny = (u: unknown): void => {
+  if (Procedure.hasHandler(u)) expectTypeOf(u).toEqualTypeOf<ProcedureWithHandler.Any>();
+};
+
 describe('Procedure builder types', () => {
   it('handler payload is inferred from input', () => {
     Procedure.input({ id: Schema.Finite }).query((payload) => {
@@ -263,5 +267,27 @@ describe('Procedure builder types', () => {
     // Requirements are recorded as written; removing middleware-provided services is the
     // server's job (Handlers.fromService), like Handlers.make does today.
     expectTypeOf<Procedure.HandlerRequirements<typeof me>>().toEqualTypeOf<CurrentUser>();
+  });
+
+  it('builder procedures are ProcedureWithHandler.Any and hasHandler narrows', () => {
+    const guardedQuery = Procedure.input({ id: Schema.Finite })
+      .output(Post)
+      .error(PostNotFound)
+      .middleware(AuthMiddleware)
+      .query(({ id }) => Effect.succeed(new Post({ id, title: 't', createdAt: new Date(0) })))
+      .middleware(LogMiddleware);
+    const guardedFeed = Procedure.output(Schema.Finite)
+      .middleware(AuthMiddleware)
+      .subscription(() => Stream.make(1, 2))
+      .middleware(LogMiddleware);
+    expectTypeOf(guardedQuery).toExtend<ProcedureWithHandler.Any>();
+    expectTypeOf(guardedFeed).toExtend<ProcedureWithHandler.Any>();
+    expectTypeOf(legacyById).not.toExtend<ProcedureWithHandler.Any>();
+
+    narrowsToAny(guardedQuery);
+    const def: ProcedureDef.Any = legacyById;
+    if (Procedure.hasHandler(def)) {
+      expectTypeOf(def).toExtend<ProcedureWithHandler.Any>();
+    }
   });
 });

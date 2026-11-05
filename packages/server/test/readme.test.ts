@@ -1,6 +1,6 @@
 // Mirrors the example in README.md so the documentation stays correct.
 import { Context, Effect, Layer, Schema, Stream } from 'effect';
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
+import { mutation, Procedure, query, Router, subscription } from '@effect-trpc/core';
 import type { ClientError } from '@effect-trpc/core';
 import { describe, expect, expectTypeOf, it } from 'vite-plus/test';
 import { createCaller, Handlers, Middleware, toWebHandler } from '../src/index.js';
@@ -124,5 +124,53 @@ describe('README example', () => {
     } finally {
       await server.dispose();
     }
+  });
+});
+
+describe('README: routers as services', () => {
+  class Post extends Schema.Class<Post>('Post')({ id: Schema.Finite, title: Schema.String }) {}
+  class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+    id: Schema.Finite,
+  }) {}
+  class Database extends Context.Service<
+    Database,
+    { readonly findPost: (id: number) => Effect.Effect<Post, PostNotFound> }
+  >()('Database') {}
+  // `Auth`, `CurrentUser` and `AuthLive` as in the README example above.
+
+  class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+    make: Effect.succeed({
+      post: {
+        byId: Procedure.input({ id: Schema.Finite })
+          .output(Post)
+          .error(PostNotFound)
+          .query(
+            Effect.fn(function* ({ id }) {
+              const db = yield* Database;
+              return yield* db.findPost(id);
+            }),
+          ),
+      },
+      me: Procedure.output(Schema.String)
+        .middleware(Auth)
+        .query(() => Effect.map(CurrentUser, (user) => user.name)),
+    }),
+  }) {}
+
+  const DatabaseLive = Layer.succeed(Database)({
+    findPost: (id) =>
+      id === 1
+        ? Effect.succeed(new Post({ id, title: 'Hello' }))
+        : Effect.fail(new PostNotFound({ id })),
+  });
+  it('Handlers.fromService with createCaller', async () => {
+    const ServiceHandlersLive = Handlers.fromService(AppRouter);
+    expectTypeOf(ServiceHandlersLive).toExtend<Layer.Layer<AppRouter, never, Database>>();
+    const ServiceServerLive = Layer.mergeAll(ServiceHandlersLive, AuthLive).pipe(
+      Layer.provide(DatabaseLive),
+    );
+    await using caller = createCaller(Router.from(AppRouter), { handlers: ServiceServerLive });
+    expect(await caller.$promise.post.byId({ id: 1 })).toBeInstanceOf(Post);
+    expect(await caller.$promise.me(undefined, { headers: { 'x-user': 'ada' } })).toBe('ada');
   });
 });

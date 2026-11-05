@@ -1,0 +1,173 @@
+import { Context, Effect, Exit, Layer, Schema, Stream } from 'effect';
+import { FetchHttpClient } from 'effect/http';
+import { RpcClient, RpcSerialization } from 'effect/rpc';
+import { Procedure, query, Router } from '@effect-trpc/core';
+import { describe, expect, it } from 'vite-plus/test';
+import { createCaller, Handlers, toWebHandler } from '../src/index.js';
+import { AuthLive, Trace, TraceLive, Unauthorized } from './fixtures.js';
+import {
+  AppRouter,
+  Database,
+  DatabaseLive,
+  LegacyRouter,
+  makeRuns,
+  Post,
+  PostNotFound,
+  postCreatedAt,
+} from './service-fixtures.js';
+
+const appRouter = Router.from(AppRouter);
+
+const ServerLive = Layer.mergeAll(Handlers.fromService(AppRouter), AuthLive()).pipe(
+  Layer.provide(DatabaseLive),
+);
+
+describe('Handlers.fromService', () => {
+  it('serves a service router end to end through createCaller', async () => {
+    await using caller = createCaller(appRouter, { handlers: ServerLive });
+    const post = await caller.$promise.post.byId({ id: 1 });
+    expect(post).toBeInstanceOf(Post);
+    expect(post.headline()).toBe('#1 Hello');
+    expect(post.createdAt).toEqual(postCreatedAt);
+
+    const error = await caller.$promise.post.byId({ id: 7 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(PostNotFound);
+
+    expect(await caller.$promise.health()).toBe('ok');
+    const titles = await Effect.runPromise(Stream.runCollect(caller.post.titles()));
+    expect(titles).toEqual(['first', 'second']);
+  });
+
+  it('runs middleware: provided services reach the handler, middleware errors are typed', async () => {
+    await using caller = createCaller(appRouter, { handlers: ServerLive });
+    expect(await caller.$promise.me(undefined, { headers: { 'x-user': 'ada' } })).toBe('ada');
+    expect(await caller.$promise.whoami(undefined, { headers: { 'x-user': 'bob' } })).toBe(
+      'I am bob',
+    );
+    const error = await caller.$promise.me().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Unauthorized);
+  });
+
+  it('serves a service router end to end through toWebHandler over HTTP', async () => {
+    await using web = await toWebHandler(appRouter, { handlers: ServerLive });
+    const fetch: typeof globalThis.fetch = (input, init) => web.handler(new Request(input, init));
+    const exit = await Effect.runPromiseExit(
+      Effect.gen(function* () {
+        const client = yield* RpcClient.make(appRouter.group);
+        const post = yield* client['post.byId']({ id: 1 });
+        const missing = yield* Effect.flip(client['post.byId']({ id: 7 }));
+        const titles = yield* Stream.runCollect(client['post.titles']());
+        return { post, missing, titles };
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(
+          RpcClient.layerProtocolHttp({ url: 'http://localhost/rpc' }).pipe(
+            Layer.provide([
+              FetchHttpClient.layer.pipe(
+                Layer.provide(Layer.succeed(FetchHttpClient.Fetch)(fetch)),
+              ),
+              RpcSerialization.layerNdjson,
+            ]),
+          ),
+        ),
+      ),
+    );
+    if (!Exit.isSuccess(exit)) throw new Error(`call failed: ${String(exit.cause)}`);
+    expect(exit.value.post).toBeInstanceOf(Post);
+    expect(exit.value.post.headline()).toBe('#1 Hello');
+    expect(exit.value.missing).toBeInstanceOf(PostNotFound);
+    expect(exit.value.titles).toEqual(['first', 'second']);
+  });
+
+  it('provides the service: yield* Svc returns the procedures record', async () => {
+    const procedures = await Effect.runPromise(
+      Effect.provide(AppRouter, Handlers.fromService(AppRouter).pipe(Layer.provide(DatabaseLive))),
+    );
+    expect(procedures).toBe(appRouter.record);
+    expect(procedures.post.byId).toBe(appRouter.record.post.byId);
+    expect(Procedure.hasHandler(procedures.post.byId)).toBe(true);
+  });
+
+  it('evaluates make once per class, whichever APIs use it', () => {
+    Handlers.fromService(AppRouter);
+    Handlers.fromProcedures(Router.from(AppRouter));
+    Router.make({ nested: AppRouter });
+    expect(makeRuns.count).toBe(1);
+  });
+
+  it('fromService rejects procedures without handlers', () => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- forces the compile error away to prove the runtime check
+    const forced = LegacyRouter as unknown as typeof AppRouter;
+    expect(() => Handlers.fromService(forced)).toThrow(
+      'Handlers.fromService: the router service "LegacyRouter" has procedures without a handler: "user.byId", "health" (defined with query/mutation/subscription({...})). Build them with Procedure (e.g. Procedure.input(...).query(handler)), or implement the router with Handlers.make',
+    );
+  });
+
+  it('throws the clear make error of Router.fromService for an async make', () => {
+    // An async make is invisible to types: Router.fromService reports it by name.
+    class AsyncRouter extends Context.Service<AsyncRouter>()('AsyncRouter', {
+      make: Effect.sleep('1 millis').pipe(Effect.as({ ok: Procedure.query(() => Effect.void) })),
+    }) {}
+    expect(() => Handlers.fromService(AsyncRouter)).toThrow(
+      'Cannot build a router from the router service "AsyncRouter": make must not require services or be asynchronous',
+    );
+  });
+});
+
+describe('Handlers.fromProcedures', () => {
+  it('serves a plain router of builder procedures', async () => {
+    const router = Router.make({
+      post: {
+        byId: Procedure.input({ id: Schema.Finite })
+          .output(Post)
+          .error(PostNotFound)
+          .query(({ id }) => Effect.flatMap(Database, (db) => db.findPost(id))),
+      },
+    });
+    await using caller = createCaller(router, {
+      handlers: Handlers.fromProcedures(router).pipe(Layer.provide(DatabaseLive)),
+    });
+    expect(await caller.$promise.post.byId({ id: 1 })).toBeInstanceOf(Post);
+    expect(await caller.$promise.post.byId({ id: 2 }).catch((e: unknown) => e)).toBeInstanceOf(
+      PostNotFound,
+    );
+  });
+
+  it('middleware keeps handlers and removes provided services from requirements', async () => {
+    const events: Array<string> = [];
+    const guarded = appRouter.middleware(Trace);
+    await using caller = createCaller(guarded, {
+      handlers: Layer.mergeAll(
+        Handlers.fromProcedures(guarded),
+        AuthLive(events),
+        TraceLive(events),
+      ).pipe(Layer.provide(DatabaseLive)),
+    });
+    expect(await caller.$promise.me(undefined, { headers: { 'x-user': 'ada' } })).toBe('ada');
+    expect((await caller.$promise.post.byId({ id: 1 })).title).toBe('Hello');
+    expect(events).toEqual(['auth:ada', 'trace:me', 'trace:post.byId']);
+  });
+
+  it('serves services nested in a router', async () => {
+    const router = Router.make({ app: AppRouter, ping: Procedure.query(() => Effect.void) });
+    await using caller = createCaller(router, {
+      handlers: Layer.mergeAll(Handlers.fromProcedures(router), AuthLive()).pipe(
+        Layer.provide(DatabaseLive),
+      ),
+    });
+    expect((await caller.$promise.app.post.byId({ id: 1 })).title).toBe('Hello');
+    expect(await caller.$promise.ping()).toBeUndefined();
+  });
+
+  it('fromProcedures rejects procedures without handlers', () => {
+    const legacy = Router.make({
+      ok: Procedure.query(() => Effect.void),
+      nested: { old: query({ success: Schema.String }) },
+    });
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- forces the compile error away to prove the runtime check
+    const forced = legacy as unknown as Router<{ readonly ok: typeof legacy.record.ok }>;
+    expect(() => Handlers.fromProcedures(forced)).toThrow(
+      'Handlers.fromProcedures: the router has procedures without a handler: "nested.old" (defined with query/mutation/subscription({...})). Build them with Procedure (e.g. Procedure.input(...).query(handler)), or implement the router with Handlers.make',
+    );
+  });
+});

@@ -5,13 +5,17 @@
  * flattens it into `router.group.toLayer(...)`, so the resulting `Layer<Rpc.ToHandler<...>>` plugs
  * into everything that serves an `RpcGroup`: {@link toWebHandler}, `layerHttp`,
  * `@effect-trpc/server/node`, `createCaller`, `RpcServer` and `RpcTest.makeClient`.
+ * `Handlers.fromService` / `Handlers.fromProcedures` build the same layer from the handlers of
+ * procedures written with `@effect-trpc/core`'s `Procedure` builder (a router service or a plain
+ * router), inferring their requirements.
  *
  * @since 0.1.0
  */
-import { Effect } from 'effect';
-import type { Layer, Scope, Stream } from 'effect';
+import { Effect, Layer } from 'effect';
+import type { Context, Scope, Stream } from 'effect';
 import type { Rpc, RpcGroup } from 'effect/rpc';
-import type { ProcedureDef, Router } from '@effect-trpc/core';
+import { Procedure, Router } from '@effect-trpc/core';
+import type { ProcedureDef, ProcedureWithHandler, RouterService } from '@effect-trpc/core';
 
 type RecordOf<R> = R extends Router<infer Rec> ? Rec : R;
 
@@ -60,6 +64,22 @@ type NestedServices<Rec, H, Prefix extends string> = {
       : NestedServices<RecordOf<Rec[K]>, H[K], `${Prefix}${K}.`>
     : never;
 }[keyof H & string];
+
+type HandlerOf<D> = D extends { readonly handler: infer H } ? H : never;
+
+type NestedProcedureServices<Rec, Prefix extends string> = {
+  [K in keyof Rec & string]: Rec[K] extends ProcedureDef.Any
+    ? HandlerServices<ProcedureDef.ToRpc<Rec[K], `${Prefix}${K}`>, HandlerOf<Rec[K]>>
+    : NestedProcedureServices<RecordOf<Rec[K]>, `${Prefix}${K}.`>;
+}[keyof Rec & string];
+
+type NestedWithoutHandler<Rec, Prefix extends string> = {
+  [K in keyof Rec & string]: Rec[K] extends ProcedureDef.Any
+    ? Rec[K] extends ProcedureWithHandler.Any
+      ? never
+      : `${Prefix}${K}`
+    : NestedWithoutHandler<RecordOf<Rec[K]>, `${Prefix}${K}.`>;
+}[keyof Rec & string];
 
 /**
  * Type-level helpers of {@link Handlers}: the handler record shapes and the services a server
@@ -116,6 +136,49 @@ export declare namespace Handlers {
     | Rpc.ToHandler<Router.Rpcs<R>>
     | Rpc.Middleware<Router.Rpcs<R>>
     | Rpc.ServicesServer<Router.Rpcs<R>>;
+
+  /**
+   * The services required by the handlers of a router built with `Procedure` (what
+   * `Handlers.fromProcedures` / `Handlers.fromService` leave as layer requirements): the union
+   * of every handler's requirements, minus `Scope` and the services the procedure's middleware
+   * provides (e.g. `CurrentUser`).
+   *
+   * @since 0.1.0
+   */
+  export type ProcedureServices<R extends Router.Any> = NestedProcedureServices<R['record'], ''>;
+
+  /**
+   * The paths of the procedures of router `R` that have no handler (defined with
+   * `query` / `mutation` / `subscription({...})` instead of `Procedure`); `never` when every
+   * procedure has one.
+   *
+   * @since 0.1.0
+   */
+  export type WithoutHandler<R extends Router.Any> = NestedWithoutHandler<R['record'], ''>;
+
+  /**
+   * The compile error of `Handlers.fromService` / `Handlers.fromProcedures` for procedures
+   * without a handler: one property per path, whose name is the message. It is intersected with
+   * the argument type, so TypeScript reports
+   * `Property "procedure 'user.byId' has no handler ..." is missing in type ...`.
+   *
+   * @since 0.1.0
+   */
+  export type ProceduresWithoutHandler<Paths extends string> = {
+    readonly [
+      P in Paths as `procedure '${P}' has no handler (defined with query/mutation/subscription({...})): build it with Procedure (e.g. Procedure.input(...).query(handler)), or implement the router with Handlers.make`
+    ]: P;
+  };
+
+  /**
+   * `unknown` when every procedure of router `R` has a handler, otherwise
+   * {@link ProceduresWithoutHandler} naming the paths that have none.
+   *
+   * @since 0.1.0
+   */
+  export type RequireHandlers<R extends Router.Any> = [WithoutHandler<R>] extends [never]
+    ? unknown
+    : ProceduresWithoutHandler<WithoutHandler<R>>;
 }
 
 type AnyHandler = (...args: ReadonlyArray<never>) => unknown;
@@ -275,6 +338,183 @@ const flat = <R extends Router.Any, H extends Handlers.Flat<R>, EX = never, RX =
     Exclude<RX, Scope.Scope> | RpcGroup.HandlersServices<Router.Rpcs<R>, H>
   >(router, build);
 
+/** The definition at `path` of a resolved router record (nested routers and plain records). */
+const procedureAt = (router: Router.Any, path: ReadonlyArray<string>): unknown => {
+  let node: unknown = router;
+  for (const segment of path) {
+    if (Router.isRouter(node)) node = node.record;
+    node = isRecord(node) && Object.hasOwn(node, segment) ? node[segment] : undefined;
+  }
+  return node;
+};
+
+/**
+ * The tag-keyed handlers of a router built with `Procedure`. Throws, naming every path, when a
+ * procedure has no handler.
+ */
+const proceduresHandlers = (router: Router.Any, owner: string): FlatHandlers => {
+  const out: { [tag: string]: AnyHandler } = {};
+  const missing: Array<string> = [];
+  for (const info of router.procedures.values()) {
+    const def = procedureAt(router, info.path);
+    if (Procedure.hasHandler(def)) out[info.tag] = def.handler;
+    else missing.push(`"${info.tag}"`);
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `${owner} has procedures without a handler: ${missing.join(', ')} (defined with query/mutation/subscription({...})). Build them with Procedure (e.g. Procedure.input(...).query(handler)), or implement the router with Handlers.make`,
+    );
+  }
+  return out;
+};
+
+/**
+ * Implements a router whose procedures were built with `Procedure` (schemas + handler) from the
+ * procedures' own handlers: no handler record to write.
+ *
+ * **When to use**
+ *
+ * Use for a plain router (`Router.make`) of `Procedure` procedures. For a router written as an
+ * Effect service use {@link Handlers.fromService}, which also provides the service.
+ *
+ * **Details**
+ *
+ * - The layer is the one `Handlers.make` would produce for the same handlers (same tags,
+ *   same `Layer<Rpc.ToHandler<...>>`); services nested in the router contribute their handlers.
+ * - Requirements are inferred ({@link Handlers.ProcedureServices}): the union of the handlers'
+ *   requirements minus `Scope` and the services provided by the procedure's middleware, whether
+ *   it was added with the builder, on the procedure or with `router.middleware(M)`.
+ *
+ * **Gotchas**
+ *
+ * - A procedure defined with `query` / `mutation` / `subscription({...})` has no handler: that
+ *   is a compile error naming its path ({@link Handlers.ProceduresWithoutHandler}) and, if
+ *   forced with a cast, throws. Implement such routers with `Handlers.make` (a builder
+ *   procedure's `handler` can be reused there).
+ * - Middleware implementations are separate layers: `Layer.mergeAll(HandlersLive, AuthLive)`.
+ *
+ * **Example** (A plain router of builder procedures)
+ *
+ * ```ts
+ * import { Context, Effect, Layer, Schema } from 'effect';
+ * import { Procedure, Router } from '@effect-trpc/core';
+ * import { Handlers } from '@effect-trpc/server';
+ *
+ * class Greeting extends Context.Service<Greeting, { readonly word: string }>()('Greeting') {}
+ *
+ * const appRouter = Router.make({
+ *   greet: Procedure.input({ name: Schema.String })
+ *     .output(Schema.String)
+ *     .query(({ name }) => Effect.map(Greeting, ({ word }) => `${word}, ${name}`)),
+ * });
+ *
+ * // Layer<Rpc.Handler<'greet'>, never, Greeting>
+ * const HandlersLive = Handlers.fromProcedures(appRouter).pipe(
+ *   Layer.provide(Layer.succeed(Greeting)({ word: 'Hello' })),
+ * );
+ * ```
+ */
+const fromProcedures = <R extends Router.Any>(
+  router: R & Handlers.RequireHandlers<R>,
+): Layer.Layer<Handlers.Provides<R>, never, Handlers.ProcedureServices<R>> =>
+  toLayer<Handlers.Provides<R>, never, Handlers.ProcedureServices<R>>(
+    router,
+    proceduresHandlers(router, 'Handlers.fromProcedures: the router'),
+  );
+
+/**
+ * Implements a router written as an Effect service (a `Context.Service` class whose `make`
+ * returns `Procedure` procedures) from the procedures' own handlers, and provides the service
+ * itself.
+ *
+ * **When to use**
+ *
+ * Use to serve a router service: pass the layer, merged with the middleware implementations
+ * and provided with the services the handlers read, to `toWebHandler`, `layerHttp`,
+ * `createCaller` or `@effect-trpc/server/node`.
+ *
+ * **Details**
+ *
+ * - The router is `Router.fromService(Svc)`: `make` is evaluated once per class per process,
+ *   shared with every other API that uses the class.
+ * - The layer provides one `Rpc.Handler<Tag>` per procedure (tags as `Router.make` assigns them)
+ *   and `Svc`, so `yield* Svc` returns the procedures record (`Router.from(Svc).record`).
+ * - Requirements are inferred ({@link Handlers.ProcedureServices}): the union of the handlers'
+ *   requirements minus `Scope` and middleware-provided services (e.g. `CurrentUser`).
+ *
+ * **Gotchas**
+ *
+ * - A procedure defined with `query` / `mutation` / `subscription({...})` inside the service
+ *   is a compile error naming its path; if forced with a cast it throws. Use `Handlers.make`
+ *   for routers mixing both styles.
+ * - A `make` that needs services is a compile error; an async or failing `make` throws the
+ *   error of `Router.fromService`.
+ * - A router service nested in `make` is provided as its resolved router
+ *   (`Router.from(Nested)`), not as the class.
+ *
+ * **Example** (Serving a router service)
+ *
+ * ```ts
+ * import { Context, Effect, Layer, Schema } from 'effect';
+ * import { Procedure, Router } from '@effect-trpc/core';
+ * import { Handlers, toWebHandler } from '@effect-trpc/server';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Finite, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Finite,
+ * }) {}
+ * class Database extends Context.Service<
+ *   Database,
+ *   { readonly findPost: (id: number) => Effect.Effect<Post, PostNotFound> }
+ * >()('Database') {}
+ *
+ * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+ *   make: Effect.succeed({
+ *     post: {
+ *       byId: Procedure.input({ id: Schema.Finite })
+ *         .output(Post)
+ *         .error(PostNotFound)
+ *         .query(
+ *           Effect.fn(function* ({ id }) {
+ *             const db = yield* Database; // read services inside handlers
+ *             return yield* db.findPost(id);
+ *           }),
+ *         ),
+ *     },
+ *   }),
+ * }) {}
+ *
+ * declare const DatabaseLive: Layer.Layer<Database>;
+ *
+ * // Layer<Rpc.Handler<'post.byId'> | AppRouter, never, Database>
+ * const HandlersLive = Handlers.fromService(AppRouter);
+ *
+ * const web = await toWebHandler(Router.from(AppRouter), {
+ *   handlers: HandlersLive.pipe(Layer.provide(DatabaseLive)),
+ * });
+ * ```
+ */
+const fromService = <S extends RouterService.Any>(
+  service: S & Handlers.RequireHandlers<Router.Of<S>>,
+): Layer.Layer<
+  Handlers.Provides<Router.Of<S>> | Context.Service.Identifier<S>,
+  never,
+  Handlers.ProcedureServices<Router.Of<S>>
+> => {
+  const router: Router.Any = Router.fromService(service);
+  const handlers = toLayer<
+    Handlers.Provides<Router.Of<S>>,
+    never,
+    Handlers.ProcedureServices<Router.Of<S>>
+  >(
+    router,
+    proceduresHandlers(router, `Handlers.fromService: the router service "${service.key}"`),
+  );
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a service key's identifier is its class (`Context.Service.Identifier<S>`); `RouterService.Any` erases it to `any`
+  const key = service as unknown as Context.Key<Context.Service.Identifier<S>, Router.Shape>;
+  return Layer.merge(handlers, Layer.succeed(key)(router.record));
+};
+
 /**
  * Identity helper that type-checks (and contextually types) a nested handler record against a
  * router, e.g. to define handlers in a separate module or inside `Effect.gen`.
@@ -311,12 +551,15 @@ const of = <R extends Router.Any, H extends Handlers.From<R>>(_router: R, handle
   handlers;
 
 /**
- * Handler constructors for a core `Router`: `make` (nested record), `flat` (tag-keyed record)
- * and `of` (contextual typing helper).
+ * Handler constructors for a core `Router`: `make` (nested record), `flat` (tag-keyed record),
+ * `of` (contextual typing helper), and `fromService` / `fromProcedures` (routers whose
+ * procedures were built with `Procedure` and carry their handlers).
  *
  * **When to use**
  *
- * Use `Handlers.make(router, record)` to implement a router; pass the resulting layer, merged
+ * Use `Handlers.make(router, record)` to implement a router of `query` / `mutation` /
+ * `subscription({...})` definitions, `Handlers.fromService(AppRouter)` for a router written as
+ * an Effect service with `Procedure`; pass the resulting layer, merged
  * with the middleware implementations, to `toWebHandler`, `layerHttp`, `createCaller` or
  * `@effect-trpc/server/node`.
  *
@@ -406,4 +649,6 @@ export const Handlers = {
   make,
   flat,
   of,
+  fromProcedures,
+  fromService,
 } as const;
