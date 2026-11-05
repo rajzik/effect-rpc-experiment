@@ -13,3 +13,5 @@ graft/
 .tanstack/
 dist-types/
 .jsdoc-examples/
+.vercel
+.env*
