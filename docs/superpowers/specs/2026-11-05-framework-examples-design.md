@@ -1,6 +1,6 @@
 # Framework examples with real-browser tests — design
 
-Date: 2026-11-05 · Status: draft for approval
+Date: 2026-11-05 · Status: approved 2026-11-05
 
 ## Intent
 
@@ -125,6 +125,12 @@ built app), `test:e2e` (Playwright). Not picked up by `vp run -r build/test` —
 2. Spike Electron binary install + Playwright `_electron` launch.
 3. Shared domain + Next.js app + suite (lowest risk, proves the harness).
 4. Start app + suite. 5. Electron app + suite. 6. CI workflow, READMEs, docs-site links.
+
+## Library bugs found by the examples (user decision)
+
+Fixed in this PR: each fix is its own commit in `packages/*` with a failing unit test first
+(plus `.test-d.ts` when types change), README / `test/PARITY.md` updates where relevant, and the
+full `pnpm ready` gate. Example tests stay strict; no scenario is skipped or weakened to pass.
 
 ## Calls I made (to check)
 
