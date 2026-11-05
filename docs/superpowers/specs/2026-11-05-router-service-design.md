@@ -1,6 +1,6 @@
 # Routers as Effect services — design
 
-Date: 2026-11-05 · Status: draft for approval (builder check done)
+Date: 2026-11-05 · Status: approved 2026-11-05
 
 ## Intent
 
