@@ -31,10 +31,12 @@ clean-up runs when a client gives up.
 
 ```ts
 byId: ({ id }) =>
-  Effect.tryPromise({
-    try: (signal) => db.query('select * from posts where id = $1', [id], { signal }),
-    catch: () => new PostNotFound({ id }),
-  }),
+  Effect.tryPromise((signal) => db.findPost(id, { signal })).pipe(
+    Effect.orDie, // a failing query is a bug, not a domain error
+    Effect.flatMap((post) =>
+      post === undefined ? Effect.fail(new PostNotFound({ id })) : Effect.succeed(post),
+    ),
+  ),
 ```
 
 ::: warning Gotchas

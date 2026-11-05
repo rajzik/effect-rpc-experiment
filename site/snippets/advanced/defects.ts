@@ -11,17 +11,23 @@ const router = Router.make({
   report: query({ payload: { id: Schema.String }, success: Schema.String, error: RateLimited }),
 });
 
-declare const loadReport: (id: string) => Promise<string>;
+declare const loadReport: (id: string) => Promise<string>; // rejects with { status } on HTTP errors
+
+const isRateLimit = (error: unknown): boolean =>
+  typeof error === 'object' && error !== null && 'status' in error && error.status === 429;
 
 const HandlersLive = Handlers.make(router, {
   report: ({ id }) =>
-    Effect.tryPromise({
-      try: () => loadReport(id),
-      // A failure clients should handle: declare it, map to it.
-      catch: () => new RateLimited({ retryAfterSeconds: 30 }),
-    }).pipe(
-      // Everything else is a bug: log it with the cause, let it become a defect.
-      Effect.tapCause((cause) => Effect.logError('report failed', cause)),
+    Effect.tryPromise(() => loadReport(id)).pipe(
+      // A failure clients should handle: declare it and map to it.
+      Effect.catchIf(
+        (error) => isRateLimit(error.cause),
+        () => Effect.fail(new RateLimited({ retryAfterSeconds: 30 })),
+      ),
+      // Everything else is a bug: log it with its cause, then make it a defect.
+      Effect.catchTag('UnknownError', (error) =>
+        Effect.logError('report failed', error.cause).pipe(Effect.andThen(Effect.die(error))),
+      ),
     ),
 });
 // #endregion handlers

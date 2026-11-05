@@ -39,8 +39,9 @@ that renderer's in-flight handlers and streams. A defect in one handler fails on
   dependencies.
 - **Any script in the page can open a connection**, as any script can call an HTTP endpoint. Treat
   procedures as a public API: validate with schemas, authorize in middleware.
-- **Who is calling.** The server sets a sender header to the renderer's `webContents.id`, replacing
-  whatever the renderer sent:
+- **Who is calling.** The server sets the `senderIdHeader` (`"x-effect-trpc-sender-id"`) to the
+  renderer's `webContents.id`, replacing whatever the renderer sent. Read it with
+  `MainRpcServer.senderId(headers)`, which also parses it:
 
 <<< @/snippets/electron/sender.ts#sender
 

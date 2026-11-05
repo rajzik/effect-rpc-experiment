@@ -28,6 +28,19 @@ typed.
 
 Without an input, `queryKey()` and `queryFilter()` match every input of that procedure.
 
+## Keys without a proxy
+
+When you have a path but no proxy (devtools, cache utilities, persisters), the standalone helpers
+build and read the same keys:
+
+| Helper                                        | What                                                    |
+| --------------------------------------------- | ------------------------------------------------------- |
+| `getQueryKey({ path, input?, type, prefix })` | the query key for a path (`prefix: undefined` for none) |
+| `getMutationKey({ path, prefix })`            | the mutation key for a path                             |
+| `readQueryKey(queryKey)`                      | splits a key back into prefix, path and args            |
+
+Prefer the proxy helpers when you have the proxy: they carry the data type.
+
 ## Key prefixes
 
 To keep several routers on one `QueryClient` without key collisions, give each a prefix. Keys

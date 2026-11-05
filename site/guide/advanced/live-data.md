@@ -20,8 +20,8 @@ calls.
 
 <<< @/snippets/advanced/live-data.tsx#component
 
-`onConnectionStateChange` reports `connecting`, `pending` (live) and `error`, so the UI can show the
-state. Writing elements into the query cache keeps the rest of the UI (detail views, lists) in sync
+`onConnectionStateChange` reports `idle`, `connecting` and `pending` (live), so the UI can show the
+state. Failures arrive through `onError` and `sub.status === 'error'`. Writing elements into the query cache keeps the rest of the UI (detail views, lists) in sync
 with the stream.
 
 ## Server-side fan-out

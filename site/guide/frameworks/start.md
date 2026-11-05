@@ -48,7 +48,9 @@ from the client build.
 
 When the server calls the HTTP endpoint (`isServer: false`, or `createBrowserClient` during SSR),
 relative URLs resolve with `getBaseUrl()`: `serverOrigin`, then `PUBLIC_URL` / `URL`, then
-`https://$VERCEL_URL`, then `http://localhost:$PORT`.
+`https://$VERCEL_URL`, then `http://localhost:$PORT`. For a hand-made link (a `wsLink`, extra
+headers), `getRpcUrl(url?)` applies the same rules; it defaults to `defaultStartPath`
+(`"/api/rpc"`).
 
 ## Router and SSR hydration
 

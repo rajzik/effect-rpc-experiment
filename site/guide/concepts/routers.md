@@ -35,7 +35,8 @@ Records and routers nest to any depth. The client mirrors the shape: `client.adm
 <<< @/snippets/concepts/routers.ts#inspect
 
 `router.procedures` lists each procedure's `path`, `tag`, `kind` and compiled `rpc` in definition
-order. `router.group` is a plain `RpcGroup`: hand it to `RpcServer`, `RpcClient` or `RpcTest`
+order. A compiled rpc also carries its kind as an annotation:
+`Context.get(rpc.annotations, ProcedureKind)` is `"query"`, `"mutation"` or `"subscription"`. `router.group` is a plain `RpcGroup`: hand it to `RpcServer`, `RpcClient` or `RpcTest`
 directly when you need something effect-trpc does not wrap.
 
 ## Middleware on procedures and routers

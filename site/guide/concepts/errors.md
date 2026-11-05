@@ -60,6 +60,7 @@ When you build on `effect/rpc` directly (custom adapters, tests with `RpcTest`),
 
 <<< @/snippets/concepts/errors.ts#cause
 
+`isRpcClientError(e)` tells `effect/rpc`'s transport errors apart from the procedure's errors.
 `causeToClientError` maps `Fail(e)` to `e` (or to `RpcTransportError` when `e` is an
 `RpcClientError`), `Die` to `RpcDefect` and interruption to `RpcInterrupted`. A typed failure wins
 over a defect, and a defect over interruption. `exitToClientError(exit)` returns

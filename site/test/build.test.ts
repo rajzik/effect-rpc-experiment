@@ -1,6 +1,6 @@
 // Checks the built site (`pnpm docs:build` first): every root-relative URL carries the Pages base.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, posix } from 'node:path';
 import { describe, expect, it } from 'vite-plus/test';
 
 import { sidebar } from '../.vitepress/sidebar';
@@ -44,6 +44,37 @@ describe('built site', () => {
     });
     expect(links.length).toBeGreaterThan(40);
     expect(missing).toEqual([]);
+  });
+
+  // VitePress's dead-link check ignores `#fragments`: check every guide link's anchor here.
+  it('every #anchor linked from a guide page exists', () => {
+    const guide = join(import.meta.dirname, '..', 'guide');
+    const pages = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory()
+          ? pages(join(dir, entry.name))
+          : entry.name.endsWith('.md')
+            ? [join(dir, entry.name)]
+            : [],
+      );
+    const broken = pages(guide).flatMap((file) => {
+      const from = posix.join('/guide', posix.relative(guide, dirname(file)).split('\\').join('/'));
+      return [...readFileSync(file, 'utf8').matchAll(/\]\(([^)\s]*)#([^)\s]+)\)/g)].flatMap(
+        ([, path = '', anchor = '']) => {
+          if (/^[a-z]+:/.test(path)) return [];
+          const route =
+            path === ''
+              ? posix.join(from, posix.basename(file, '.md'))
+              : path.startsWith('/')
+                ? path
+                : posix.join(from, path);
+          const html = join(dist, route.endsWith('/') ? `${route}index.html` : `${route}.html`);
+          const ok = existsSync(html) && readFileSync(html, 'utf8').includes(`id="${anchor}"`);
+          return ok ? [] : [`${posix.relative(guide, file)} → ${path}#${anchor}`];
+        },
+      );
+    });
+    expect(broken).toEqual([]);
   });
 
   it('emits a 404 page', () => {

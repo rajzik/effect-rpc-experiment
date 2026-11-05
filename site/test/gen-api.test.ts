@@ -1,7 +1,7 @@
 // The API generator covers every public export. The oracle is independent of the generator: the
 // export lists of the built `dist/*.d.mts` files (run `vp run -r build` first).
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vite-plus/test';
@@ -57,8 +57,29 @@ afterAll(() => {
 });
 
 describe('gen-api', () => {
+  it('refuses to clear an --out folder it did not create', () => {
+    const foreign = mkdtempSync(join(tmpdir(), 'effect-trpc-foreign-'));
+    writeFileSync(join(foreign, 'keep.txt'), 'user data');
+    try {
+      expect(() =>
+        execFileSync(process.execPath, [generator, '--out', foreign], { cwd: repo, stdio: 'pipe' }),
+      ).toThrow(/refusing to clear/);
+      expect(readFileSync(join(foreign, 'keep.txt'), 'utf8')).toBe('user data');
+    } finally {
+      rmSync(foreign, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects --out without a value', () => {
+    expect(() =>
+      execFileSync(process.execPath, [generator, '--out'], { cwd: repo, stdio: 'pipe' }),
+    ).toThrow(/--out/);
+  });
+
   it('writes one page per package entry, and none for e2e', () => {
-    const files = readdirSync(out).toSorted();
+    const files = readdirSync(out)
+      .filter((file) => !file.startsWith('.'))
+      .toSorted();
     expect(files).toEqual(
       [...Object.keys(pages).map((name) => `${name}.md`), 'index.md'].toSorted(),
     );

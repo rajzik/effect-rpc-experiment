@@ -59,7 +59,8 @@ const merged = Router.merge(appRouter, versionRouter); // tags of both; overlapp
 try {
   Router.make({ then: query({ success: Schema.String }) });
 } catch (error) {
-  // Error: "then" is reserved: a router proxy with a `then` key looks like a Promise.
+  // Error: Invalid router key "then" at the router root: "then" is reserved
+  // (a proxy with a `then` key would be awaited as a Promise)
 }
 // #endregion reserved
 

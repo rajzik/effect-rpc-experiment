@@ -28,7 +28,9 @@ want the requirement enforced by the types.
 ::: warning Gotchas
 
 - The in-process caller needs the client half too: include it in `createCaller`'s `handlers`.
-- The client half's typed `clientError` is added to the error type on the client.
+- The middleware's `error` is part of the procedure's error type on both halves. A `clientError`
+  (raised only by the client half) is not part of `ClientError<E>`'s type: declare errors clients
+  branch on as the middleware's `error`.
 
 :::
 

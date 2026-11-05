@@ -31,6 +31,10 @@ describe('theme', () => {
     for (const color of ['#09090b', '#18181b', '#10b981']) expect(css).toContain(color);
   });
 
+  it('light meta text has readable contrast (zinc-500, about 4.8:1 on white)', () => {
+    expect(block(tokens(), ':root')).toContain('--vp-c-text-3: var(--et-zinc-500);');
+  });
+
   it('ships no Effect brand assets', () => {
     expect(files(site).filter((file) => /effect-logo|logomark/i.test(file))).toEqual([]);
   });
