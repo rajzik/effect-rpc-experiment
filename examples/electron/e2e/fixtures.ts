@@ -2,8 +2,9 @@
  * The Electron suites' fixtures: how the shared scenarios reach the app.
  *
  * The app opens two windows at startup, one per user (`ada`, `guest`). A "board" is the window of
- * that user, found by its title, so `Boards.open('ada')` returns the page of the ada window. Every
- * board is guarded: a `pageerror` or `console.error` in any window fails the test at teardown.
+ * that user, found by its title, so `Boards.open('ada')` returns the page of the ada window. EVERY
+ * window is guarded from the moment it appears (`watchWindows`), whether or not a test opens it: a
+ * `pageerror` or `console.error` in any window fails the test at teardown.
  *
  * Two flavours of `test`:
  * - `sharedTest` runs against ONE app per worker (launched once, windows reloaded per test), so
@@ -39,17 +40,76 @@ export const windowTitle = (name: string): string => `Task board: ${name}`;
  * Launches the built app (`dist/main.mjs`). The first launch can download the Electron binary
  * (Electron has no postinstall), hence the generous timeout.
  */
+/**
+ * True when the app is launched with Chromium's `--no-sandbox` (Linux CI: no setuid `chrome-sandbox`
+ * helper, often root). Then renderers are NOT OS-sandboxed, whatever `webPreferences.sandbox` says.
+ */
+export const noSandbox = process.platform === 'linux' && process.env['CI'] !== undefined;
+
+/**
+ * Launches the built app (`dist/main.mjs`). The first launch can download the Electron binary
+ * (Electron has no postinstall), hence the generous timeout.
+ */
 export const launchApp = async (): Promise<ElectronApplication> =>
   await electron.launch({
-    args: [
-      '.',
-      // Linux CI (no setuid chrome-sandbox helper, often root): Chromium refuses to start without it.
-      ...(process.platform === 'linux' && process.env['CI'] ? ['--no-sandbox'] : []),
-    ],
+    args: ['.', ...(noSandbox ? ['--no-sandbox'] : [])],
     cwd: appDir,
     env: { ...process.env, EXAMPLES_TEST: '1' },
     timeout: 120_000,
   });
+
+/** Console-error guards over every window of an app. */
+export interface WindowWatch {
+  /**
+   * Throws when any window (open or already closed) logged a `pageerror` / `console.error` since
+   * the last call.
+   */
+  readonly assertNone: () => void;
+  /** How many windows are watched. */
+  readonly count: () => number;
+}
+
+/**
+ * Guards every window of `app`, the ones that exist and every one that appears later, so no
+ * window escapes the console-error check because a test did not open it.
+ */
+export const watchWindows = (app: ElectronApplication): WindowWatch => {
+  const watched = new Map<Page, { guard: ConsoleErrorGuard; reported: number }>();
+  const watch = (page: Page) => {
+    if (!watched.has(page)) watched.set(page, { guard: failOnConsoleErrors(page), reported: 0 });
+  };
+  for (const page of app.windows()) watch(page);
+  app.on('window', watch);
+  return {
+    count: () => watched.size,
+    assertNone: () => {
+      const fresh: Array<string> = [];
+      for (const entry of watched.values()) {
+        fresh.push(...entry.guard.errors.slice(entry.reported));
+        entry.reported = entry.guard.errors.length;
+      }
+      if (fresh.length > 0) {
+        throw new Error(`The windows logged ${fresh.length} error(s):\n${fresh.join('\n')}`);
+      }
+    },
+  };
+};
+
+/**
+ * Launches the app with every window guarded. Playwright attaches to a window only after it was
+ * created, so whatever the first load logged is invisible to it: both windows are reloaded once
+ * the guard is on, which puts a full load of each under watch.
+ */
+export const launchWatched = async (): Promise<{
+  readonly app: ElectronApplication;
+  readonly watch: WindowWatch;
+}> => {
+  const app = await launchApp();
+  const watch = watchWindows(app);
+  await expect.poll(() => watch.count(), { message: 'both windows opened' }).toBe(2);
+  for (const page of app.windows()) await page.reload();
+  return { app, watch };
+};
 
 /** The window whose title says it belongs to `name`. */
 export const windowOf = async (app: ElectronApplication, name: string): Promise<Page> => {
@@ -93,24 +153,13 @@ const windowAdapter = (page: Page): TaskBoardAdapter => ({
   },
 });
 
-/** {@link Boards} over the windows of `app`; `dispose()` throws when a window logged an error. */
-export const windowBoards = (
-  app: ElectronApplication,
-): { readonly boards: Boards; readonly dispose: () => void } => {
-  const guards: Array<ConsoleErrorGuard> = [];
-  return {
-    boards: {
-      open: async (name) => {
-        const page = await windowOf(app, name);
-        guards.push(failOnConsoleErrors(page));
-        return new TaskBoardPage(page, windowAdapter(page));
-      },
-    },
-    dispose: () => {
-      for (const guard of guards) guard.assertNone();
-    },
-  };
-};
+/** {@link Boards} over the windows of `app` (the console guard is {@link watchWindows}). */
+export const windowBoards = (app: ElectronApplication): Boards => ({
+  open: async (name) => {
+    const page = await windowOf(app, name);
+    return new TaskBoardPage(page, windowAdapter(page));
+  },
+});
 
 /** The number of live subscriptions to `tasks.onChanged`, read from the main process's store. */
 export const subscriberCount = async (app: ElectronApplication): Promise<number> =>
@@ -146,15 +195,14 @@ export const test = base.extend<{
 }>({
   // oxlint-disable-next-line no-empty-pattern -- Playwright reads the fixture names from this destructuring and requires one, even when the fixture uses none
   launchApp: async ({}, use) => {
-    const launched: Array<{ app: ElectronApplication; dispose: () => void }> = [];
+    const launched: Array<{ app: ElectronApplication; watch: WindowWatch }> = [];
     try {
       await use(async () => {
-        const app = await launchApp();
-        const web = windowBoards(app);
-        launched.push({ app, dispose: web.dispose });
-        return { app, boards: web.boards };
+        const { app, watch } = await launchWatched();
+        launched.push({ app, watch });
+        return { app, boards: windowBoards(app) };
       });
-      for (const entry of launched) entry.dispose();
+      for (const { watch } of launched) watch.assertNone();
     } finally {
       await Promise.all(launched.map(async ({ app }) => await app.close().catch(() => {})));
     }
@@ -162,14 +210,18 @@ export const test = base.extend<{
 });
 
 /** For the shared scenarios: a `boards` fixture over the worker's one app. */
-export const sharedTest = base.extend<{ boards: Boards }, { sharedApp: ElectronApplication }>({
+export const sharedTest = base.extend<
+  { boards: Boards },
+  { sharedApp: { app: ElectronApplication; watch: WindowWatch } }
+>({
   sharedApp: [
     // oxlint-disable-next-line no-empty-pattern -- Playwright reads the fixture names from this destructuring and requires one, even when the fixture uses none
     async ({}, use) => {
-      shared = launchApp();
-      const app = await shared;
+      const launching = launchWatched();
+      shared = launching.then(({ app }) => app);
+      const { app, watch } = await launching;
       try {
-        await use(app);
+        await use({ app, watch });
       } finally {
         await app.close().catch(() => {});
         shared = undefined;
@@ -178,9 +230,11 @@ export const sharedTest = base.extend<{ boards: Boards }, { sharedApp: ElectronA
     { scope: 'worker', auto: true, timeout: 180_000 },
   ],
   boards: async ({ sharedApp }, use) => {
-    const web = windowBoards(sharedApp);
-    await use(web.boards);
-    web.dispose();
+    await use(windowBoards(sharedApp.app));
+    // Both windows are guarded, not only the ones this test opened.
+    expect(sharedApp.watch.count()).toBe(2);
+    // Both windows, opened by the test or not; the first test also covers the initial load.
+    sharedApp.watch.assertNone();
   },
 });
 

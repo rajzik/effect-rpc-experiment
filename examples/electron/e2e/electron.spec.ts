@@ -1,4 +1,7 @@
-import { expect, subscriberCount, test, windowOf } from './fixtures';
+import type { TaskBoardPage } from '@effect-trpc-examples/shared/e2e';
+import type { ElectronApplication } from '@playwright/test';
+
+import { expect, noSandbox, subscriberCount, test, windowOf, windowTitle } from './fixtures';
 
 test('two windows see different users', async ({ launchApp }) => {
   const { app, boards } = await launchApp();
@@ -38,36 +41,92 @@ test('preload exposes nothing', async ({ launchApp }) => {
       electron: 'undefined',
       process: 'undefined',
     });
-    // What the main process asked for.
+    // Context isolation and no Node integration are what main.ts asked for (not affected by
+    // `--no-sandbox`); the behaviour above is the proof that they took effect.
     const preferences = await (
       await app.browserWindow(board.page)
     ).evaluate((window) => {
-      const { contextIsolation, sandbox, nodeIntegration } =
+      const { contextIsolation, nodeIntegration } =
         window.webContents.getLastWebPreferences() ?? {};
-      return { contextIsolation, sandbox, nodeIntegration };
+      return { contextIsolation, nodeIntegration };
     });
-    expect(preferences).toMatchObject({ contextIsolation: true, sandbox: true });
+    expect(preferences.contextIsolation).toBe(true);
     expect(preferences.nodeIntegration).not.toBe(true);
   }
 });
 
+test('renderer processes run in an OS sandbox', async ({ launchApp }, testInfo) => {
+  const { app, boards } = await launchApp();
+  for (const name of ['ada', 'guest']) await (await boards.open(name)).gotoList();
+
+  // `getAppMetrics().sandboxed` is what Electron reports about the running processes (macOS and
+  // Windows only), unlike `getLastWebPreferences()`, which only echoes what main.ts requested.
+  if (noSandbox || (process.platform !== 'darwin' && process.platform !== 'win32')) {
+    const reason = noSandbox
+      ? 'launched with --no-sandbox (Linux CI): renderers are not OS-sandboxed in this run'
+      : `Electron does not report the sandbox state of processes on ${process.platform}`;
+    testInfo.annotations.push({ type: 'skipped runtime sandbox assertion', description: reason });
+    return;
+  }
+  const renderers = await app.evaluate(({ app: electronApp }) =>
+    electronApp
+      .getAppMetrics()
+      .filter((metric) => metric.type === 'Tab')
+      .map((metric) => ({ pid: metric.pid, sandboxed: metric.sandboxed })),
+  );
+  expect(renderers.length).toBeGreaterThanOrEqual(2);
+  expect(
+    renderers.every((renderer) => renderer.sandboxed === true),
+    JSON.stringify(renderers),
+  ).toBe(true);
+});
+
+/** The number of `tasks.onChanged` subscriptions the main process holds, once both windows have one. */
+const bothSubscribed = async (app: ElectronApplication): Promise<void> => {
+  await expect.poll(async () => await subscriberCount(app)).toBe(2);
+};
+
+/** The remaining ada window still receives live changes. */
+const expectAdaStillReceives = async (
+  app: ElectronApplication,
+  ada: TaskBoardPage,
+): Promise<void> => {
+  expect(await windowOf(app, 'ada')).toBe(ada.page);
+  await ada.toggle('Publish the release notes');
+  await ada.expectLive('Publish the release notes');
+  expect(app.windows()).toHaveLength(1);
+};
+
 test('closing a window ends its subscription, the other keeps receiving', async ({ launchApp }) => {
+  // The ordinary way: the user closes the page and the renderer unloads normally (its `pagehide`
+  // handler runs). Not proof of the main process's own cleanup: see the destroyed-window test.
   const { app, boards } = await launchApp();
   const ada = await boards.open('ada');
   const guest = await boards.open('guest');
   await ada.gotoList();
   await guest.gotoList();
-  // Each open window holds one `tasks.onChanged` subscription in the main process.
-  await expect.poll(async () => await subscriberCount(app)).toBe(2);
-
+  await bothSubscribed(app);
   await guest.page.close();
-  // Closing the window closes its port; the main process interrupts that connection's stream.
   await expect.poll(async () => await subscriberCount(app)).toBe(1);
+  await expectAdaStillReceives(app, ada);
+});
 
-  // The remaining window still receives live changes, and the app is still running.
-  const adaPage = await windowOf(app, 'ada');
-  expect(adaPage).toBe(ada.page);
-  await ada.toggle('Publish the release notes');
-  await ada.expectLive('Publish the release notes');
-  expect(app.windows()).toHaveLength(1);
+test('a destroyed window ends its subscription without renderer cleanup, the other keeps receiving', async ({
+  launchApp,
+}) => {
+  // The main process destroys the window: no `pagehide`, no `client.dispose()`, nothing from the
+  // renderer. Only the main process noticing the closed port can end the subscription.
+  const { app, boards } = await launchApp();
+  const ada = await boards.open('ada');
+  const guest = await boards.open('guest');
+  await ada.gotoList();
+  await guest.gotoList();
+  await bothSubscribed(app);
+  await app.evaluate(({ BrowserWindow }, title) => {
+    BrowserWindow.getAllWindows()
+      .find((window) => window.getTitle() === title)
+      ?.destroy();
+  }, windowTitle('guest'));
+  await expect.poll(async () => await subscriberCount(app)).toBe(1);
+  await expectAdaStillReceives(app, ada);
 });
