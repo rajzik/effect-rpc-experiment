@@ -15,3 +15,5 @@ dist-types/
 .jsdoc-examples/
 .vercel
 .env*
+test-results/
+playwright-report/

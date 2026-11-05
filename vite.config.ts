@@ -27,6 +27,8 @@ export default defineConfig({
       'site/.vitepress/cache/**',
       'site/.vitepress/dist/**',
       'site/api/**',
+      // Written by the TanStack Router plugin on every build; it asks to be left unlinted.
+      'examples/*/src/routeTree.gen.ts',
     ],
     rules: {
       'no-console': ['error', { allow: ['warn', 'error'] }],
@@ -118,6 +120,7 @@ export default defineConfig({
       'site/.vitepress/cache/**',
       'site/.vitepress/dist/**',
       'site/api/**',
+      'examples/*/src/routeTree.gen.ts',
     ],
   },
   run: {

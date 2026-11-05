@@ -1,0 +1,23 @@
+{
+  "name": "@effect-trpc-examples/electron",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.mjs",
+  "scripts": {
+    "example:build": "vp pack",
+    "example:test": "playwright test"
+  },
+  "dependencies": {
+    "@effect-trpc/client": "workspace:*",
+    "@effect-trpc/core": "workspace:*",
+    "@effect-trpc/electron": "workspace:*",
+    "@effect-trpc/server": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "electron": "catalog:"
+  }
+}
