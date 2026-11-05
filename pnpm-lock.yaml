@@ -141,6 +141,43 @@ importers:
         specifier: 'catalog:'
         version: 44.5.1
 
+  examples/shared:
+    dependencies:
+      '@effect-trpc/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@effect-trpc/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@effect-trpc/server':
+        specifier: workspace:*
+        version: link:../../packages/server
+      '@effect-trpc/tanstack-react-query':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-react-query
+      '@tanstack/react-query':
+        specifier: 'catalog:'
+        version: 5.104.1(react@19.3.0)
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.1
+      react:
+        specifier: 'catalog:'
+        version: 19.3.0
+    devDependencies:
+      '@effect-trpc/test-utils':
+        specifier: workspace:*
+        version: link:../../packages/test-utils
+      '@playwright/test':
+        specifier: 'catalog:'
+        version: 1.64.1
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
+
   examples/start:
     dependencies:
       '@effect-trpc/client':
