@@ -26,8 +26,9 @@ that:
 
 `test/fixtures.ts` holds the router and handlers the suite runs against.
 
-Electron, Next.js and TanStack Start are listed as dev dependencies but are not exercised here yet;
-their behaviour is covered by each package's own tests.
+Next.js, TanStack Start and Electron are not exercised here. Each adapter's own tests cover its
+behaviour, and the apps in [`examples/`](../../examples/README.md) run them for real (Playwright
+against production builds; `pnpm examples:test`).
 
 ## Run it
 

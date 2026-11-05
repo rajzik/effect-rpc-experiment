@@ -1,0 +1,108 @@
+name: Examples
+
+# The three framework example apps (examples/next, examples/start, examples/electron) are driven
+# by Playwright against their production builds. Separate from ci.yml: it needs browsers, a display
+# for Electron and the Electron binary, so it is slower and must not gate the package checks.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: examples-${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded pull request runs only; every push to main runs to completion.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  examples:
+    name: ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [next, start, electron]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version comes from the `packageManager` field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The examples consume the workspace packages through their built `dist/`.
+      - name: Build packages
+        run: pnpm exec vp run -r build
+
+      - name: Install Playwright Chromium
+        if: matrix.app != 'electron'
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Electron needs the Chromium system libraries and a display (xvfb) on Linux. The browser
+      # itself is not needed (Electron brings its own Chromium).
+      - name: Install Electron system dependencies
+        if: matrix.app == 'electron'
+        run: |
+          pnpm exec playwright install-deps chromium
+          sudo apt-get install -y xvfb xauth
+
+      # Electron has no postinstall: its binary downloads on first launch (well over 30s cold).
+      # Fetch it up front, cached by Electron version, so the suite never waits on a download.
+      - name: Resolve Electron version
+        if: matrix.app == 'electron'
+        id: electron
+        working-directory: examples/electron
+        run: echo "version=$(node -p "require('electron/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Electron binary
+        if: matrix.app == 'electron'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: electron-${{ runner.os }}-${{ steps.electron.outputs.version }}
+
+      - name: Fetch the Electron binary
+        if: matrix.app == 'electron'
+        working-directory: examples/electron
+        run: pnpm exec install-electron
+
+      # The renderer sandbox needs `chrome-sandbox` to be setuid root; node_modules does not
+      # install it that way. Fixing it keeps the OS-level renderer sandbox ON for the suite
+      # (the fixtures only pass `--no-sandbox` when the helper is not setuid).
+      - name: Make the Electron sandbox helper setuid
+        if: matrix.app == 'electron'
+        run: |
+          helper="$(echo "$PWD"/node_modules/.pnpm/electron@*/node_modules/electron/dist/chrome-sandbox)"
+          sudo chown root:root "$helper"
+          sudo chmod 4755 "$helper"
+          ls -l "$helper"
+
+      - name: Test (${{ matrix.app }})
+        if: matrix.app != 'electron'
+        run: pnpm -C examples/${{ matrix.app }} example:test
+
+      - name: Test (electron, under xvfb)
+        if: matrix.app == 'electron'
+        run: xvfb-run -a pnpm -C examples/electron example:test
+
+      # Traces are recorded on failure (retain-on-failure); open one with
+      # `pnpm exec playwright show-trace <trace.zip>`.
+      - name: Upload report and traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: examples-${{ matrix.app }}-playwright
+          path: |
+            examples/${{ matrix.app }}/playwright-report
+            examples/${{ matrix.app }}/test-results
+          if-no-files-found: ignore
+          retention-days: 7

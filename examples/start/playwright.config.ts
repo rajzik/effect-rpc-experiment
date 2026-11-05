@@ -9,7 +9,7 @@ export default defineConfig({
   testDir: 'e2e',
   workers: 1,
   retries: process.env['CI'] ? 1 : 0,
-  reporter: 'list',
+  reporter: process.env['CI'] ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://localhost:${port}`,
     browserName: 'chromium',

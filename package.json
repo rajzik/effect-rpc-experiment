@@ -10,6 +10,7 @@
     "test": "vp run -r test",
     "build": "vp run -r build",
     "ready": "effect-tsgo vp check --deny-warnings && vp run typecheck && vp run -r test && vp run -r build && node scripts/verify-jsdoc.mjs",
+    "examples:test": "pnpm -C examples/next example:test && pnpm -C examples/start example:test && pnpm -C examples/electron example:test",
     "docs:check": "node scripts/verify-jsdoc.mjs",
     "docs:dev": "pnpm -C site docs:dev",
     "docs:build": "pnpm -C site docs:build"

@@ -98,6 +98,11 @@ use the HTTP endpoint.
 
 :::
 
+## Full example
+
+[`examples/start`](https://github.com/rajzik/effect-rpc-experiment/tree/main/examples/start) is a
+TanStack Start app (server route, isomorphic client, loader prefetch and hydration, cookie sessions) tested in Chromium against the built output served by `vp preview`.
+
 See also: [`createStartHandler`](/api/start#createstarthandler),
 [`createIsomorphicClient`](/api/start#createisomorphicclient),
 [`createStartHelpers`](/api/start#createstarthelpers),

@@ -120,6 +120,11 @@ Without the hook:
 
 :::
 
+## Full example
+
+[`examples/next`](https://github.com/rajzik/effect-rpc-experiment/tree/main/examples/next) is a
+Next.js app (route handler, RSC prefetch and hydration, a server action, cookie sessions) tested in Chromium against `next start`.
+
 See also: [`createRouteHandler`](/api/next#createroutehandler),
 [`createNextRpcClient`](/api/next#createnextrpcclient), [`createRscHelpers`](/api/next#createrschelpers),
 [`createServerActionCaller`](/api/next#createserveractioncaller),

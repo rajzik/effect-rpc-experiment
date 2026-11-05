@@ -54,6 +54,10 @@ minimumReleaseAgeExclude:
 allowBuilds:
   # esbuild (pulled in by VitePress via Vite 5) installs its platform binary in postinstall.
   esbuild: true
-  # Electron 44 has no postinstall: the binary downloads on first use (`require('electron')`, so on
-  # Playwright's `_electron.launch`). pnpm still flags the package, so approve it explicitly.
+  # Electron 44's package.json has no lifecycle scripts: the binary downloads on first use
+  # (`require('electron')`, so on Playwright's `_electron.launch`) or via its `install-electron`
+  # bin (`install.js`), which CI runs explicitly. This entry runs nothing (checked: approving it
+  # downloads no binary). It is here because pnpm 11 reported `electron` under
+  # ERR_PNPM_IGNORED_BUILDS in this workspace without it; the cause is pnpm's build detection, not
+  # a script we need.
   electron: true

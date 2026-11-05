@@ -18,6 +18,10 @@
 
 <<< @/snippets/electron/renderer.ts [renderer.ts]
 
+The main file waits for `app.whenReady()` with `.then(...)` and a `.catch` that logs and exits
+instead of a top-level `await`: a main module that is still evaluating can hang tools that drive
+the app, such as Playwright's `_electron.launch`.
+
 ## How it works
 
 1. On its first call, `rendererLink()` creates a `MessageChannel` and posts one end to its own
@@ -68,6 +72,12 @@ For utility processes, workers and custom handshakes, serve and call any `Messag
 `MessagePortServer.make()` and `messagePortProtocolClient(port)` give the bare `effect/rpc`
 protocols. All of these accept `serialization` (default JSON). Binary serializations send
 `Uint8Array` frames.
+
+## Full example
+
+[`examples/electron`](https://github.com/rajzik/effect-rpc-experiment/tree/main/examples/electron)
+runs this in a real app: two windows (one per user, told apart by `senderId`), a sandboxed preload
+and a Vite renderer, driven by Playwright's `_electron` against the built files in CI.
 
 See also: [`MainRpcServer`](/api/electron-main#mainrpcserver),
 [`installPreloadBridge`](/api/electron-preload#installpreloadbridge),

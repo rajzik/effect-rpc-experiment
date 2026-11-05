@@ -63,7 +63,7 @@ test('renderer processes run in an OS sandbox', async ({ launchApp }, testInfo) 
   // Windows only), unlike `getLastWebPreferences()`, which only echoes what main.ts requested.
   if (noSandbox || (process.platform !== 'darwin' && process.platform !== 'win32')) {
     const reason = noSandbox
-      ? 'launched with --no-sandbox (Linux CI): renderers are not OS-sandboxed in this run'
+      ? 'launched with --no-sandbox (Linux without a setuid chrome-sandbox helper, or EXAMPLES_ELECTRON_NO_SANDBOX=1): renderers are not OS-sandboxed in this run'
       : `Electron does not report the sandbox state of processes on ${process.platform}`;
     testInfo.annotations.push({ type: 'skipped runtime sandbox assertion', description: reason });
     return;

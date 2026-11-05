@@ -12,6 +12,9 @@
  * - `test` launches a fresh app per `launchApp()` call, for tests that close windows or inspect
  *   the app's own configuration.
  */
+import { statSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -37,18 +40,34 @@ const appDir = fileURLToPath(new URL('..', import.meta.url));
 export const windowTitle = (name: string): string => `Task board: ${name}`;
 
 /**
- * Launches the built app (`dist/main.mjs`). The first launch can download the Electron binary
- * (Electron has no postinstall), hence the generous timeout.
+ * Whether Electron's `chrome-sandbox` helper is set up for the OS-level renderer sandbox on Linux:
+ * owned by root with the setuid bit. `node_modules` does not install it that way; the examples
+ * workflow does (`.github/workflows/examples.yml`).
  */
+const sandboxHelperIsSetuid = (): boolean => {
+  try {
+    const electronPath: string = createRequire(import.meta.url)('electron');
+    const stat = statSync(join(dirname(electronPath), 'chrome-sandbox'));
+    return stat.uid === 0 && (stat.mode & 0o4000) !== 0;
+  } catch {
+    return false;
+  }
+};
+
 /**
- * True when the app is launched with Chromium's `--no-sandbox` (Linux CI: no setuid `chrome-sandbox`
- * helper, often root). Then renderers are NOT OS-sandboxed, whatever `webPreferences.sandbox` says.
+ * True when the app is launched with Chromium's `--no-sandbox`: renderers are then NOT OS-sandboxed,
+ * whatever `webPreferences.sandbox` says. Only on Linux, and only when asked for
+ * (`EXAMPLES_ELECTRON_NO_SANDBOX=1`) or in CI where the `chrome-sandbox` helper is not setuid.
+ * Everywhere else (and in CI once the workflow fixed the helper) the sandbox stays on.
  */
-export const noSandbox = process.platform === 'linux' && process.env['CI'] !== undefined;
+export const noSandbox =
+  process.platform === 'linux' &&
+  (process.env['EXAMPLES_ELECTRON_NO_SANDBOX'] === '1' ||
+    (process.env['CI'] !== undefined && !sandboxHelperIsSetuid()));
 
 /**
  * Launches the built app (`dist/main.mjs`). The first launch can download the Electron binary
- * (Electron has no postinstall), hence the generous timeout.
+ * (Electron has no postinstall), hence the generous timeout; CI fetches it up front.
  */
 export const launchApp = async (): Promise<ElectronApplication> =>
   await electron.launch({
