@@ -45,14 +45,15 @@ jobs:
 
       - name: Install Playwright Chromium
         if: matrix.app != 'electron'
-        run: pnpm exec playwright install --with-deps chromium
+        # Resolve Playwright from the app that declares @playwright/test (not the repo root).
+        run: pnpm -C examples/${{ matrix.app }} exec playwright install --with-deps chromium
 
       # Electron needs the Chromium system libraries and a display (xvfb) on Linux. The browser
       # itself is not needed (Electron brings its own Chromium).
       - name: Install Electron system dependencies
         if: matrix.app == 'electron'
         run: |
-          pnpm exec playwright install-deps chromium
+          pnpm -C examples/electron exec playwright install-deps chromium
           sudo apt-get install -y xvfb xauth
 
       # Electron has no postinstall: its binary downloads on first launch (well over 30s cold).
