@@ -10,7 +10,9 @@
     "test": "vp run -r test",
     "build": "vp run -r build",
     "ready": "effect-tsgo vp check && vp run typecheck && vp run -r test && vp run -r build && node scripts/verify-jsdoc.mjs",
-    "docs:check": "node scripts/verify-jsdoc.mjs"
+    "docs:check": "node scripts/verify-jsdoc.mjs",
+    "docs:dev": "pnpm -C site docs:dev",
+    "docs:build": "pnpm -C site docs:build"
   },
   "devDependencies": {
     "@effect/language-service": "catalog:",

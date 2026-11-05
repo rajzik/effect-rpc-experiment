@@ -24,6 +24,9 @@ export default defineConfig({
       '**/.next/**',
       '**/.output/**',
       '**/.jsdoc-examples/**',
+      'site/.vitepress/cache/**',
+      'site/.vitepress/dist/**',
+      'site/api/**',
     ],
     rules: {
       'no-console': ['error', { allow: ['warn', 'error'] }],
@@ -91,6 +94,9 @@ export default defineConfig({
       'pnpm-lock.yaml',
       '**/__snapshots__/**',
       '**/.jsdoc-examples/**',
+      'site/.vitepress/cache/**',
+      'site/.vitepress/dist/**',
+      'site/api/**',
     ],
   },
   run: {

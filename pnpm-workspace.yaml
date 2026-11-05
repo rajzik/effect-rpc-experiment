@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - examples/*
+  - site
 
 catalogMode: prefer
 
@@ -28,9 +29,13 @@ catalog:
   vite-plus: 1.4.0
   '@effect/language-service': ^0.87.3
   '@effect/tsgo': 0.67.1
+  vitepress: 1.6.4
+  vue: ^3.5.44
 
 overrides:
   vite: npm:@voidzero-dev/vite-plus-core@1.4.0
+  # VitePress 1.x needs real Vite 5 (esbuild-based); scoped so packages keep Vite+.
+  'vitepress>vite': ^5.4.21
   vitest: 5.0.5
 
 minimumReleaseAgeExclude:
@@ -42,3 +47,7 @@ minimumReleaseAgeExclude:
   - '@effect/tsgo-win32-arm64@0.67.1'
   - '@effect/tsgo-win32-x64@0.67.1'
   - '@effect/tsgo@0.67.1'
+
+allowBuilds:
+  # esbuild (pulled in by VitePress via Vite 5) installs its platform binary in postinstall.
+  esbuild: true
