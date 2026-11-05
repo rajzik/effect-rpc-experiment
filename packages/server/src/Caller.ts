@@ -13,7 +13,7 @@ import { Context, Effect, Exit, Layer, ManagedRuntime, Stream } from 'effect';
 import type { Headers } from 'effect/http';
 import { RpcTest } from 'effect/rpc';
 import type { Rpc, RpcGroup } from 'effect/rpc';
-import { causeToClientError, RpcInterrupted } from '@effect-trpc/core';
+import { causeToClientError, Router, RpcInterrupted } from '@effect-trpc/core';
 import type {
   inferError,
   inferInput,
@@ -21,7 +21,6 @@ import type {
   inferOutput,
   ProcedureDef,
   ProcedureInfo,
-  Router,
 } from '@effect-trpc/core';
 import type { Handlers } from './Handlers.js';
 
@@ -236,7 +235,8 @@ class CallerClient extends Context.Service<CallerClient, CallerClientShape>()(
   '@effect-trpc/server/CallerClient',
 ) {}
 
-const reservedKeys: ReadonlySet<string | symbol> = new Set(['then', 'toJSON', 'valueOf']);
+/** Top-level keys of the caller itself; a router may not use them (see `createCaller`). */
+const reservedCallerKeys: ReadonlySet<string> = new Set(['$promise', '$router', 'dispose']);
 
 const callHeaders = (options: CallOptions | undefined): CallOptions | undefined =>
   options?.headers === undefined ? undefined : { headers: options.headers };
@@ -270,6 +270,8 @@ const rejectWithClientError = <A>(exit: Exit.Exit<A, unknown>): A => {
  * **Gotchas**
  *
  * - Calling a path that is not a procedure of the router throws an `Error` synchronously.
+ * - Throws if the router has a top-level key `$promise`, `$router` or `dispose` (the caller's
+ *   own members); nest such procedures under another key.
  * - `handlers` must include the middleware implementations, not only `Handlers.make(...)`.
  *
  * **Example** (Calling procedures in-process with the Effect and Promise APIs)
@@ -345,6 +347,13 @@ export const createCaller = <R extends Router.Any, LE = never>(
   router: R,
   options: CallerOptions<R, LE>,
 ): Caller<R> => {
+  for (const key of Object.keys(router.record)) {
+    if (reservedCallerKeys.has(key)) {
+      throw new Error(
+        `createCaller: the router's top-level key "${key}" is reserved by the caller (${[...reservedCallerKeys].join(', ')}); nest it under another key`,
+      );
+    }
+  }
   // `RpcTest.makeClient` wires an in-memory RpcServer to an RpcClient: no serialization.
   const makeClient = RpcTest.makeClient(router.group as RpcGroup.RpcGroup<Rpc.AnyWithProps>, {
     flatten: true,
@@ -445,8 +454,8 @@ export const createCaller = <R extends Router.Any, LE = never>(
   ): object =>
     new Proxy(() => undefined, {
       get: (_target, key) => {
-        if (typeof key === 'symbol' || reservedKeys.has(key)) return undefined;
-        return makeProxy([...path, key], call);
+        const next = Router.childPath(router, path, key);
+        return next === undefined ? undefined : makeProxy(next, call);
       },
       apply: (_target, _thisArg, args: ReadonlyArray<unknown>) =>
         call(lookup(path), args[0], args[1] as PromiseCallOptions | undefined),

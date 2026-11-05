@@ -277,7 +277,8 @@ export const { getQueryClient, rpc, HydrateClient, prefetch, caller } = createRs
   from a `'use client'` module. The default (the package's own boundary) only works outside RSC,
   for example in tests.
 - `caller` (only with `{ handlers }`) reads data directly in a server component, without the
-  cache: `await caller.$promise.post.byId({ id: 1 })`.
+  cache: `await caller.$promise.post.byId({ id: 1 })`. It shares the in-process client's runtime:
+  the handler layer is built once, `headers` apply to both, and disposing either disposes both.
 - `{ client }` instead of `{ handlers }` uses an existing client, for example `httpLink` to
   another service.
 - `keyPrefix` must equal `createNextRpcClient`'s `keyPrefix`. `dehydrateOptions` are passed to `dehydrate`.

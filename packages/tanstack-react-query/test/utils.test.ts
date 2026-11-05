@@ -1,7 +1,17 @@
 // Port of trpc/packages/tanstack-react-query/test/utils.test.ts
-import { skipToken } from '@tanstack/react-query';
+import { createClient, localLink } from '@effect-trpc/client';
+import { query, Router } from '@effect-trpc/core';
+import { Handlers } from '@effect-trpc/server';
+import { QueryClient, skipToken } from '@tanstack/react-query';
+import { Effect, Schema } from 'effect';
 import { describe, expect, it } from 'vite-plus/test';
-import { getMutationKey, getQueryKey, QueryKeys, readQueryKey } from '../src/index.js';
+import {
+  createRpcOptionsProxy,
+  getMutationKey,
+  getQueryKey,
+  QueryKeys,
+  readQueryKey,
+} from '../src/index.js';
 
 describe('getQueryKey', () => {
   it('creates a query key', () => {
@@ -103,5 +113,28 @@ describe('readQueryKey', () => {
     expect(QueryKeys.parseQueryKey(['todos', { type: 'query' }])).toBeUndefined();
     expect(QueryKeys.parseQueryKey([['a']])).toBeUndefined();
     expect(QueryKeys.parseQueryKey([['a'], { input: 1 }])).toBeUndefined();
+  });
+});
+
+describe('createRpcOptionsProxy — router keys', () => {
+  it('reaches declared procedures named like introspection keys', async () => {
+    const router = Router.make({
+      nested: { toString: query({ success: Schema.String }) },
+    });
+    const client = createClient(router, {
+      link: localLink({
+        handlers: Handlers.make(router, { nested: { toString: () => Effect.succeed('str') } }),
+      }),
+    });
+    try {
+      const rpc = createRpcOptionsProxy({ client, queryClient: new QueryClient() });
+      const options = rpc.nested.toString.queryOptions();
+      expect(options.queryKey).toEqual([['nested', 'toString'], { type: 'query' }]);
+      expect(await new QueryClient().fetchQuery(options)).toBe('str');
+      // Undeclared introspection keys still resolve to `undefined`.
+      expect((rpc.nested as unknown as { then?: unknown }).then).toBeUndefined();
+    } finally {
+      await client.dispose();
+    }
   });
 });

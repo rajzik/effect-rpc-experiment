@@ -181,6 +181,37 @@ describe('createRouteHandler', () => {
     expect(response.status).toBe(200);
   });
 
+  test('dispose() while a rewritten request body is read: no server is built afterwards', async () => {
+    const { handlers, state } = makeFixture();
+    const route = createRouteHandler(appRouter, { handlers });
+    let releaseBody!: () => void;
+    const bodyGate = new Promise<void>((resolve) => {
+      releaseBody = resolve;
+    });
+    const raw = await rpcRequest('http://localhost/api/rpc', 'post.byId', { id: 1 }).text();
+    const body = new ReadableStream<Uint8Array>({
+      pull: async (controller) => {
+        await bodyGate;
+        controller.enqueue(new TextEncoder().encode(raw));
+        controller.close();
+      },
+    });
+    // A sub-path (tRPC-style URL) is rewritten to the endpoint, which buffers the body.
+    const pending = route.POST(
+      new Request('http://localhost/api/rpc/post.byId', {
+        method: 'POST',
+        headers: { 'content-type': 'application/ndjson' },
+        body,
+        duplex: 'half',
+      } as RequestInit),
+    );
+    await route.dispose();
+    releaseBody();
+    expect((await pending).status).toBe(503);
+    await route.dispose();
+    expect(state.builds).toEqual({ count: 0, released: 0 });
+  });
+
   test('dispose() before any request does not build anything', async () => {
     const { handlers, state } = makeFixture();
     const route = createRouteHandler(appRouter, { handlers });

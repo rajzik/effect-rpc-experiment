@@ -4,9 +4,17 @@ import type { ClientError } from '@effect-trpc/core';
 import { act, fireEvent } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, expectTypeOf, test, vi } from 'vite-plus/test';
-import { skipToken, useSubscription, type RpcSubscriptionResult } from '../src/index.js';
-import { Post, PostNotFound } from './fixtures.js';
-import { testReactResource, waitFor } from './helpers.js';
+import { createClient, localLink } from '@effect-trpc/client';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { render } from '@testing-library/react';
+import {
+  createRpcContext,
+  skipToken,
+  useSubscription,
+  type RpcSubscriptionResult,
+} from '../src/index.js';
+import { appRouter, makeFixture, Post, PostNotFound, type AppRouter } from './fixtures.js';
+import { makeQueryClient, testReactResource, waitFor } from './helpers.js';
 
 /** The fields that changed between consecutive results. */
 const diff = (list: ReadonlyArray<Record<string, unknown>>) =>
@@ -321,5 +329,78 @@ describe('useSubscription', () => {
     await vi.waitFor(() => {
       expect(ctx.state.emitter.listenerCount('created')).toBe(0);
     });
+  });
+
+  test('a throwing onData reports onError and closes the server stream', async () => {
+    await using ctx = await testReactResource();
+    const onError = vi.fn<(error: unknown) => void>();
+    const boom = new Error('onData failed');
+    const options = ctx.optionsProxy.events.subscriptionOptions({ offset: 7 });
+    options.subscribe({
+      onData: () => {
+        throw boom;
+      },
+      onError,
+    });
+    await vi.waitFor(() => {
+      expect(ctx.state.emitter.listenerCount('data')).toBe(1);
+    });
+    ctx.state.emitter.emit('data', 1);
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalledWith(boom);
+    });
+    // The handler's stream finalizer ran: the transport subscription was released.
+    await vi.waitFor(() => {
+      expect(ctx.state.closed).toEqual([7]);
+    });
+    expect(ctx.state.emitter.listenerCount('data')).toBe(0);
+  });
+
+  test('a new client (RpcProvider client prop) restarts the subscription on it', async () => {
+    const first = makeFixture();
+    const second = makeFixture();
+    const clients = [first, second].map((fixture) =>
+      createClient(appRouter, { link: localLink({ handlers: fixture.handlers }) }),
+    );
+    const queryClient = makeQueryClient();
+    const { RpcProvider, useRpc } = createRpcContext<AppRouter>();
+
+    function Events() {
+      const result = useSubscription(useRpc().events.subscriptionOptions({ offset: 0 }));
+      return <pre>{`data: ${String(result.data)}`}</pre>;
+    }
+    const app = (client: (typeof clients)[number]) => (
+      <QueryClientProvider client={queryClient}>
+        <RpcProvider client={client} queryClient={queryClient}>
+          <Events />
+        </RpcProvider>
+      </QueryClientProvider>
+    );
+
+    const utils = render(app(clients[0]!));
+    await waitFor(() => {
+      expect(first.state.emitter.listenerCount('data')).toBe(1);
+    });
+    act(() => {
+      first.state.emitter.emit('data', 1);
+    });
+    await waitFor(() => {
+      expect(utils.container.textContent).toBe('data: 1');
+    });
+
+    utils.rerender(app(clients[1]!));
+    await waitFor(() => {
+      expect(second.state.emitter.listenerCount('data')).toBe(1);
+    });
+    expect(first.state.closed).toEqual([0]);
+    act(() => {
+      second.state.emitter.emit('data', 2);
+    });
+    await waitFor(() => {
+      expect(utils.container.textContent).toBe('data: 2');
+    });
+    utils.unmount();
+    await Promise.all(clients.map((client) => client.dispose()));
+    queryClient.clear();
   });
 });

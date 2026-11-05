@@ -191,3 +191,30 @@ describe('Router.getByPath / isRouter / definitions', () => {
     expect(Schema.is(router.procedures.get('def')!.rpc.payloadSchema)({ id: 1 })).toBe(true);
   });
 });
+
+describe('Router.isPath / Router.childPath', () => {
+  const router = Router.make({
+    toJSON: query({ success: Schema.String }),
+    nested: {
+      toString: query({ success: Schema.String }),
+      byId: query({ success: Schema.String }),
+    },
+  });
+
+  it('isPath: root, namespaces and procedures are declared; others are not', () => {
+    expect(Router.isPath(router, [])).toBe(true);
+    expect(Router.isPath(router, ['nested'])).toBe(true);
+    expect(Router.isPath(router, ['nested', 'byId'])).toBe(true);
+    expect(Router.isPath(router, ['missing'])).toBe(false);
+    expect(Router.isPath(router, ['nested', 'byId', 'deeper'])).toBe(false);
+  });
+
+  it('childPath: declared introspection keys resolve, undeclared ones do not', () => {
+    expect(Router.childPath(router, [], 'toJSON')).toEqual(['toJSON']);
+    expect(Router.childPath(router, ['nested'], 'toString')).toEqual(['nested', 'toString']);
+    expect(Router.childPath(router, ['nested'], 'toJSON')).toBeUndefined();
+    expect(Router.childPath(router, [], 'then')).toBeUndefined();
+    expect(Router.childPath(router, [], Symbol.iterator)).toBeUndefined();
+    expect(Router.childPath(router, ['nested'], 'missing')).toEqual(['nested', 'missing']);
+  });
+});

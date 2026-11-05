@@ -2,6 +2,7 @@
 // React Server Components helpers (tRPC's `trpc/server.tsx`): per-request query client, in-process
 // prefetch, Schema-aware `HydrateClient`.
 import { RpcDefect } from '@effect-trpc/core';
+import { Cause, Effect } from 'effect';
 import { hydrate } from '@effect-trpc/tanstack-react-query';
 import { testServerAndClient } from '@effect-trpc/test-utils';
 import {
@@ -210,6 +211,38 @@ describe('createRscHelpers', () => {
     );
     expect(await getQueryClient().fetchQuery(rpc.post.whoami.queryOptions())).toBe('ada');
     await client.dispose();
+  });
+
+  test('client and caller share one runtime: one layer build, the same headers', async () => {
+    const fixture = makeFixture();
+    const { client, caller } = createRscHelpers(
+      appRouter,
+      { handlers: fixture.handlers, headers: { 'x-user': 'ada' } },
+      { cache: requestScopes().cache },
+    );
+    expect(await client.post.whoami()).toBe('ada');
+    expect(await caller.$promise.post.whoami()).toBe('ada');
+    expect(await Effect.runPromise(caller.post.whoami())).toBe('ada');
+    expect(fixture.state.builds).toEqual({ count: 1, released: 0 });
+    await caller.dispose();
+    expect(fixture.state.builds).toEqual({ count: 1, released: 1 });
+  });
+
+  test('caller Effect API: a throwing headers() is a defect, not a typed error', async () => {
+    const fixture = makeFixture();
+    const { caller } = createRscHelpers(
+      appRouter,
+      {
+        handlers: fixture.handlers,
+        headers: () => {
+          throw new Error('no request');
+        },
+      },
+      { cache: requestScopes().cache },
+    );
+    const exit = await Effect.runPromiseExit(caller.post.whoami());
+    expect(exit._tag === 'Failure' && Cause.hasDies(exit.cause)).toBe(true);
+    await caller.dispose();
   });
 
   test('keyPrefix prefixes the query keys', async () => {

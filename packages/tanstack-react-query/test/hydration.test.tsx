@@ -2,9 +2,11 @@
 // Schema-aware SSR hydration: `dehydrate` encodes with the procedures' schemas, `hydrate` /
 // `HydrationBoundary` restore class instances, typed errors and defects.
 import { createClient, localLink } from '@effect-trpc/client';
-import { RpcDefect } from '@effect-trpc/core';
+import { query, Router, RpcDefect } from '@effect-trpc/core';
+import { Handlers } from '@effect-trpc/server';
 import { QueryClientProvider, useQuery, type DehydratedState } from '@tanstack/react-query';
 import { cleanup, render } from '@testing-library/react';
+import { Effect, Schema } from 'effect';
 import * as React from 'react';
 import { describe, expect, test } from 'vite-plus/test';
 import {
@@ -40,7 +42,7 @@ const serverState = async (keyPrefix?: string) => {
   });
   const todos = { at: todosDate };
   queryClient.setQueryData(['todos'], todos);
-  const state = helpers.dehydrate(queryClient);
+  const state = helpers.dehydrate(queryClient, keyPrefix === undefined ? {} : { keyPrefix });
   await client.dispose();
   queryClient.clear();
   return { state, json: JSON.parse(JSON.stringify(state)) as DehydratedState, todos };
@@ -156,7 +158,7 @@ describe('hydrate', () => {
     const { json } = await serverState('tenant-1');
     expect(keyOf(json, 'tenant-1')).toBeDefined();
     const queryClient = makeQueryClient();
-    hydrate(appRouter, queryClient, json);
+    hydrate(appRouter, queryClient, json, { keyPrefix: 'tenant-1' });
     const post = queryClient.getQueryData([
       ['tenant-1'],
       ['post', 'byId'],
@@ -173,6 +175,55 @@ describe('hydrate', () => {
     // a null / undefined state is ignored
     expect(() => helpers.hydrate(queryClient, undefined)).not.toThrow();
     queryClient.clear();
+  });
+
+  test('routers sharing a QueryClient: each keyPrefix owns its own queries', async () => {
+    // The same encoded shape: only the key prefix tells the two routers' queries apart.
+    class ItemA extends Schema.Class<ItemA>('ItemA')({ v: Schema.String }) {}
+    class ItemB extends Schema.Class<ItemB>('ItemB')({ v: Schema.String }) {}
+    const routerA = Router.make({ item: query({ success: ItemA }) });
+    const routerB = Router.make({ item: query({ success: ItemB }) });
+    const clientA = createClient(routerA, {
+      link: localLink({
+        handlers: Handlers.make(routerA, { item: () => Effect.succeed(new ItemA({ v: 'a' })) }),
+      }),
+    });
+    const clientB = createClient(routerB, {
+      link: localLink({
+        handlers: Handlers.make(routerB, { item: () => Effect.succeed(new ItemB({ v: 'b' })) }),
+      }),
+    });
+    const server = makeQueryClient();
+    const rpcA = createRpcOptionsProxy<typeof routerA, { keyPrefix: true }>({
+      client: clientA,
+      queryClient: server,
+      keyPrefix: 'a',
+    });
+    const rpcB = createRpcOptionsProxy<typeof routerB, { keyPrefix: true }>({
+      client: clientB,
+      queryClient: server,
+      keyPrefix: 'b',
+    });
+    await server.prefetchQuery(rpcA.item.queryOptions());
+    await server.prefetchQuery(rpcB.item.queryOptions());
+    const helpersA = createHydrationHelpers(routerA, { keyPrefix: 'a' });
+    const helpersB = createHydrationHelpers(routerB, { keyPrefix: 'b' });
+    const stateA = JSON.parse(JSON.stringify(helpersA.dehydrate(server))) as DehydratedState;
+    const stateB = JSON.parse(JSON.stringify(helpersB.dehydrate(server))) as DehydratedState;
+    // Each state holds only its own router's query (never encoded with the other's schema).
+    expect(stateA.queries.map((q) => q.queryKey[0])).toEqual([['a']]);
+    expect(stateB.queries.map((q) => q.queryKey[0])).toEqual([['b']]);
+
+    const browser = makeQueryClient();
+    // A boundary of the other router ignores the state; the owning one restores its class.
+    helpersA.hydrate(browser, stateB);
+    helpersB.hydrate(browser, stateA);
+    expect(browser.getQueryCache().getAll()).toHaveLength(0);
+    helpersA.hydrate(browser, stateA);
+    helpersB.hydrate(browser, stateB);
+    expect(browser.getQueryData(rpcA.item.queryKey())).toBeInstanceOf(ItemA);
+    expect(browser.getQueryData(rpcB.item.queryKey())).toBeInstanceOf(ItemB);
+    await Promise.all([clientA.dispose(), clientB.dispose()]);
   });
 
   test('composes with serializeData / deserializeData', async () => {

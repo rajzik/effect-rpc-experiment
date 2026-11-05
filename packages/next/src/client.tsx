@@ -267,7 +267,10 @@ export const createNextRpcClient = <
     readonly keyPrefix?: string;
     readonly children?: React.ReactNode;
   }>;
-  const { HydrationBoundary } = createHydrationHelpers(router);
+  const { HydrationBoundary } = createHydrationHelpers(
+    router,
+    options.keyPrefix === undefined ? undefined : { keyPrefix: options.keyPrefix },
+  );
   const make = options.makeQueryClient ?? (() => makeQueryClient());
   let browserQueryClient: QueryClient | undefined;
 

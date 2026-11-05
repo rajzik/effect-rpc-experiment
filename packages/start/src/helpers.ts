@@ -22,11 +22,13 @@ import type {
   CreateRpcContextResult,
   DefaultFeatureFlags,
   FeatureFlags,
+  HydrationHelpersOptions,
   KeyPrefixOptions,
   RpcDehydrateOptions,
+  RpcHydrateOptions,
   RpcOptionsProxy,
 } from '@effect-trpc/tanstack-react-query';
-import type { DehydratedState, HydrateOptions, QueryClient } from '@tanstack/react-query';
+import type { DehydratedState, QueryClient } from '@tanstack/react-query';
 
 /**
  * Schema-aware SSR hydration for a TanStack Start router; see {@link createStartHydration}.
@@ -47,7 +49,7 @@ export interface StartHydration {
   readonly hydrate: (
     queryClient: QueryClient,
     state: DehydratedState | null | undefined,
-    options?: HydrateOptions,
+    options?: RpcHydrateOptions,
   ) => void;
   /**
    * The TanStack Router `dehydrate` / `hydrate` options for a `QueryClient`, to spread into
@@ -100,6 +102,8 @@ export interface StartRouterHydrationOptions {
  *   `Date`s, a failed query's error is the `TaggedError`.
  * - `routerOptions(queryClient)` returns `createRouter`'s `dehydrate` / `hydrate` options; the
  *   payload is a JSON string (`{ queryState }`) so it passes the router's serializability check.
+ * - `options.keyPrefix` must equal the options proxy's `keyPrefix`; only queries with it are
+ *   dehydrated and hydrated.
  *
  * **Gotchas**
  *
@@ -141,8 +145,11 @@ export interface StartRouterHydrationOptions {
  * @category hydration
  * @since 0.1.0
  */
-export const createStartHydration = (router: Router.Any): StartHydration => {
-  const { dehydrate, hydrate } = createHydrationHelpers(router);
+export const createStartHydration = (
+  router: Router.Any,
+  options?: HydrationHelpersOptions,
+): StartHydration => {
+  const { dehydrate, hydrate } = createHydrationHelpers(router, options);
   return {
     dehydrate,
     hydrate,
@@ -336,6 +343,9 @@ export const createStartHelpers = <
     RpcProvider,
     useRpc,
     useRpcClient,
-    hydration: createStartHydration(router),
+    hydration: createStartHydration(
+      router,
+      options.keyPrefix === undefined ? undefined : { keyPrefix: options.keyPrefix },
+    ),
   };
 };

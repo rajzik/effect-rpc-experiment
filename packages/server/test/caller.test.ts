@@ -82,6 +82,38 @@ describe('createCaller — Effect API', () => {
   });
 });
 
+describe('createCaller — router keys', () => {
+  it('reaches declared procedures named like introspection keys', async () => {
+    const router = Router.make({
+      toJSON: query({ success: Schema.String }),
+      nested: { name: query({ success: Schema.String }) },
+    });
+    const keyCaller = createCaller(router, {
+      handlers: Handlers.make(router, {
+        toJSON: () => Effect.succeed('json'),
+        nested: { name: () => Effect.succeed('name') },
+      }),
+    });
+    try {
+      expect(await keyCaller.$promise.toJSON()).toBe('json');
+      expect(await keyCaller.$promise.nested.name()).toBe('name');
+      // Undeclared introspection keys still resolve to `undefined` (the caller is not a thenable).
+      expect((keyCaller.$promise.nested as unknown as { then?: unknown }).then).toBeUndefined();
+    } finally {
+      await keyCaller.dispose();
+    }
+  });
+
+  it('rejects top-level keys that clash with the caller members', () => {
+    const router = Router.make({ dispose: query({ success: Schema.String }) });
+    expect(() =>
+      createCaller(router, {
+        handlers: Handlers.make(router, { dispose: () => Effect.succeed('x') }),
+      }),
+    ).toThrow(/top-level key "dispose" is reserved/);
+  });
+});
+
 describe('createCaller — Promise API', () => {
   it('resolves with instances', async () => {
     const user = await caller.$promise.user.create({ name: 'Grace' });

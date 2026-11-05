@@ -60,6 +60,46 @@ export interface RpcDehydrateOptions extends DehydrateOptions {
    * instance. Default `true`.
    */
   readonly dehydrateErrors?: boolean | undefined;
+  /**
+   * The `keyPrefix` of the options proxy whose queries are dehydrated (default: none). Only
+   * queries with this prefix are encoded; queries of another prefix (another router sharing the
+   * `QueryClient`) are left out for that router's own `dehydrate`.
+   */
+  readonly keyPrefix?: string | undefined;
+}
+
+/**
+ * Options of {@link hydrate}: TanStack's `HydrateOptions` plus the `keyPrefix` whose queries are
+ * decoded.
+ *
+ * **Gotchas**
+ *
+ * - `keyPrefix` must equal the one given to {@link dehydrate}; queries of another prefix are not
+ *   hydrated (another router's helpers own them).
+ *
+ * @see {@link hydrate}
+ * @category hydration
+ * @since 0.1.0
+ */
+export interface RpcHydrateOptions extends HydrateOptions {
+  /** The `keyPrefix` of the options proxy whose queries are hydrated (default: none). */
+  readonly keyPrefix?: string | undefined;
+}
+
+/**
+ * Options of {@link createHydrationHelpers}.
+ *
+ * @see {@link createHydrationHelpers}
+ * @category hydration
+ * @since 0.1.0
+ */
+export interface HydrationHelpersOptions {
+  /**
+   * The `keyPrefix` of the options proxy (`createRpcOptionsProxy` / `RpcProvider`) the helpers
+   * serve. Required when several routers share one `QueryClient`, so that each one only encodes
+   * and decodes its own queries. Default: no prefix.
+   */
+  readonly keyPrefix?: string | undefined;
 }
 
 /**
@@ -89,7 +129,7 @@ export interface HydrationHelpers {
   readonly hydrate: (
     queryClient: QueryClient,
     state: DehydratedState | null | undefined,
-    options?: HydrateOptions,
+    options?: RpcHydrateOptions,
   ) => void;
   /** TanStack's `HydrationBoundary`, decoding what `dehydrate` encoded back to real instances. */
   readonly HydrationBoundary: React.FC<RpcHydrationBoundaryProps>;
@@ -189,12 +229,35 @@ const redactUnlessTypedError = (error: unknown): boolean =>
     !isClientInfrastructureError(error)
   );
 
-const lookup = (router: Router.Any, queryKey: ReadonlyArray<unknown>) => {
+/** The router and key prefix whose queries a `dehydrate` / `hydrate` call owns. */
+interface Owner {
+  readonly router: Router.Any;
+  /** `undefined` for unprefixed keys (`""` is no prefix, as in the options proxy). */
+  readonly prefix: string | undefined;
+}
+
+const ownerOf = (router: Router.Any, keyPrefix: string | undefined): Owner => ({
+  router,
+  prefix: keyPrefix === '' ? undefined : keyPrefix,
+});
+
+/**
+ * - `owned`: a query of the owner's router and prefix, encoded with its procedure's schemas.
+ * - `foreign`: an effect-trpc query key of another prefix: another router's helpers own it.
+ * - `other`: any other query (not an effect-trpc key, or not a query procedure of the router).
+ */
+type Ownership =
+  | { readonly _tag: 'owned'; readonly info: ProcedureInfo; readonly type: EncodedMarker['type'] }
+  | { readonly _tag: 'foreign' }
+  | { readonly _tag: 'other' };
+
+const ownership = (owner: Owner, queryKey: ReadonlyArray<unknown>): Ownership => {
   const parsed = parseQueryKey(queryKey);
-  if (parsed === undefined) return undefined;
-  const info = router.procedures.get(parsed.path.join('.'));
-  if (info === undefined || info.kind !== 'query') return undefined;
-  return { info, type: parsed.type };
+  if (parsed === undefined) return { _tag: 'other' };
+  if (parsed.prefix !== owner.prefix) return { _tag: 'foreign' };
+  const info = owner.router.procedures.get(parsed.path.join('.'));
+  if (info === undefined || info.kind !== 'query') return { _tag: 'other' };
+  return { _tag: 'owned', info, type: parsed.type };
 };
 
 /**
@@ -210,6 +273,8 @@ const lookup = (router: Router.Any, queryKey: ReadonlyArray<unknown>) => {
  *
  * - Data of every query of the router is encoded with `Codecs.success(rpc)` (each page for
  *   infinite queries). Queries with other keys are dehydrated unchanged.
+ * - Only queries with `options.keyPrefix` (default: none) belong to the router; effect-trpc
+ *   queries of another prefix are left out (that router's own `dehydrate` encodes them).
  * - Unless `dehydrateErrors: false`, failed queries of the router are included: typed errors are
  *   encoded as an `Exit`, `RpcDefect` / `RpcTransportError` / `RpcInterrupted` with their own
  *   schemas. The `cause` of a defect / transport error is dropped (it may hold server details).
@@ -265,7 +330,8 @@ export const dehydrate = (
   queryClient: QueryClient,
   options: RpcDehydrateOptions = {},
 ): DehydratedState => {
-  const { dehydrateErrors = true, ...rest } = options;
+  const { dehydrateErrors = true, keyPrefix, ...rest } = options;
+  const owner = ownerOf(router, keyPrefix);
   const defaults = queryClient.getDefaultOptions().dehydrate;
   const shouldDehydrate =
     rest.shouldDehydrateQuery ?? defaults?.shouldDehydrateQuery ?? defaultShouldDehydrateQuery;
@@ -277,13 +343,14 @@ export const dehydrate = (
       shouldDehydrate(query) ||
       (dehydrateErrors &&
         query.state.status === 'error' &&
-        lookup(router, query.queryKey) !== undefined),
+        ownership(owner, query.queryKey)._tag === 'owned'),
     shouldRedactErrors:
       rest.shouldRedactErrors ?? defaults?.shouldRedactErrors ?? redactUnlessTypedError,
   });
   const queries = state.queries.flatMap((query): Array<MarkedQuery> => {
-    const found = lookup(router, query.queryKey);
-    if (found === undefined) {
+    const found = ownership(owner, query.queryKey);
+    if (found._tag === 'foreign') return [];
+    if (found._tag === 'other') {
       if (serializeData === identity) return [query];
       return [
         {
@@ -336,7 +403,7 @@ export const dehydrate = (
  * query). Queries that fail to decode are dropped, so the client fetches them again.
  */
 const decodeState = (
-  router: Router.Any,
+  owner: Owner,
   state: DehydratedState,
   deserializeData: (data: any) => any,
 ): DehydratedState => {
@@ -357,9 +424,9 @@ const decodeState = (
         },
       ];
     }
-    const found = lookup(router, query.queryKey);
-    // Encoded by a router that has this procedure while this one does not: let the client fetch.
-    if (found === undefined) return [];
+    const found = ownership(owner, query.queryKey);
+    // Encoded by another router (or prefix): hydrated by that router's helpers, or fetched.
+    if (found._tag !== 'owned') return [];
     const { info } = found;
     const decode = (data: unknown): unknown =>
       mapData(marker.type, deserializeData(data), (value) =>
@@ -421,6 +488,8 @@ const withIdentityDeserializer = <O extends { defaultOptions?: object | undefine
  * **Details**
  *
  * - `null` / `undefined` states are ignored.
+ * - Only queries with `options.keyPrefix` (default: none) are decoded; encoded queries of another
+ *   prefix are left for that router's helpers.
  * - `deserializeData` (from `options` or the client's defaults) runs before the schema decoding.
  * - Queries that fail to decode are dropped, so the client fetches them again.
  *
@@ -458,14 +527,19 @@ export const hydrate = (
   router: Router.Any,
   queryClient: QueryClient,
   state: DehydratedState | null | undefined,
-  options?: HydrateOptions,
+  options: RpcHydrateOptions = {},
 ): void => {
   if (state === null || state === undefined || typeof state !== 'object') return;
-  const decoded = decodeState(router, state, deserializerOf(queryClient, options));
-  tanstackHydrate(queryClient, decoded, withIdentityDeserializer(options));
+  const { keyPrefix, ...tanstackOptions } = options;
+  const decoded = decodeState(
+    ownerOf(router, keyPrefix),
+    state,
+    deserializerOf(queryClient, tanstackOptions),
+  );
+  tanstackHydrate(queryClient, decoded, withIdentityDeserializer(tanstackOptions));
 };
 
-const makeHydrationBoundary = (router: Router.Any): React.FC<RpcHydrationBoundaryProps> => {
+const makeHydrationBoundary = (owner: Owner): React.FC<RpcHydrationBoundaryProps> => {
   const HydrationBoundary: React.FC<RpcHydrationBoundaryProps> = (props) => {
     const contextClient = useQueryClient(props.queryClient);
     const { state, options } = props;
@@ -474,7 +548,7 @@ const makeHydrationBoundary = (router: Router.Any): React.FC<RpcHydrationBoundar
       () =>
         state === null || state === undefined || typeof state !== 'object'
           ? state
-          : decodeState(router, state, deserializeData),
+          : decodeState(owner, state, deserializeData),
       // `deserializeData` is configuration: decode again only for a new state.
       // eslint-disable-next-line react-hooks/exhaustive-deps
       [state],
@@ -508,15 +582,17 @@ const makeHydrationBoundary = (router: Router.Any): React.FC<RpcHydrationBoundar
  * **Details**
  *
  * - `dehydrate(queryClient, options?)` and `hydrate(queryClient, state, options?)` are
- *   {@link dehydrate} / {@link hydrate} with the router bound.
+ *   {@link dehydrate} / {@link hydrate} with the router (and `keyPrefix`) bound.
  * - `HydrationBoundary` has TanStack's props. It decodes a new `state` once (memoized on `state`)
  *   and hydrates through TanStack's boundary.
  * - A dehydrated `RpcDefect` keeps its message but drops its server-side `cause`.
  *
  * **Gotchas**
  *
- * - Both sides must use helpers for the same router: queries whose procedure the client's router
- *   does not know are dropped and refetched.
+ * - Both sides must use helpers for the same router and `keyPrefix`: queries whose procedure the
+ *   client's router does not know are dropped and refetched.
+ * - Routers sharing one `QueryClient` need distinct `keyPrefix`es (on the options proxy and
+ *   here); without prefixes their keys cannot be told apart.
  * - Mixing in TanStack's own `dehydrate` / `HydrationBoundary` for router queries loses the class
  *   instances (data arrives as plain objects and ISO strings).
  *
@@ -576,8 +652,17 @@ const makeHydrationBoundary = (router: Router.Any): React.FC<RpcHydrationBoundar
  * @category hydration
  * @since 0.1.0
  */
-export const createHydrationHelpers = (router: Router.Any): HydrationHelpers => ({
-  dehydrate: (queryClient, options) => dehydrate(router, queryClient, options),
-  hydrate: (queryClient, state, options) => hydrate(router, queryClient, state, options),
-  HydrationBoundary: makeHydrationBoundary(router),
-});
+export const createHydrationHelpers = (
+  router: Router.Any,
+  options: HydrationHelpersOptions = {},
+): HydrationHelpers => {
+  const { keyPrefix } = options;
+  const bound = keyPrefix === undefined ? {} : { keyPrefix };
+  return {
+    dehydrate: (queryClient, dehydrateOptions) =>
+      dehydrate(router, queryClient, { ...bound, ...dehydrateOptions }),
+    hydrate: (queryClient, state, hydrateOptions) =>
+      hydrate(router, queryClient, state, { ...bound, ...hydrateOptions }),
+    HydrationBoundary: makeHydrationBoundary(ownerOf(router, keyPrefix)),
+  };
+};

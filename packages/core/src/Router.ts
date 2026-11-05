@@ -649,8 +649,130 @@ const getRpc = <R extends Router.Any, const Tag extends Router.Paths<R>>(
   return info.rpc as unknown as Rpc.ExtractTag<Router.Rpcs<R>, Tag>;
 };
 
+const pathKey = (path: ReadonlyArray<string>): string => JSON.stringify(path);
+
+const pathsCache = new WeakMap<Router.Any, ReadonlySet<string>>();
+
+const declaredPaths = (router: Router.Any): ReadonlySet<string> => {
+  let paths = pathsCache.get(router);
+  if (paths === undefined) {
+    const collected = new Set<string>();
+    for (const info of router.procedures.values()) {
+      for (let i = 1; i <= info.path.length; i++) collected.add(pathKey(info.path.slice(0, i)));
+    }
+    paths = collected;
+    pathsCache.set(router, paths);
+  }
+  return paths;
+};
+
 /**
- * Router constructors and helpers: `make`, `merge`, `getByPath`, `getRpc` and `isRouter`.
+ * Returns `true` when `path` is declared by the router: a procedure or a namespace on the way to
+ * one (the empty path is the root).
+ *
+ * **When to use**
+ *
+ * Use it in code that walks a router by path (proxies, adapters) to tell a namespace apart from an
+ * unknown path, e.g. for an error message.
+ *
+ * **Example** (Telling namespaces from unknown paths)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { query, Router } from '@effect-trpc/core';
+ *
+ * const appRouter = Router.make({ post: { byId: query({ success: Schema.String }) } });
+ *
+ * Router.isPath(appRouter, ['post']); // true: a namespace
+ * Router.isPath(appRouter, ['post', 'byId']); // true: a procedure
+ * Router.isPath(appRouter, ['user']); // false
+ * ```
+ *
+ * @see {@link childPath}
+ * @category getters
+ * @since 0.1.0
+ */
+const isPath = (router: Router.Any, path: ReadonlyArray<string>): boolean =>
+  path.length === 0 || declaredPaths(router).has(pathKey(path));
+
+/**
+ * Keys that `await`, `JSON.stringify`, test matchers, `util.inspect` and React dev tools probe on
+ * any object. A router proxy that answered them with a callable node would look like a thenable,
+ * a React element or a mock matcher.
+ */
+const introspectionKeys: ReadonlySet<string> = new Set([
+  'then',
+  'toJSON',
+  'asymmetricMatch',
+  'nodeType',
+  '$$typeof',
+  'constructor',
+  'prototype',
+  'inspect',
+  'valueOf',
+  'toString',
+  'length',
+  'name',
+]);
+
+/**
+ * The key policy shared by every router proxy (client, caller, options proxy): resolves the
+ * property `key` read on the proxy node at `path` to the child path, or `undefined` when the proxy
+ * must not expose a child there.
+ *
+ * **When to use**
+ *
+ * Use it in the `get` trap of a proxy that mirrors a router, so that every proxy agrees on which
+ * keys reach a procedure.
+ *
+ * **Details**
+ *
+ * - Symbols resolve to `undefined`.
+ * - A declared path (see {@link isPath}) always resolves, even when its key is an introspection
+ *   key such as `toJSON`, `toString` or `name`.
+ * - Other introspection keys resolve to `undefined`, so that a proxy is not mistaken for a
+ *   thenable, a React element or a test matcher.
+ * - Any other key resolves to the child path, so that calling an unknown path can throw a useful
+ *   error instead of `undefined is not a function`.
+ *
+ * **Gotchas**
+ *
+ * - Keys a proxy adds itself (`$effect`, `dispose`, `queryOptions`, ...) are not handled here:
+ *   resolve them before calling `childPath`.
+ *
+ * **Example** (A minimal router proxy)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { query, Router } from '@effect-trpc/core';
+ *
+ * const appRouter = Router.make({
+ *   toJSON: query({ success: Schema.String }),
+ *   post: { byId: query({ success: Schema.String }) },
+ * });
+ *
+ * Router.childPath(appRouter, [], 'toJSON'); // ["toJSON"]: declared
+ * Router.childPath(appRouter, ['post'], 'toJSON'); // undefined: introspection
+ * Router.childPath(appRouter, ['post'], 'missing'); // ["post", "missing"]
+ * ```
+ *
+ * @see {@link isPath}
+ * @category getters
+ * @since 0.1.0
+ */
+const childPath = (
+  router: Router.Any,
+  path: ReadonlyArray<string>,
+  key: PropertyKey,
+): ReadonlyArray<string> | undefined => {
+  if (typeof key !== 'string') return undefined;
+  const next = [...path, key];
+  return introspectionKeys.has(key) && !isPath(router, next) ? undefined : next;
+};
+
+/**
+ * Router constructors and helpers: `make`, `merge`, `getByPath`, `getRpc`, `isPath`, `childPath`
+ * and `isRouter`.
  *
  * **When to use**
  *
@@ -665,6 +787,8 @@ const getRpc = <R extends Router.Any, const Tag extends Router.Paths<R>>(
  * | `Router.merge(a, b)`                        | Merge two routers; overlapping keys throw.       |
  * | `Router.getByPath(router, ['post','byId'])` | `Option<ProcedureInfo>`.                         |
  * | `Router.getRpc(router, 'post.byId')`        | The compiled rpc, precisely typed.               |
+ * | `Router.isPath(router, ['post'])`           | Is the path a namespace or procedure?            |
+ * | `Router.childPath(router, path, key)`       | The key policy shared by router proxies.         |
  * | `Router.isRouter(u)`                        | Guard.                                           |
  *
  * **Example** (Defining and inspecting a router)
@@ -701,5 +825,7 @@ export const Router = {
   merge,
   getByPath,
   getRpc,
+  isPath,
+  childPath,
   isRouter,
 } as const;

@@ -11,7 +11,8 @@
  * @since 0.1.0
  */
 import type { Client } from '@effect-trpc/client';
-import type { ProcedureDef, ProcedureKind, Router } from '@effect-trpc/core';
+import { Router } from '@effect-trpc/core';
+import type { ProcedureDef, ProcedureKind } from '@effect-trpc/core';
 import type { DataTag, QueryClient, QueryFilters } from '@tanstack/react-query';
 import { rpcInfiniteQueryOptions, type RpcInfiniteQueryOptions } from './infiniteQueryOptions.js';
 import type { ProcedureCaller } from './internals/call.js';
@@ -405,34 +406,25 @@ const procedureUtils: Readonly<Record<string, ProcedureKind>> = {
   subscriptionOptions: 'subscription',
 };
 
-/** Keys that introspection (await, test matchers, React dev tools) probes on any object. */
-const introspectionKeys: ReadonlySet<string> = new Set([
-  'then',
-  'toJSON',
-  'asymmetricMatch',
-  '$$typeof',
-  'nodeType',
-  'constructor',
-  'prototype',
-  'valueOf',
-  'toString',
-]);
-
 const kindHint: Readonly<Record<ProcedureKind, string>> = {
   query: 'queryOptions()/infiniteQueryOptions()',
   mutation: 'mutationOptions()',
   subscription: 'subscriptionOptions()',
 };
 
-/** A recursive proxy that calls `callback(path, args)` when a path is called. */
+/**
+ * A recursive proxy that calls `callback(path, args)` when a path is called. Keys resolve with the
+ * router proxies' shared policy (`Router.childPath`).
+ */
 const createRecursiveProxy = (
+  router: Router.Any,
   callback: (path: ReadonlyArray<string>, args: ReadonlyArray<unknown>) => unknown,
 ): unknown => {
   const make = (path: ReadonlyArray<string>): unknown =>
     new Proxy(() => undefined, {
       get: (_target, key) => {
-        if (typeof key !== 'string' || introspectionKeys.has(key)) return undefined;
-        return make([...path, key]);
+        const next = Router.childPath(router, path, key);
+        return next === undefined ? undefined : make(next);
       },
       apply: (_target, _this, args: ReadonlyArray<unknown>) => callback(path, args),
     });
@@ -578,7 +570,7 @@ export const createRpcOptionsProxy = <
   const queryClient = (): QueryClient | undefined =>
     opts.queryClient === undefined ? undefined : unwrapLazyArg(opts.queryClient);
 
-  return createRecursiveProxy((fullPath, args) => {
+  return createRecursiveProxy(router, (fullPath, args) => {
     const path = fullPath.slice(0, -1);
     const util = fullPath[fullPath.length - 1] as UtilName | undefined;
     const [arg1, arg2] = args as ReadonlyArray<any>;
@@ -632,6 +624,7 @@ export const createRpcOptionsProxy = <
         return getMutationKeyInternal({ path, prefix });
       case 'subscriptionOptions':
         return rpcSubscriptionOptions({
+          client,
           opts: arg2 as RpcSubscriptionOptionsIn<unknown, unknown> | undefined,
           path,
           input: arg1,

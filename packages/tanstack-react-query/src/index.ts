@@ -32,7 +32,9 @@ export type {
 export { createHydrationHelpers, dehydrate, hydrate } from './Hydration.js';
 export type {
   HydrationHelpers,
+  HydrationHelpersOptions,
   RpcDehydrateOptions,
+  RpcHydrateOptions,
   RpcHydrationBoundaryProps,
 } from './Hydration.js';
 export type { RpcInfiniteQueryOptions } from './infiniteQueryOptions.js';

@@ -251,9 +251,11 @@ export const createRouteHandler = <R extends Router.Any, LE = never>(
   };
 
   const POST: NextRouteHandlerFn = async (request) => {
-    if (disposed !== undefined) return json(503, { _tag: 'Disposed', message: 'Server disposed' });
     const endpoint = await toEndpoint(request);
     if (endpoint instanceof Response) return endpoint;
+    // Checked after the await (not before): `dispose()` may have run while the body was read, and
+    // `getServer()` must never start a server that `dispose()` has already missed.
+    if (disposed !== undefined) return json(503, { _tag: 'Disposed', message: 'Server disposed' });
     const web = await getServer();
     return web.handler(endpoint);
   };

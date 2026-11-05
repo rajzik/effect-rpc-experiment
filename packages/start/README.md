@@ -375,4 +375,4 @@ not provide a server-function link.
 | `createBrowserClient(router, { url?, headers?, fetch?, serialization?, serverOrigin? })` | `Client<R>` over `httpLink` (relative url resolved)                      |
 | `getBaseUrl({ serverOrigin? })` / `getRpcUrl(url?, { serverOrigin? })`                   | origin / absolute rpc url for SSR and the browser                        |
 | `createStartHelpers(router, { client, keyPrefix? })`                                     | `{ rpc, getRpc, client, RpcProvider, useRpc, useRpcClient, hydration }`  |
-| `createStartHydration(router)`                                                           | `{ dehydrate(qc), hydrate(qc, state), routerOptions(qc) }`, Schema-aware |
+| `createStartHydration(router, { keyPrefix? })`                                           | `{ dehydrate(qc), hydrate(qc, state), routerOptions(qc) }`, Schema-aware |

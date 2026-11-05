@@ -116,6 +116,11 @@ export interface RpcSubscriptionOptionsOut<TOutput, TError, TFeatureFlags extend
   enabled: boolean;
   queryKey: RpcQueryKey<TFeatureFlags['keyPrefix']>;
   /**
+   * The client the subscription runs on (the options proxy's `client`). `useSubscription`
+   * re-subscribes when it changes, e.g. when `RpcProvider` gets a new client.
+   */
+  readonly client: object;
+  /**
    * Starts the subscription and returns a function that stops it (aborting the underlying
    * request, which interrupts the server stream).
    */
@@ -187,13 +192,14 @@ const noop = (): void => {};
 
 /** @internal Builds the options of `subscriptionOptions`. */
 export const rpcSubscriptionOptions = (args: {
+  readonly client: object;
   readonly call: ProcedureCaller;
   readonly path: ReadonlyArray<string>;
   readonly queryKey: RpcQueryKey<boolean>;
   readonly input: unknown;
   readonly opts: RpcSubscriptionOptionsIn<unknown, unknown> | undefined;
 }): RpcSubscriptionOptionsOut<unknown, unknown, FeatureFlags> => {
-  const { call, path, queryKey, input, opts = {} } = args;
+  const { client, call, path, queryKey, input, opts = {} } = args;
   const enabled = opts.enabled === undefined ? input !== skipToken : opts.enabled;
 
   const subscribe = (inner: RpcSubscribeOptions<unknown, unknown>): (() => void) => {
@@ -206,13 +212,15 @@ export const rpcSubscriptionOptions = (args: {
     const run = async (): Promise<void> => {
       if (signal.aborted) return;
       inner.onConnectionStateChange?.({ state: 'connecting', error: null });
+      let iterator: AsyncIterator<unknown> | undefined;
+      let finished = false;
       try {
         const iterable = call(
           path,
           input === skipToken ? undefined : input,
           callOptions(signal, opts.rpc),
         ) as AsyncIterable<unknown>;
-        const iterator = iterable[Symbol.asyncIterator]();
+        iterator = iterable[Symbol.asyncIterator]();
         let next = iterator.next();
         // Avoid an unhandled rejection if a callback below throws before `next` is awaited.
         next.catch(noop);
@@ -222,9 +230,16 @@ export const rpcSubscriptionOptions = (args: {
         inner.onConnectionStateChange?.({ state: 'pending', error: null });
         inner.onStarted?.();
         for (;;) {
-          const result = await next;
+          let result: IteratorResult<unknown>;
+          try {
+            result = await next;
+          } catch (error) {
+            finished = true; // the stream failed: nothing to close
+            throw error;
+          }
           if (signal.aborted) return;
           if (result.done === true) {
+            finished = true;
             inner.onComplete?.();
             return;
           }
@@ -236,6 +251,12 @@ export const rpcSubscriptionOptions = (args: {
         if (!signal.aborted) inner.onError?.(error);
       } finally {
         inner.signal?.removeEventListener('abort', abort);
+        // Release the transport on every other exit (abort, a throwing callback): cancel the
+        // request and close the iterator, as `for await` would.
+        if (!finished) {
+          abort();
+          void Promise.resolve(iterator?.return?.()).catch(noop);
+        }
       }
     };
     void run();
@@ -245,6 +266,7 @@ export const rpcSubscriptionOptions = (args: {
   return {
     ...opts,
     enabled,
+    client,
     subscribe,
     queryKey,
     rpc: createRpcOptionsResult(path),

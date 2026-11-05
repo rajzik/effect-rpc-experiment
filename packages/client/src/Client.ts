@@ -364,8 +364,6 @@ const RpcClientService = Context.Service<AnyRpcClient>('@effect-trpc/client/RpcC
 interface Shared {
   readonly router: Router.Any;
   readonly runtime: ManagedRuntime.ManagedRuntime<AnyRpcClient, never>;
-  /** Path prefixes of the router (namespaces and procedures), JSON-encoded. */
-  readonly prefixes: ReadonlySet<string>;
   disposed: boolean;
   disposing: Promise<void> | undefined;
 }
@@ -513,32 +511,13 @@ const pathKey = (path: ReadonlyArray<string>): string => JSON.stringify(path);
 const describeUnknown = (shared: Shared, path: ReadonlyArray<string>): string => {
   const tag = path.join('.');
   if (path.length === 0) return 'The client root is not callable; call a procedure instead';
-  if (shared.prefixes.has(pathKey(path))) {
+  if (Router.isPath(shared.router, path)) {
     return `"${tag}" is a router namespace, not a procedure`;
   }
   const known = Array.from(shared.router.procedures.keys());
   const listed = known.slice(0, 20).join(', ') + (known.length > 20 ? ', ...' : '');
   return `Unknown procedure "${tag}". Known procedures: ${listed}`;
 };
-
-/**
- * Keys that introspection (await, JSON, test matchers, React, Node inspect) probes on any object.
- * They resolve to `undefined` unless the router actually uses them as a path segment.
- */
-const introspectionKeys: ReadonlySet<string> = new Set([
-  'then',
-  'toJSON',
-  'asymmetricMatch',
-  'nodeType',
-  '$$typeof',
-  'constructor',
-  'prototype',
-  'inspect',
-  'valueOf',
-  'toString',
-  'length',
-  'name',
-]);
 
 type Mode = 'promise' | 'effect';
 
@@ -562,10 +541,8 @@ const makeFacade = <R extends Router.Any>(
   };
 
   const child = (mode: Mode, path: ReadonlyArray<string>, key: string | symbol): unknown => {
-    if (typeof key !== 'string') return undefined;
-    const next = [...path, key];
-    if (introspectionKeys.has(key) && !shared.prefixes.has(pathKey(next))) return undefined;
-    return node(mode, next);
+    const next = Router.childPath(shared.router, path, key);
+    return next === undefined ? undefined : node(mode, next);
   };
 
   const node = (mode: Mode, path: ReadonlyArray<string>): unknown => {
@@ -729,10 +706,6 @@ export const createClient = <R extends Router.Any>(
       );
     }
   }
-  const prefixes = new Set<string>();
-  for (const info of router.procedures.values()) {
-    for (let i = 1; i <= info.path.length; i++) prefixes.add(pathKey(info.path.slice(0, i)));
-  }
   // `Link<Handlers>` is only a type-level check (done by `CreateClientOptions`).
   const link = options.link as Link;
   const middleware: Layer.Layer<never, unknown> | undefined = options.middleware;
@@ -745,6 +718,6 @@ export const createClient = <R extends Router.Any>(
       ? clientLayer
       : clientLayer.pipe(Layer.provide(Layer.orDie(middleware))),
   );
-  const shared: Shared = { router, runtime, prefixes, disposed: false, disposing: undefined };
+  const shared: Shared = { router, runtime, disposed: false, disposing: undefined };
   return makeFacade<R>(shared, options.headers === undefined ? [] : [options.headers]);
 };

@@ -136,6 +136,9 @@ export function PostTitle({ id }: { id: number }) {
 - Don't check `error instanceof TRPCClientError` or `error.data?.code`. Switch on `error._tag`.
 - Don't use TanStack's `dehydrate` / `HydrationBoundary` for router queries (instances become
   plain objects and ISO strings). Use `createHydrationHelpers(appRouter)`.
+- Don't forget `keyPrefix` on the hydration helpers when the options proxy has one:
+  `createHydrationHelpers(appRouter, { keyPrefix: 'billing' })`. They only encode and decode
+  queries with their own prefix, so routers sharing a `QueryClient` never read each other's data.
 - Don't pass `trpcClient=`. `RpcProvider` takes `client=` and `queryClient=`, and you must render
   `QueryClientProvider` yourself.
 - Don't disable a query with a placeholder input and `enabled: false`. Pass `skipToken` as the
@@ -317,6 +320,8 @@ The helpers for keys and filters are the same as tRPC's:
 To share one `QueryClient` between several routers, give each its own key prefix:
 `createRpcContext<BillingRouter, { keyPrefix: true }>()` together with
 `<RpcProvider keyPrefix="billing" …>`. Keys then become `[["billing"], ["list"], {...}]`.
+For SSR, give the hydration helpers the same prefix:
+`createHydrationHelpers(billingRouter, { keyPrefix: 'billing' })`.
 
 `createRpcOptionsProxy({ ..., overrides: { mutations: { onSuccess } } })` wraps the `onSuccess`
 of every mutation, for example to invalidate everything after any mutation. The wrapper receives

@@ -144,8 +144,8 @@ const trackResult = <T extends object>(
  *
  * **Details**
  *
- * - Re-subscribes when the input (query key) changes or `enabled` flips, aborting the previous
- *   subscription; unsubscribes on unmount. Aborting interrupts the server stream.
+ * - Re-subscribes when the input (query key) or the client changes or `enabled` flips, aborting
+ *   the previous subscription; unsubscribes on unmount. Aborting interrupts the server stream.
  * - `skipToken` / `enabled: false` keep it `idle`.
  * - Status goes `connecting` → `pending` (the request was handed to the transport) and stays
  *   `pending` while elements arrive and after the stream completes; `error` on failure.
@@ -225,7 +225,7 @@ export const useSubscription = <TOutput, TError>(
   const currentSubscriptionRef = React.useRef<() => void>(() => {});
   const resultRef = React.useRef<$Result | null>(null);
   const queryHash = hashKey(opts.queryKey);
-  const { enabled } = opts;
+  const { enabled, client } = opts;
 
   const updateStateRef = React.useRef<(update: (prev: $Result) => $Result) => void>(() => {});
 
@@ -268,9 +268,10 @@ export const useSubscription = <TOutput, TError>(
       },
     });
     currentSubscriptionRef.current = unsubscribe;
-    // `queryHash` identifies the input: a new input restarts the subscription.
+    // `queryHash` identifies the input and `client` the transport: a new one restarts the
+    // subscription. Callbacks are read from `optsRef`, so new inline functions do not.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryHash, enabled]);
+  }, [queryHash, enabled, client]);
 
   if (resultRef.current === null) resultRef.current = initialState(enabled, reset);
   const latest = resultRef as React.RefObject<$Result>;

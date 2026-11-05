@@ -33,13 +33,13 @@ with `httpLink`), for React Query (`@effect-trpc/tanstack-react-query`) or for t
 
 **Entry points**
 
-| Import path         | Exports                                                                                                                                                              | Source                                   |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `@effect-trpc/core` | `query`, `mutation`, `subscription`, `isProcedureDef`, `ProcedureDef`, `PayloadInput`, `NormalizePayload`, `inferInput` / `inferOutput` / `inferError` / `inferKind` | `src/Procedure.ts`                       |
-| `@effect-trpc/core` | `Router` (`make`, `merge`, `getByPath`, `getRpc`, `isRouter`), `ProcedureInfo`, `inferRouterInputs` / `inferRouterOutputs` / `inferRouterErrors`                     | `src/Router.ts`                          |
-| `@effect-trpc/core` | `ProcedureKind` (annotation key + `"query" \| "mutation" \| "subscription"` type)                                                                                    | `src/ProcedureKind.ts`                   |
-| `@effect-trpc/core` | `ClientError`, `ClientInfrastructureError`, `RpcDefect`, `RpcTransportError`, `RpcInterrupted`, `causeToClientError`, `exitToClientError`, guards                    | `src/ClientError.ts`                     |
-| `@effect-trpc/core` | `Codecs` namespace (`payload`, `success`, `error`, `exit`, `encode*Sync` / `decode*Sync`)                                                                            | `src/Codecs.ts` (barrel: `src/index.ts`) |
+| Import path         | Exports                                                                                                                                                                 | Source                                   |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `@effect-trpc/core` | `query`, `mutation`, `subscription`, `isProcedureDef`, `ProcedureDef`, `PayloadInput`, `NormalizePayload`, `inferInput` / `inferOutput` / `inferError` / `inferKind`    | `src/Procedure.ts`                       |
+| `@effect-trpc/core` | `Router` (`make`, `merge`, `getByPath`, `getRpc`, `isPath`, `childPath`, `isRouter`), `ProcedureInfo`, `inferRouterInputs` / `inferRouterOutputs` / `inferRouterErrors` | `src/Router.ts`                          |
+| `@effect-trpc/core` | `ProcedureKind` (annotation key + `"query" \| "mutation" \| "subscription"` type)                                                                                       | `src/ProcedureKind.ts`                   |
+| `@effect-trpc/core` | `ClientError`, `ClientInfrastructureError`, `RpcDefect`, `RpcTransportError`, `RpcInterrupted`, `causeToClientError`, `exitToClientError`, guards                       | `src/ClientError.ts`                     |
+| `@effect-trpc/core` | `Codecs` namespace (`payload`, `success`, `error`, `exit`, `encode*Sync` / `decode*Sync`)                                                                               | `src/Codecs.ts` (barrel: `src/index.ts`) |
 
 **Golden path** — define a router, implement `router.group` with plain `effect/rpc`, classify
 failures (apps normally use `@effect-trpc/server` + `@effect-trpc/client` for the last two steps):
@@ -223,6 +223,8 @@ const AuthLive = Layer.succeed(Auth)(Auth.of((effect) => effect));
 | `Router.merge(a, b)`                        | Merge two routers; overlapping top-level keys throw.                                                                                                  |
 | `Router.getByPath(router, ['post','byId'])` | `Option<ProcedureInfo>`.                                                                                                                              |
 | `Router.getRpc(router, 'post.byId')`        | The compiled rpc, precisely typed (`Rpc<"post.byId", …>`).                                                                                            |
+| `Router.isPath(router, ['post'])`           | `true` for a declared namespace or procedure.                                                                                                         |
+| `Router.childPath(router, path, key)`       | Key policy shared by router proxies: introspection keys (`then`, `toJSON`, ...) resolve only when declared.                                           |
 | `Router.isRouter(u)` / `isProcedureDef(u)`  | Guards.                                                                                                                                               |
 
 Type helpers: `Router.Rpcs<R>`, `Router.Paths<R>` (`"health" | "post.byId" | …`),

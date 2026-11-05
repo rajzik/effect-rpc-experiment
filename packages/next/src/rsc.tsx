@@ -5,19 +5,18 @@
  * `@effect-trpc/tanstack-react-query` options proxy (`rpc`), a fire-and-forget `prefetch`, and
  * `HydrateClient`, which dehydrates the request's cache with the procedures' schemas and renders
  * the client `HydrationBoundary` from `createNextRpcClient`. By default the router runs
- * in-process (`localLink` + `createCaller`), with no HTTP hop. Server-only.
+ * in-process (`localLink`), with no HTTP hop. Server-only.
  *
  * @since 0.1.0
  */
 import { createClient, localLink } from '@effect-trpc/client';
 import type { Client, HeadersOption } from '@effect-trpc/client';
 import type { Router } from '@effect-trpc/core';
-import { createCaller } from '@effect-trpc/server';
+import { RpcTransportError } from '@effect-trpc/core';
 import type { Caller } from '@effect-trpc/server';
 import {
   createHydrationHelpers,
   createRpcOptionsProxy,
-  dehydrate,
   QueryKeys,
 } from '@effect-trpc/tanstack-react-query';
 import type {
@@ -26,7 +25,8 @@ import type {
   RpcOptionsProxy,
 } from '@effect-trpc/tanstack-react-query';
 import type { DehydratedState, QueryClient } from '@tanstack/react-query';
-import { Layer } from 'effect';
+import { Effect, Stream } from 'effect';
+import type { Layer } from 'effect';
 import * as React from 'react';
 import { makeQueryClient } from './queryClient.js';
 
@@ -205,6 +205,50 @@ const reactCache = (React as { readonly cache?: CacheFn }).cache;
 const isPrefetchInfinite = (queryKey: ReadonlyArray<unknown>): boolean =>
   QueryKeys.parseQueryKey(queryKey)?.type === 'infinite';
 
+const isTransportError = (error: unknown): error is RpcTransportError =>
+  error instanceof RpcTransportError;
+
+/** A client's `RpcTransportError` (a throwing `headers()`, a disposed client) is a caller defect. */
+const dieOnTransportError = (result: unknown): unknown =>
+  Stream.isStream(result)
+    ? Stream.catchIf(result, isTransportError, (error) => Stream.die(error))
+    : Effect.catchIf(result as Effect.Effect<unknown, unknown>, isTransportError, (error) =>
+        Effect.die(error),
+      );
+
+/** Wraps a node of `client.$effect`: children are wrapped, calls go through `dieOnTransportError`. */
+const wrapEffectNode = (node: unknown): unknown =>
+  typeof node === 'function' || (typeof node === 'object' && node !== null)
+    ? new Proxy(node, {
+        get: (target, key) => wrapEffectNode(Reflect.get(target, key)),
+        apply: (target, thisArg, args: ReadonlyArray<unknown>) =>
+          dieOnTransportError(Reflect.apply(target as (...a: never) => unknown, thisArg, args)),
+      })
+    : node;
+
+/**
+ * The `caller` of the `{ handlers }` source, backed by the in-process `client`: both share one
+ * runtime (the handler layer is built once, and released once) and the client's `headers`.
+ */
+const callerFromClient = <R extends Router.Any>(router: R, client: Client<R>): Caller<R> => {
+  const effectRoot = wrapEffectNode(client.$effect) as object;
+  return new Proxy(Object.create(null) as object, {
+    get: (_target, key) => {
+      switch (key) {
+        case '$promise':
+          return client;
+        case '$router':
+          return router;
+        case 'dispose':
+        case Symbol.asyncDispose:
+          return client.dispose;
+        default:
+          return Reflect.get(effectRoot, key);
+      }
+    },
+  }) as Caller<R>;
+};
+
 /**
  * Creates server-component helpers for the App Router + TanStack Query (tRPC's
  * `trpc/server.tsx`), running the router in-process.
@@ -246,8 +290,8 @@ const isPrefetchInfinite = (queryKey: ReadonlyArray<unknown>): boolean =>
  * - A pending query that fails while streaming loses its `TaggedError` class (React serializes
  *   the rejection as `Error`); `await getQueryClient().prefetchQuery(...)` when the page needs
  *   typed errors.
- * - The handler layer is built once for the in-process client and once more for `caller` if you
- *   use it.
+ * - `client` and `caller` share one in-process runtime: the handler layer is built once, both
+ *   send `headers`, and disposing either one disposes both.
  * - `keyPrefix` must match the `keyPrefix` of `createNextRpcClient` (both unset by default).
  *
  * **Example** (trpc/server.tsx, server only)
@@ -422,13 +466,7 @@ export function createRscHelpers<
       ...(source.headers !== undefined && { headers: source.headers }),
       ...(source.middleware !== undefined && { middleware: source.middleware }),
     });
-    const handlers =
-      source.middleware === undefined
-        ? source.handlers
-        : Layer.merge(source.handlers, source.middleware);
-    caller = createCaller(router, {
-      handlers,
-    });
+    caller = callerFromClient(router, client);
   }
 
   const rpc = createRpcOptionsProxy<R, PrefixFlags<P>>({
@@ -437,11 +475,15 @@ export function createRscHelpers<
     ...(options.keyPrefix !== undefined && { keyPrefix: options.keyPrefix }),
   } as unknown as Parameters<typeof createRpcOptionsProxy<R, PrefixFlags<P>>>[0]);
 
+  const hydration = createHydrationHelpers(
+    router,
+    options.keyPrefix === undefined ? undefined : { keyPrefix: options.keyPrefix },
+  );
   const Boundary: HydrationBoundaryComponent =
-    options.HydrationBoundary ?? createHydrationHelpers(router).HydrationBoundary;
+    options.HydrationBoundary ?? hydration.HydrationBoundary;
 
   const dehydrateRequest = (): DehydratedState =>
-    dehydrate(router, getQueryClient(), options.dehydrateOptions);
+    hydration.dehydrate(getQueryClient(), options.dehydrateOptions);
 
   const HydrateClient: React.FC<{ readonly children?: React.ReactNode }> = ({ children }) => (
     <Boundary state={dehydrateRequest()}>{children}</Boundary>
