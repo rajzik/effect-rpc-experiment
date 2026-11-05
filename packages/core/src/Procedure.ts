@@ -12,6 +12,7 @@
 import { Predicate, Schema } from 'effect';
 import { Rpc } from 'effect/rpc';
 import type { RpcMiddleware, RpcSchema } from 'effect/rpc';
+import type { ProcedureWithHandler } from './ProcedureBuilder.js';
 import { ProcedureKind } from './ProcedureKind.js';
 
 const TypeId = '~@effect-trpc/core/ProcedureDef' as const;
@@ -138,7 +139,7 @@ export interface ProcedureDef<
   /** Compiles the definition to an `effect/rpc` `Rpc` with the given tag. */
   toRpc<const Tag extends string>(
     tag: Tag,
-  ): ProcedureDef.ToRpc<ProcedureDef<Kind, Payload, Success, Error, Middleware, Requires>, Tag>;
+  ): RpcOf<Kind, Payload, Success, Error, Middleware, Requires, Tag>;
 }
 
 /**
@@ -180,14 +181,33 @@ export declare namespace ProcedureDef {
   }
 
   /**
-   * Adds middleware `M` to a definition type (the type of `def.middleware(M)`).
+   * Adds middleware `M` to a definition type (the type of `def.middleware(M)`). A procedure built
+   * with `Procedure` stays a `ProcedureWithHandler` with the same handler requirements.
    *
    * @since 0.1.0
    */
   export type AddMiddleware<D, M extends RpcMiddleware.AnyService> =
-    D extends ProcedureDef<infer K, infer P, infer S, infer E, infer Mw, infer Rq>
-      ? ProcedureDef<K, P, S, E, Mw | M, RpcMiddleware.ApplyServices<M['Identifier'], Rq>>
-      : never;
+    D extends ProcedureWithHandler<
+      infer K,
+      infer P,
+      infer S,
+      infer E,
+      infer Mw,
+      infer Rq,
+      infer HandlerR
+    >
+      ? ProcedureWithHandler<
+          K,
+          P,
+          S,
+          E,
+          Mw | M,
+          RpcMiddleware.ApplyServices<M['Identifier'], Rq>,
+          HandlerR
+        >
+      : D extends ProcedureDef<infer K, infer P, infer S, infer E, infer Mw, infer Rq>
+        ? ProcedureDef<K, P, S, E, Mw | M, RpcMiddleware.ApplyServices<M['Identifier'], Rq>>
+        : never;
 
   /**
    * The `Rpc` a definition compiles to under `Tag`. Subscriptions become streaming rpcs
@@ -195,13 +215,43 @@ export declare namespace ProcedureDef {
    *
    * @since 0.1.0
    */
-  export type ToRpc<D, Tag extends string> =
-    D extends ProcedureDef<infer K, infer P, infer S, infer E, infer Mw, infer Rq>
-      ? K extends 'subscription'
-        ? Rpc.Rpc<Tag, P, RpcSchema.Stream<S, E>, Schema.Never, Mw, Rq>
-        : Rpc.Rpc<Tag, P, S, E, Mw, Rq>
-      : never;
+  export type ToRpc<D, Tag extends string> = D extends unknown
+    ? DefOf<D> extends ProcedureDef<infer K, infer P, infer S, infer E, infer Mw, infer Rq>
+      ? RpcOf<K, P, S, E, Mw, Rq, Tag>
+      : never
+    : never;
 }
+
+/** The rpc of a definition (distributes over `Kind`). */
+type RpcOf<
+  Kind extends ProcedureKind.Value,
+  Payload extends Schema.Top,
+  Success extends Schema.Top,
+  Error extends Schema.Top,
+  Middleware extends RpcMiddleware.AnyService,
+  Requires,
+  Tag extends string,
+> = Kind extends 'subscription'
+  ? Rpc.Rpc<Tag, Payload, RpcSchema.Stream<Success, Error>, Schema.Never, Middleware, Requires>
+  : Rpc.Rpc<Tag, Payload, Success, Error, Middleware, Requires>;
+
+/**
+ * `D` as a plain `ProcedureDef<...>` reference, so that `infer` reads its type arguments
+ * directly. Inferring `ProcedureDef<infer ...>` structurally from a `ProcedureWithHandler`
+ * subscription would also pick `Success` candidates from the streaming branch of `toRpc`.
+ */
+type DefOf<D> =
+  D extends ProcedureWithHandler<
+    infer K,
+    infer P,
+    infer S,
+    infer E,
+    infer Mw,
+    infer Rq,
+    infer _HandlerR
+  >
+    ? ProcedureDef<K, P, S, E, Mw, Rq>
+    : D;
 
 /**
  * The decoded input (payload) type of a procedure definition. `void` when it takes no input.
@@ -328,10 +378,11 @@ export type inferError<D extends ProcedureDef.Any> = TypesOf<D>['error'];
  */
 export type inferKind<D extends ProcedureDef.Any> = D['kind'];
 
-type TypesOf<D> =
-  D extends ProcedureDef<infer K, infer P, infer S, infer E, infer M, infer _Rq>
+type TypesOf<D> = D extends unknown
+  ? DefOf<D> extends ProcedureDef<infer K, infer P, infer S, infer E, infer M, infer _Rq>
     ? ProcedureDef.Types<K, P, S, E, M>
-    : never;
+    : never
+  : never;
 
 /**
  * Returns `true` when `u` is a procedure definition created by `query`, `mutation` or
@@ -362,12 +413,17 @@ type TypesOf<D> =
 export const isProcedureDef = (u: unknown): u is ProcedureDef.Any =>
   Predicate.hasProperty(u, TypeId) && u[TypeId] === TypeId;
 
+/** A procedure implementation, erased (its precise type lives on `ProcedureWithHandler`). */
+type AnyHandler = (...args: ReadonlyArray<never>) => unknown;
+
 interface DefState {
   readonly kind: ProcedureKind.Value;
   readonly payloadSchema: Schema.Top;
   readonly successSchema: Schema.Top;
   readonly errorSchema: Schema.Top;
   readonly middlewares: ReadonlyArray<RpcMiddleware.AnyService>;
+  /** Only procedures built with `Procedure` have one; plain definitions omit the key. */
+  readonly handler?: AnyHandler;
 }
 
 type AnyRpc = Rpc.Rpc<string, Schema.Top, Schema.Top, Schema.Top, any, any>;
@@ -379,6 +435,8 @@ class ProcedureDefImpl implements DefState {
   readonly successSchema: Schema.Top;
   readonly errorSchema: Schema.Top;
   readonly middlewares: ReadonlyArray<RpcMiddleware.AnyService>;
+  // `declare`: no own `handler` key is emitted for plain definitions.
+  declare readonly handler?: AnyHandler;
 
   constructor(state: DefState) {
     this.kind = state.kind;
@@ -386,17 +444,22 @@ class ProcedureDefImpl implements DefState {
     this.successSchema = state.successSchema;
     this.errorSchema = state.errorSchema;
     this.middlewares = Object.freeze([...state.middlewares]);
+    if (state.handler !== undefined) this.handler = state.handler;
     Object.freeze(this);
   }
 
   middleware(middleware: RpcMiddleware.AnyService): ProcedureDefImpl {
-    return new ProcedureDefImpl({
+    const next: DefState = {
       kind: this.kind,
       payloadSchema: this.payloadSchema,
       successSchema: this.successSchema,
       errorSchema: this.errorSchema,
       middlewares: [...this.middlewares, middleware],
-    });
+    };
+    // The handler travels with the definition, so middleware never drops an implementation.
+    return new ProcedureDefImpl(
+      this.handler === undefined ? next : { ...next, handler: this.handler },
+    );
   }
 
   toRpc(tag: string): AnyRpc {
@@ -429,22 +492,30 @@ export const addDefMiddleware = (
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every `ProcedureDef` is created by this module as a `ProcedureDefImpl`
   (def as ProcedureDefImpl).middleware(middleware);
 
-// Returns `any`: the builders below assign the precise `ProcedureDef<...>` type.
-const define = (
+/**
+ * @internal Creates a definition (used by the builders below and by `Procedure`). Returns `any`:
+ * callers assign the precise `ProcedureDef<...>` / `ProcedureWithHandler<...>` type.
+ */
+export const define = (
   kind: ProcedureKind.Value,
   options: {
     readonly payload?: PayloadInput;
     readonly success?: Schema.Top;
     readonly error?: Schema.Top;
+    readonly handler?: AnyHandler;
   },
-): any =>
-  new ProcedureDefImpl({
+): any => {
+  const state: DefState = {
     kind,
     payloadSchema: normalizePayload(options.payload),
     successSchema: options.success ?? Schema.Void,
     errorSchema: options.error ?? Schema.Never,
     middlewares: [],
-  });
+  };
+  return new ProcedureDefImpl(
+    options.handler === undefined ? state : { ...state, handler: options.handler },
+  );
+};
 
 /**
  * Defines a query procedure (a read; maps to tRPC's `.query()`).

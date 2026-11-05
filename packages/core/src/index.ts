@@ -22,6 +22,7 @@ export {
   type PayloadInput,
   type ProcedureDef,
 } from './Procedure.js';
+export { Procedure, type ProcedureWithHandler } from './ProcedureBuilder.js';
 export {
   Router,
   type inferRouterErrors,

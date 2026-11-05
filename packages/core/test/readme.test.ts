@@ -1,12 +1,14 @@
 // Mirrors the example in README.md so the documentation stays correct.
-import { Effect, Exit, Layer, Schema, Stream } from 'effect';
-import { RpcMiddleware, RpcTest } from 'effect/rpc';
+import { Context, Effect, Exit, Layer, Schema, Stream } from 'effect';
+import { Headers } from 'effect/http';
+import { Rpc, RpcMessage, RpcMiddleware, RpcTest } from 'effect/rpc';
 import { describe, expect, expectTypeOf, it } from 'vite-plus/test';
 import {
   causeToClientError,
   Codecs,
   isClientInfrastructureError,
   mutation,
+  Procedure,
   query,
   Router,
   subscription,
@@ -63,7 +65,66 @@ const HandlersLive = appRouter.group.toLayer({
 // Server side of the Auth middleware (a no-op here).
 const AuthLive = Layer.succeed(Auth)(Auth.of((effect) => effect));
 
+class Database extends Context.Service<
+  Database,
+  { readonly findPost: (id: number) => Effect.Effect<Post, PostNotFound> }
+>()('Database') {}
+
+const blogRouter = Router.make({
+  post: {
+    byId: Procedure.input({ id: Schema.Finite })
+      .output(Post)
+      .error(PostNotFound)
+      .query(
+        Effect.fn(function* ({ id }) {
+          const db = yield* Database;
+          return yield* db.findPost(id);
+        }),
+      ),
+    create: Procedure.input({ title: Schema.String })
+      .output(Post)
+      .middleware(Auth)
+      .mutation(({ title }) => Effect.succeed(new Post({ id: 2, title, createdAt: new Date() }))),
+    onCreated: Procedure.output(Post).subscription(() => Stream.empty),
+  },
+});
+
+const handler = blogRouter.record.post.byId.handler;
+
+const DatabaseLive = Layer.succeed(Database)({
+  findPost: (id) =>
+    id === 1
+      ? Effect.succeed(new Post({ id, title: 'Hello', createdAt: new Date(0) }))
+      : Effect.fail(new PostNotFound({ id })),
+});
+
 describe('README example', () => {
+  it('builder procedures keep their handlers', async () => {
+    expectTypeOf<
+      Procedure.HandlerRequirements<typeof blogRouter.record.post.byId>
+    >().toEqualTypeOf<Database>();
+    expectTypeOf<inferError<typeof blogRouter.record.post.create>>().toEqualTypeOf<Unauthorized>();
+    expect([...blogRouter.group.requests.keys()]).toEqual([
+      'post.byId',
+      'post.create',
+      'post.onCreated',
+    ]);
+    const ctx: Procedure.HandlerContext = {
+      client: new Rpc.ServerClient(0),
+      requestId: RpcMessage.RequestId(1),
+      headers: Headers.empty,
+      rpc: Router.getRpc(blogRouter, 'post.byId'),
+    };
+    const found = await Effect.runPromise(
+      handler({ id: 1 }, ctx).pipe(Effect.provide(DatabaseLive)),
+    );
+    expect(found.title).toBe('Hello');
+    const missing = await Effect.runPromise(
+      Effect.flip(handler({ id: 7 }, ctx)).pipe(Effect.provide(DatabaseLive)),
+    );
+    expect(missing).toBeInstanceOf(PostNotFound);
+  });
+
   it('infers procedure types', () => {
     expectTypeOf<inferInput<typeof byId>>().toEqualTypeOf<{ readonly id: number }>();
     expectTypeOf<inferOutput<typeof byId>>().toEqualTypeOf<Post>();
