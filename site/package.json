@@ -35,6 +35,7 @@
     "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
     "vitepress": "catalog:",
     "vue": "catalog:"
   }
