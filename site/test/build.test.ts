@@ -3,6 +3,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vite-plus/test';
 
+import { sidebar } from '../.vitepress/sidebar';
+
 const dist = join(import.meta.dirname, '..', '.vitepress', 'dist');
 const base = '/effect-rpc-experiment/';
 
@@ -28,6 +30,20 @@ describe('built site', () => {
         .map((url) => `${file.slice(dist.length)}: ${url}`),
     );
     expect(offenders).toEqual([]);
+  });
+
+  it('every sidebar and nav link has a page', () => {
+    const links = Object.values(sidebar).flatMap((groups) =>
+      (groups as ReadonlyArray<{ items?: ReadonlyArray<{ link?: string }> }>).flatMap((group) =>
+        (group.items ?? []).map((item) => item.link ?? ''),
+      ),
+    );
+    const missing = links.filter((link) => {
+      const path = link.endsWith('/') ? `${link}index.html` : `${link}.html`;
+      return !existsSync(join(dist, path));
+    });
+    expect(links.length).toBeGreaterThan(40);
+    expect(missing).toEqual([]);
   });
 
   it('emits a 404 page', () => {

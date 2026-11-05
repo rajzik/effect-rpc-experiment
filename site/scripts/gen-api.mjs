@@ -421,11 +421,15 @@ function dedupe(members) {
 // ---------------------------------------------------------------------------------------------
 // Rendering
 
-/** Replaces `{@link X}` with a link when X is documented, else inline code. */
-function linkify(text, page, anchors) {
+/**
+ * Replaces `{@link X}` with a link when X is documented, else inline code. Inside a namespace
+ * (`scope` = `"Router"`), a bare sibling name (`{@link childPath}`) links to `Router.childPath`.
+ */
+function linkify(text, page, anchors, scope) {
   return text.replace(/\{@link\s+([^}|\s]+)(?:\s*\|\s*([^}]+))?\}/g, (_, target, label) => {
     const shown = `\`${(label ?? target).trim()}\``;
-    const key = slug(target);
+    const scoped = scope === undefined ? undefined : slug(`${scope}.${target}`);
+    const key = scoped !== undefined && anchors.has(scoped) ? scoped : slug(target);
     const home = anchors.get(key);
     if (!home) return shown;
     return home === page ? `[${shown}](#${key})` : `[${shown}](./${home}#${key})`;
@@ -447,14 +451,14 @@ function escapeProse(md) {
     .join('');
 }
 
-function renderDoc(doc, page, anchors) {
+function renderDoc(doc, page, anchors, scope) {
   const out = [];
   if (doc.deprecated !== undefined) {
     out.push(`::: warning Deprecated\n${doc.deprecated || 'Deprecated.'}\n:::`);
   }
   if (doc.body) out.push(doc.body);
   if (doc.see.length > 0) out.push(`**See also:** ${doc.see.join(', ')}`);
-  return escapeProse(linkify(out.join('\n\n'), page, anchors));
+  return escapeProse(linkify(out.join('\n\n'), page, anchors, scope));
 }
 
 const fence = (code) => `\`\`\`ts\n${code}\n\`\`\``;
@@ -462,7 +466,7 @@ const fence = (code) => `\`\`\`ts\n${code}\n\`\`\``;
 function renderItem(item, page, anchors) {
   const out = [`### \`${item.name}\` {#${item.anchor}}`, ''];
   for (const signature of item.signatures) out.push(fence(signature), '');
-  const doc = renderDoc(item.doc, page, anchors);
+  const doc = renderDoc(item.doc, page, anchors, item.name);
   if (doc) out.push(doc, '');
   if (item.members.length > 0) {
     out.push(`**Members of \`${item.name}\`**`, '');
@@ -482,7 +486,7 @@ function renderItem(item, page, anchors) {
       const anchor = anchorOf.get(member);
       out.push(`#### \`${item.name}.${member.name}\` {#${anchor}}`, '');
       for (const signature of member.signatures) out.push(fence(signature), '');
-      const memberDoc = renderDoc(member.doc, page, anchors);
+      const memberDoc = renderDoc(member.doc, page, anchors, item.name);
       if (memberDoc) out.push(memberDoc, '');
       if (member.doc.since) out.push(`<p class="api-since">Since ${member.doc.since}</p>`, '');
     }

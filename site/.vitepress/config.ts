@@ -9,6 +9,7 @@ export default defineConfig({
   base: '/effect-rpc-experiment/',
   title: 'effect-trpc',
   description: 'End-to-end type-safe RPC for Effect v4, with TanStack Query and framework adapters',
+  srcExclude: ['README.md'],
   cleanUrls: true,
   lastUpdated: true,
   appearance: true,

@@ -17,7 +17,7 @@ const server = await MainRpcServer.run(appRouter, {
 app.on('will-quit', () => void server.dispose());
 // #endregion run
 
-new BrowserWindow({
+await new BrowserWindow({
   webPreferences: {
     preload: `${import.meta.dirname}/preload.js`,
     contextIsolation: true, // required (Electron's default)

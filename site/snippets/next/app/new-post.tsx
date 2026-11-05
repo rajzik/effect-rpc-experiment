@@ -10,7 +10,12 @@ import { createPost } from './actions';
 export function NewPost() {
   const create = useServerAction(createPost, { router: appRouter, path: 'post.create' });
   return (
-    <form action={(form) => void create.run({ title: String(form.get('title')) })}>
+    <form
+      action={(form) => {
+        const title = form.get('title');
+        if (typeof title === 'string') void create.run({ title });
+      }}
+    >
       <input name="title" />
       <button disabled={create.isPending}>Create</button>
       {create.data && <p>Created {create.data.slug}</p>}

@@ -58,6 +58,17 @@ export default defineConfig({
         },
       },
       {
+        // Documentation samples show values as bare expressions (`post.slug; // "hello"`), log
+        // with console, declare values only to display them, and demonstrate a reserved key.
+        files: ['site/snippets/**'],
+        rules: {
+          'no-console': 'off',
+          'no-unused-expressions': 'off',
+          'no-unused-vars': 'off',
+          'unicorn/no-thenable': 'off',
+        },
+      },
+      {
         // The docs theme imports its stylesheets (tokens, fonts) for their side effects.
         files: ['site/.vitepress/**'],
         rules: { 'import/no-unassigned-import': ['warn', { allow: ['**/*.css'] }] },

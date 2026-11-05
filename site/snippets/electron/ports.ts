@@ -12,7 +12,7 @@ const { port1, port2 } = new MessageChannel();
 const program = Effect.gen(function* () {
   const { attach } = yield* MessagePortServer.serve(appRouter, { handlers: ServerLive });
   yield* attach(port1, { headers: { 'x-origin': 'worker' } });
-  yield* Effect.never; // keep serving until the scope closes
+  return yield* Effect.never; // keep serving until the scope closes
 });
 void Effect.runFork(Effect.scoped(program));
 

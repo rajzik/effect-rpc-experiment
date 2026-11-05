@@ -41,7 +41,7 @@ const program = Effect.gen(function* () {
   return post.slug;
 });
 
-Effect.runPromise(program.pipe(Effect.provide(ApiLive)));
+await Effect.runPromise(program.pipe(Effect.provide(ApiLive)));
 // #endregion service
 
 void [title, created];

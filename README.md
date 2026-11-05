@@ -13,6 +13,13 @@ TanStack Start and Electron.
 - **Built on `effect/rpc`**, not a reimplementation: `RpcGroup`, `RpcServer`, `RpcClient`,
   `RpcMiddleware` and `RpcSerialization` do the heavy lifting.
 
+## Documentation
+
+The reference site lives in [`site/`](site/) and is published at
+<https://rajzik.github.io/effect-rpc-experiment/>: guides for every package, framework setups,
+advanced recipes, and an API reference generated from the JSDoc. Run it locally with
+`pnpm docs:dev` (after `pnpm exec vp run -r build`).
+
 ## For AI agents
 
 Start here, then read the `## For AI agents` section of the package you are touching. Every public
@@ -82,6 +89,8 @@ pnpm exec vp run -r test     # Vitest 5 in every package (runtime + type tests)
 pnpm exec vp -C packages/core test   # one package
 pnpm exec vp run -r build    # vp pack (tsdown) every package → dist/
 pnpm docs:check              # JSDoc contract + type-check every @example (after build)
+pnpm docs:dev                # the documentation site (site/), with the generated API reference
+pnpm docs:build              # build the site; fails on dead links
 pnpm run ready               # everything above, in order
 ```
 

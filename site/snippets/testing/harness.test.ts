@@ -44,6 +44,6 @@ describe('post router', () => {
 it('rejects unauthenticated mutations', () =>
   withTestServer(appRouter, { handlers: ServerLive }, async (ctx) => {
     const error = await ctx.client.post.create({ title: 'x' }).catch((e: unknown) => e);
-    assertInstance(error, Unauthorized);
+    expect(error).toBeInstanceOf(Unauthorized);
   }));
 // #endregion with

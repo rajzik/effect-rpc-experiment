@@ -94,6 +94,10 @@ describe('gen-api', () => {
     expect(page('server')).toContain('{#createcaller}');
   });
 
+  it('links {@link sibling} inside a namespace to the sibling member', () => {
+    expect(page('core')).toContain('[`childPath`](#router-childpath)');
+  });
+
   it('renders the JSDoc sections, signatures and since tags', () => {
     const client = page('client');
     expect(client).toContain('**When to use**');
