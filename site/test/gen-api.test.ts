@@ -59,7 +59,9 @@ afterAll(() => {
 describe('gen-api', () => {
   it('writes one page per package entry, and none for e2e', () => {
     const files = readdirSync(out).toSorted();
-    expect(files).toEqual([...Object.keys(pages).map((name) => `${name}.md`), 'index.md'].toSorted());
+    expect(files).toEqual(
+      [...Object.keys(pages).map((name) => `${name}.md`), 'index.md'].toSorted(),
+    );
     expect(existsSync(join(out, 'e2e.md'))).toBe(false);
   });
 
