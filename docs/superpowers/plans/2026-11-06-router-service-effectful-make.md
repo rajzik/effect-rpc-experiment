@@ -23,7 +23,7 @@
 
 ## Review Focus
 
-1. A `make` that reads a service *and* nests a pure service and a plain `Router.make` router: tags `a.b.c` resolve exactly as today — test in Task 4 (`nested mix`).
+1. A `make` that reads a service _and_ nests a pure service and a plain `Router.make` router: tags `a.b.c` resolve exactly as today — test in Task 4 (`nested mix`).
 2. Two layer builds (e.g. two `toWebHandler` calls) each run `make` once with their own services; nothing is memoized across builds — test in Task 4 (`make runs per build`).
 3. A `make` that fails with a typed error: the layer build fails with that error (typed `E` on the layer) — test in Task 4 (`make failure`).
 4. A forced effectful class passed to `createClient` / `Router.from`: throws an error naming `Handlers.fromService` and `router.client.gen.ts`, and leaves no running fiber — test in Task 2.
@@ -34,11 +34,13 @@
 ### Task 1: Core types for effectful router services
 
 **Files:**
+
 - Modify: `packages/core/src/Router.ts` (namespace `Router` ~L140-317, namespace `RouterService` ~L356-366, `ServiceRecord` / `Resolve` / `ResolveEntry` / `EntryHasService` / `RecordOf` ~L368-405)
 - Modify: `packages/core/src/index.ts` only if a new top-level export is needed (type-only additions live in existing namespaces)
 - Test: `packages/core/test/routerServiceEffectful.test-d.ts`
 
 **Interfaces:**
+
 - Produces:
   - `RouterService.Effectful = Context.Key<any, any> & { readonly make: Effect.Effect<RouterService.EffectfulShape, unknown, unknown> }` (pure services satisfy it).
   - `RouterService.EffectfulShape = { readonly [key: string]: ProcedureDef.Any | Router.Any | RouterService.Effectful | RouterService.EffectfulShape }`.
@@ -67,10 +69,12 @@
 ### Task 2: Core runtime — build a service's router as an Effect
 
 **Files:**
+
 - Modify: `packages/core/src/Router.ts` (`runMake` ~L638, `fromService` ~L705, add `buildService`, export in the `Router` value object)
 - Test: `packages/core/test/routerServiceEffectful.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1 types.
 - Produces: `Router.buildService: <S extends RouterService.Effectful>(service: S) => Effect.Effect<{ readonly router: Router.Of<S>; readonly value: Context.Service.Shape<S> }, RouterService.MakeError<S>, RouterService.MakeServices<S>>`
   - Runs `service.make` in the current context, then resolves nested router services (effectful or pure) by running their `make` the same way (each class at most once per `buildService` run; a cycle fails with the existing "nests the service itself" error as a defect), then `Router.make` on the resolved record. `value` is the record `make` returned (nested services kept as classes). Not memoized across runs. Validates "record, not a router" like `fromService`.
@@ -93,10 +97,12 @@
 ### Task 3: Core — `Router.withSchemas` over an effectful service
 
 **Files:**
+
 - Modify: `packages/core/src/Router.ts` (`withSchemas` ~L1100 and its JSDoc)
 - Test: `packages/core/test/routerWithSchemas.test.ts`, `packages/core/test/routerWithSchemas.test-d.ts`
 
 **Interfaces:**
+
 - Consumes: `Router.buildService` (Task 2).
 - Produces: for a router **service** source (pure or effectful — runtime cannot tell them apart without running `make`), `withSchemas(source, schemas): RouterService.WithSchemas<X, S>` where
   `RouterService.WithSchemas<X, S> = Context.Key<Context.Service.Identifier<X>, Context.Service.Shape<X>> & { readonly make: Effect.Effect<Router.WithSchemas<Router.Record<X>, S>, RouterService.MakeError<X>, RouterService.MakeServices<X>> }`.
@@ -119,11 +125,13 @@
 ### Task 4: Server — `Handlers.fromService` for effectful services
 
 **Files:**
+
 - Modify: `packages/server/src/Handlers.ts` (`fromService` ~L573 and its JSDoc)
 - Test: `packages/server/test/routerServiceEffectful.test.ts`, `packages/server/test/routerServiceEffectful.test-d.ts`
 - Modify: `packages/server/test/PARITY.md` only if it lists router-service tests
 
 **Interfaces:**
+
 - Consumes: `Router.buildService`, `RouterService.Effectful`, `MakeError`, `MakeServices`.
 - Produces: `Handlers.fromService: <S extends RouterService.Effectful>(service: S & Handlers.RequireHandlers<Router.Of<S>>) => Layer.Layer<Handlers.Provides<Router.Of<S>> | Context.Service.Identifier<S>, RouterService.MakeError<S>, Exclude<RouterService.MakeServices<S>, Scope.Scope> | Handlers.ProcedureServices<Router.Of<S>>>`.
   Implementation: `Layer.unwrap(Effect.map(Router.buildService(service), ({ router, value }) => Layer.merge(toLayer(router, proceduresHandlers(router, …)), Layer.succeed(key)(value))))`. Pure services may use this path too (types reduce to today's).
@@ -147,10 +155,12 @@
 ### Task 5: Codegen — `Effect.gen` makes
 
 **Files:**
+
 - Modify: `packages/codegen/src/generate.ts` (`makeRecord` ~L213, `copyExpression` ~L890, server export emission ~L1158)
 - Test: `packages/codegen/test/generate.test.ts`, `packages/codegen/test/clientTypes.test-d.ts`, fixtures under `packages/codegen/test/fixtures/`
 
 **Interfaces:**
+
 - Consumes: `Router.withSchemas` (Task 3), `Handlers.fromService` (Task 4).
 - Produces:
   - `makeRecord` reads `Effect.gen(function* () { …; return { … } })` (the object literal of the generator body's last top-level `return`), in addition to `Effect.succeed` / `Effect.sync`.
@@ -175,6 +185,7 @@
 ### Task 6: Docs, JSDoc, READMEs
 
 **Files:**
+
 - Modify: `site/guide/concepts/router-services.md` (section "`make` must not read services" → "`make` that reads services"; "Inferred schemas" serving line; Gotchas bullets about `make` needing services)
 - Create: `site/snippets/concepts/router-service-effectful.ts` (`#service`, `#server`, `#client` regions; must type-check like other snippets)
 - Modify: `site/guide/advanced/codegen.md` if it says to serve the gen module with `Handlers.fromProcedures`

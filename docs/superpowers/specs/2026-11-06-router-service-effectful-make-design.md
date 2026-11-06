@@ -78,12 +78,12 @@ working exactly as today (no contract needed anywhere).
 
 ## Approaches
 
-| Approach | Trade-off | Verdict |
-| --- | --- | --- |
-| **1. Generated contract for sync APIs; `make` runs only in the server layer** | One definition kept; clients/adapters need codegen (or a hand-written contract) | **Picked** |
-| 2. Hand-written contract only | No codegen work; schemas written twice | Rejected (still possible under 1) |
-| Adapters build the router lazily inside their layers | Client still has no schemas; touches ~30 entry points | Rejected |
-| Run `make` on the client with fake services | Breaks any `make` doing real top-level work | Rejected |
+| Approach                                                                      | Trade-off                                                                       | Verdict                           |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------- |
+| **1. Generated contract for sync APIs; `make` runs only in the server layer** | One definition kept; clients/adapters need codegen (or a hand-written contract) | **Picked**                        |
+| 2. Hand-written contract only                                                 | No codegen work; schemas written twice                                          | Rejected (still possible under 1) |
+| Adapters build the router lazily inside their layers                          | Client still has no schemas; touches ~30 entry points                           | Rejected                          |
+| Run `make` on the client with fake services                                   | Breaks any `make` doing real top-level work                                     | Rejected                          |
 
 Within 1, an earlier draft passed the contract to `Handlers.fromService(Svc, contract)`. Rejected
 by the user: the server already has the class, so everything is inferred from it.
