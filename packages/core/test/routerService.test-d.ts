@@ -129,10 +129,13 @@ describe('router services (types)', () => {
     expectTypeOf<typeof NeedsDb>().not.toExtend<RouterService.Any>();
     expectTypeOf<typeof MayFail>().not.toExtend<Router.Input>();
     // @ts-expect-error -- make requires Database
+    // oxlint-disable-next-line effecttsgo/missing-effect-context -- deliberately wrong: `make` requires Database (the @ts-expect-error case)
     Router.from(NeedsDb);
     // @ts-expect-error -- make requires Database
+    // oxlint-disable-next-line effecttsgo/missing-effect-context -- deliberately wrong: `make` requires Database (the @ts-expect-error case)
     Router.fromService(NeedsDb);
     // @ts-expect-error -- make requires Database
+    // oxlint-disable-next-line effecttsgo/missing-effect-context -- deliberately wrong: `make` requires Database (the @ts-expect-error case)
     Router.make({ db: NeedsDb });
     // @ts-expect-error -- make may fail
     Router.from(MayFail);
@@ -199,6 +202,7 @@ describe('router services (types)', () => {
     expectTypeOf(Router.serviceValue(Outer)).toEqualTypeOf<Context.Service.Shape<typeof Outer>>();
     expectTypeOf(Router.serviceValue(Outer).admin).toEqualTypeOf<typeof AdminRouter>();
     // @ts-expect-error -- make requires Database
+    // oxlint-disable-next-line effecttsgo/missing-effect-context -- deliberately wrong: `make` requires Database (the @ts-expect-error case)
     Router.serviceValue(NeedsDb);
   });
 

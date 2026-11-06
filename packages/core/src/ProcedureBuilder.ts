@@ -10,8 +10,7 @@
  *
  * @since 0.1.0
  */
-import { Predicate, Schema } from 'effect';
-import type { Effect, Stream } from 'effect';
+import { Effect, Predicate, Schema, Stream } from 'effect';
 import type { Headers } from 'effect/http';
 import type { Rpc, RpcMessage, RpcMiddleware } from 'effect/rpc';
 import { addDefMiddleware, define, isProcedureDef } from './Procedure.js';
@@ -221,6 +220,94 @@ export declare namespace Procedure {
       : never;
 
   /**
+   * What a builder still infers from its handler. A fresh builder infers both: `'output'` until
+   * `.output(...)` or `.inferred({ output })` sets the output schema, `'error'` until `.error(...)`
+   * or `.output(...)` makes the failures checked. `never` is the fully explicit builder.
+   *
+   * @since 0.1.0
+   */
+  export type Infer = 'output' | 'error';
+
+  /**
+   * The success schema type of a procedure whose output is inferred from a handler succeeding
+   * with `A`: `Schema.Void` for `void` (and `undefined` / `never`), else a `Schema.declare<A>`
+   * that carries `A` for the client types. At runtime the schema is `Schema.Void`; a handler
+   * value other than `undefined` is a defect until the schema generator (or `.output`) sets a
+   * real schema.
+   *
+   * @since 0.1.0
+   */
+  export type InferredSuccess<A> = [A] extends [void] ? Schema.Void : Schema.declare<A>;
+
+  /**
+   * The argument of `.inferred(...)`: the schemas the generator derived from the handler types.
+   *
+   * @since 0.1.0
+   */
+  export interface InferredSchemas {
+    readonly output?: Schema.Top;
+    readonly error?: Schema.Top;
+  }
+
+  /**
+   * The upper bound of a terminal's handler result while the builder infers (see {@link Infer}):
+   * the success is free while `'output'` is inferred, the failures while `'error'` is.
+   *
+   * @since 0.1.0
+   */
+  export type InferBound<
+    Kind extends ProcedureKind.Value,
+    Success extends Schema.Top,
+    Error extends Schema.Top,
+    Middleware extends RpcMiddleware.AnyService,
+    Infer_ extends Infer,
+  > = Kind extends 'subscription'
+    ? Stream.Stream<
+        'output' extends Infer_ ? unknown : Success['Type'],
+        'error' extends Infer_ ? unknown : HandlerError<Error, Middleware>,
+        unknown
+      >
+    : Effect.Effect<
+        'output' extends Infer_ ? unknown : Success['Type'],
+        'error' extends Infer_ ? unknown : HandlerError<Error, Middleware>,
+        unknown
+      >;
+
+  /**
+   * A terminal (`query`, `mutation`, `subscription`) of a {@link Builder}. An explicit builder
+   * types the handler from its schemas; an inferring one infers the handler's whole result (so
+   * the failures of a `cond ? Effect.fail(a) : Effect.fail(b)` handler union) and reads the
+   * success and services from it.
+   *
+   * @since 0.1.0
+   */
+  export type Terminal<
+    Kind extends ProcedureKind.Value,
+    Payload extends Schema.Top,
+    Success extends Schema.Top,
+    Error extends Schema.Top,
+    Middleware extends RpcMiddleware.AnyService,
+    Requires,
+    Infer_ extends Infer,
+  > = [Infer_] extends [never]
+    ? <R = never>(
+        handler: Handler<Kind, Payload, Success, Error, Middleware, R>,
+      ) => ProcedureWithHandler<Kind, Payload, Success, Error, Middleware, Requires, R>
+    : <Out extends InferBound<Kind, Success, Error, Middleware, Infer_>>(
+        handler: (payload: Payload['Type'], ctx: HandlerContext) => Out,
+      ) => ProcedureWithHandler<
+        Kind,
+        Payload,
+        'output' extends Infer_
+          ? InferredSuccess<Kind extends 'subscription' ? Stream.Success<Out> : Effect.Success<Out>>
+          : Success,
+        Error,
+        Middleware,
+        Requires,
+        Kind extends 'subscription' ? Stream.Services<Out> : Effect.Services<Out>
+      >;
+
+  /**
    * An immutable procedure builder. Each step returns a new builder; a terminal (`query`,
    * `mutation`, `subscription`) takes the handler and returns a {@link ProcedureWithHandler}.
    *
@@ -232,19 +319,38 @@ export declare namespace Procedure {
     Error extends Schema.Top,
     Middleware extends RpcMiddleware.AnyService,
     Requires,
+    Infer_ extends Infer = never,
   > {
     /** Sets the input: a schema or `Schema.Struct` fields (replaces an earlier `input`). */
     readonly input: <P extends PayloadInput>(
       input: P,
-    ) => Builder<NormalizePayload<P>, Success, Error, Middleware, Requires>;
-    /** Sets the success schema (for subscriptions: each element; replaces an earlier `output`). */
+    ) => Builder<NormalizePayload<P>, Success, Error, Middleware, Requires, Infer_>;
+    /**
+     * Sets the success schema (for subscriptions: each element; replaces an earlier `output`).
+     * The builder becomes explicit: the handler's output and failures are checked.
+     */
     readonly output: <S extends Schema.Top>(
       schema: S,
     ) => Builder<Payload, S, Error, Middleware, Requires>;
     /** Sets the typed error schema (replaces an earlier `error`; use `Schema.Union` for several). */
     readonly error: <E extends Schema.Top>(
       schema: E,
-    ) => Builder<Payload, Success, E, Middleware, Requires>;
+    ) => Builder<Payload, Success, E, Middleware, Requires, Exclude<Infer_, 'error'>>;
+    /**
+     * Sets the schemas the schema generator inferred from the handler. Written by the
+     * generator: by hand, use `.output` / `.error`. The output is checked; failures not in
+     * `error` stay allowed (they reach the client as defects).
+     */
+    readonly inferred: <const S extends InferredSchemas>(
+      schemas: S,
+    ) => Builder<
+      Payload,
+      S extends { readonly output: infer O extends Schema.Top } ? O : Success,
+      S extends { readonly error: infer X extends Schema.Top } ? X : Error,
+      Middleware,
+      Requires,
+      S extends { readonly output: Schema.Top } ? Exclude<Infer_, 'output'> : Infer_
+    >;
     /** Adds `effect/rpc` middleware (applied after earlier middleware). */
     readonly middleware: <M extends RpcMiddleware.AnyService>(
       middleware: M,
@@ -253,20 +359,23 @@ export declare namespace Procedure {
       Success,
       Error,
       Middleware | M,
-      RpcMiddleware.ApplyServices<M['Identifier'], Requires>
+      RpcMiddleware.ApplyServices<M['Identifier'], Requires>,
+      Infer_
     >;
     /** Finishes a query whose handler returns an `Effect`. */
-    readonly query: <R = never>(
-      handler: EffectHandler<Payload, Success, Error, Middleware, R>,
-    ) => ProcedureWithHandler<'query', Payload, Success, Error, Middleware, Requires, R>;
+    readonly query: Terminal<'query', Payload, Success, Error, Middleware, Requires, Infer_>;
     /** Finishes a mutation whose handler returns an `Effect`. */
-    readonly mutation: <R = never>(
-      handler: EffectHandler<Payload, Success, Error, Middleware, R>,
-    ) => ProcedureWithHandler<'mutation', Payload, Success, Error, Middleware, Requires, R>;
+    readonly mutation: Terminal<'mutation', Payload, Success, Error, Middleware, Requires, Infer_>;
     /** Finishes a subscription whose handler returns a `Stream` of elements. */
-    readonly subscription: <R = never>(
-      handler: StreamHandler<Payload, Success, Error, Middleware, R>,
-    ) => ProcedureWithHandler<'subscription', Payload, Success, Error, Middleware, Requires, R>;
+    readonly subscription: Terminal<
+      'subscription',
+      Payload,
+      Success,
+      Error,
+      Middleware,
+      Requires,
+      Infer_
+    >;
   }
 }
 
@@ -275,9 +384,37 @@ interface BuilderState {
   readonly success: Schema.Top;
   readonly error: Schema.Top;
   readonly middlewares: ReadonlyArray<RpcMiddleware.AnyService>;
+  /** No output schema yet: the success type is inferred and the runtime schema is `Void`. */
+  readonly inferOutput: boolean;
 }
 
 type AnyHandler = (...args: ReadonlyArray<never>) => unknown;
+type RuntimeHandler = (payload: unknown, ctx: Procedure.HandlerContext) => unknown;
+
+const missingOutputSchema = (): Error =>
+  new Error(
+    'effect-trpc: this procedure has no output schema, so the value its handler returned cannot ' +
+      'be sent. Add `.output(schema)` to the procedure, or generate the schemas from the handler ' +
+      'types with the effect-trpc schema generator and serve the generated router.',
+  );
+
+const checkVoid = (value: unknown): Effect.Effect<unknown> =>
+  value === undefined ? Effect.succeed(value) : Effect.die(missingOutputSchema());
+
+// Without an output schema the success is encoded with `Schema.Void`, which turns any value into
+// `null`: fail loudly instead of sending `undefined` to a client typed with the handler's value.
+const guardInferredOutput =
+  (kind: ProcedureKind.Value, handler: AnyHandler): RuntimeHandler =>
+  (payload, ctx) => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the builder's typed terminal guarantees the handler's signature for this kind
+    const run = handler as unknown as RuntimeHandler;
+    // The services (`R`) are erased: the server provides them; only the success is inspected.
+    return kind === 'subscription'
+      ? // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a subscription handler returns a Stream (typed terminal)
+        Stream.mapEffect(run(payload, ctx) as Stream.Stream<unknown, unknown>, checkVoid)
+      : // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/any-unknown-in-error-context -- a query/mutation handler returns an Effect (typed terminal); its failures pass through untouched, so the error type is erased
+        Effect.flatMap(run(payload, ctx) as Effect.Effect<unknown, unknown>, checkVoid);
+  };
 
 const finish = (kind: ProcedureKind.Value, state: BuilderState, handler: AnyHandler): any => {
   // Same path as `query({...}).middleware(...)`: `define`, then one `middleware` per step.
@@ -285,7 +422,7 @@ const finish = (kind: ProcedureKind.Value, state: BuilderState, handler: AnyHand
     payload: state.payload,
     success: state.success,
     error: state.error,
-    handler,
+    handler: state.inferOutput ? guardInferredOutput(kind, handler) : handler,
   });
   for (const middleware of state.middlewares) def = addDefMiddleware(def, middleware);
   return def;
@@ -295,8 +432,14 @@ const finish = (kind: ProcedureKind.Value, state: BuilderState, handler: AnyHand
 const makeBuilder = (state: BuilderState): any =>
   Object.freeze({
     input: (payload: PayloadInput) => makeBuilder({ ...state, payload }),
-    output: (success: Schema.Top) => makeBuilder({ ...state, success }),
+    output: (success: Schema.Top) => makeBuilder({ ...state, success, inferOutput: false }),
     error: (error: Schema.Top) => makeBuilder({ ...state, error }),
+    inferred: (schemas: Procedure.InferredSchemas) =>
+      makeBuilder({
+        ...state,
+        ...(schemas.output === undefined ? {} : { success: schemas.output, inferOutput: false }),
+        ...(schemas.error === undefined ? {} : { error: schemas.error }),
+      }),
     middleware: (middleware: RpcMiddleware.AnyService) =>
       makeBuilder({ ...state, middlewares: [...state.middlewares, middleware] }),
     query: (handler: AnyHandler) => finish('query', state, handler),
@@ -304,11 +447,19 @@ const makeBuilder = (state: BuilderState): any =>
     subscription: (handler: AnyHandler) => finish('subscription', state, handler),
   });
 
-const empty: Procedure.Builder<Schema.Void, Schema.Void, Schema.Never, never, never> = makeBuilder({
+const empty: Procedure.Builder<
+  Schema.Void,
+  Schema.Void,
+  Schema.Never,
+  never,
+  never,
+  Procedure.Infer
+> = makeBuilder({
   payload: Schema.Void,
   success: Schema.Void,
   error: Schema.Never,
   middlewares: [],
+  inferOutput: true,
 });
 
 /**
@@ -346,8 +497,15 @@ const hasHandler = (u: unknown): u is ProcedureWithHandler.Any =>
  * - Every step is optional; defaults match `query({...})`: input `Schema.Void`, output
  *   `Schema.Void`, error `Schema.Never`. `input` accepts a schema or `Schema.Struct` fields.
  * - The handler is contextually typed: `(payload, ctx)` where `payload` is the decoded input and
- *   `ctx` is {@link Procedure.HandlerContext}. It must succeed with the decoded output and may
- *   fail only with the declared `error` or the errors of middleware added before the terminal.
+ *   `ctx` is {@link Procedure.HandlerContext}. With `.output(...)` it must succeed with the
+ *   decoded output and may fail only with the declared `error` or the errors of middleware added
+ *   before the terminal.
+ * - Without `.output(...)` the builder is in inference mode: the output type is the handler's
+ *   success type (`inferOutput` gives it), and the handler may fail with anything unless
+ *   `.error(...)` was set (then failures stay checked). The schemas themselves come from the
+ *   schema generator, which reads the handler types and writes `.inferred({ output, error })`
+ *   into a generated copy of the router: serve and import that copy. `.inferred` is the
+ *   generator's step; by hand, write `.output` / `.error`.
  * - The handler's requirements are inferred and recorded on the procedure
  *   ({@link Procedure.HandlerRequirements}); read services inside the handler with `yield*`.
  * - Subscription handlers return a `Stream` of output elements.
@@ -359,6 +517,10 @@ const hasHandler = (u: unknown): u is ProcedureWithHandler.Any =>
  *
  * - Calling `input`, `output` or `error` twice replaces the earlier schema (use `Schema.Union`
  *   for several errors); `middleware` accumulates.
+ * - In inference mode, without the generated schemas, a handler returning a value other than
+ *   `undefined` dies with a defect naming the fix (the runtime output schema is still
+ *   `Schema.Void`, which would drop the value), and every failure reaches the client as a defect.
+ *   Failures not declared in `.inferred({ error })` (e.g. a `Data.TaggedError`) are defects too.
  * - Middleware added after the terminal does not widen what the already-typed handler may fail
  *   with: add middleware before the terminal when the handler fails with its errors.
  * - The handler closure ships wherever the procedure is imported (including browser bundles):
@@ -406,6 +568,34 @@ const hasHandler = (u: unknown): u is ProcedureWithHandler.Any =>
  * type Services = Procedure.HandlerRequirements<typeof appRouter.record.post.byId>; // Database
  * ```
  *
+ * **Example** (Inference mode and the generated step)
+ *
+ * ```ts
+ * import { Effect, Schema } from 'effect';
+ * import { Procedure } from '@effect-trpc/core';
+ * import type { inferError, inferOutput } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Finite, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Finite,
+ * }) {}
+ *
+ * const find = (id: number) =>
+ *   id === 1
+ *     ? Effect.succeed(new Post({ id, title: 'Hello' }))
+ *     : Effect.fail(new PostNotFound({ id }));
+ *
+ * // As written: no `.output` / `.error`; the types come from the handler.
+ * const byId = Procedure.input({ id: Schema.Finite }).query(({ id }) => find(id));
+ * type Output = inferOutput<typeof byId>; // Post
+ *
+ * // As generated: the same chain with the inferred schemas.
+ * const generated = Procedure.input({ id: Schema.Finite })
+ *   .inferred({ output: Post, error: PostNotFound })
+ *   .query(({ id }) => find(id));
+ * type Failure = inferError<typeof generated>; // PostNotFound
+ * ```
+ *
  * @see {@link ProcedureWithHandler}
  * @category constructors
  * @since 0.1.0
@@ -414,6 +604,7 @@ export const Procedure = {
   input: empty.input,
   output: empty.output,
   error: empty.error,
+  inferred: empty.inferred,
   middleware: empty.middleware,
   query: empty.query,
   mutation: empty.mutation,

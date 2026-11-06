@@ -110,8 +110,8 @@ describe('Procedure builder types', () => {
   it('undeclared error is rejected', () => {
     // @ts-expect-error -- Unauthorized is not declared
     Procedure.error(PostNotFound).query(() => Effect.fail(new Unauthorized()));
-    // @ts-expect-error -- no error declared: the default is Never
-    Procedure.mutation(() => Effect.fail(new PostNotFound({ id: 1 })));
+    // @ts-expect-error -- `.output` set, no error declared: the error is Never
+    Procedure.output(Post).mutation(() => Effect.fail(new PostNotFound({ id: 1 })));
     // @ts-expect-error -- Unauthorized is not declared
     Procedure.output(Post).subscription(() => Stream.fail(new Unauthorized()));
     const declared = Procedure.error(PostNotFound).query(() =>
@@ -129,8 +129,10 @@ describe('Procedure builder types', () => {
     Procedure.output(Post)
       .middleware(AuthMiddleware)
       .subscription(() => Stream.fail(new Unauthorized()));
-    // @ts-expect-error -- LogMiddleware declares no error
-    Procedure.middleware(LogMiddleware).query(() => Effect.fail(new Unauthorized()));
+    Procedure.output(Post)
+      .middleware(LogMiddleware)
+      // @ts-expect-error -- LogMiddleware declares no error
+      .query(() => Effect.fail(new Unauthorized()));
   });
 
   it('R is recorded', () => {
@@ -289,5 +291,99 @@ describe('Procedure builder types', () => {
     if (Procedure.hasHandler(def)) {
       expectTypeOf(def).toExtend<ProcedureWithHandler.Any>();
     }
+  });
+});
+
+describe('inference mode (no `.output`)', () => {
+  it('infers the output from the handler', () => {
+    const byIdInferred = Procedure.input({ id: Schema.Finite }).query(({ id }) =>
+      Effect.succeed(new Post({ id, title: 't', createdAt: new Date(0) })),
+    );
+    expectTypeOf<inferOutput<typeof byIdInferred>>().toEqualTypeOf<Post>();
+    expectTypeOf(byIdInferred.successSchema).toEqualTypeOf<Schema.declare<Post>>();
+    const shape = Procedure.query(() => Effect.succeed({ items: [post], next: null }));
+    expectTypeOf<inferOutput<typeof shape>>().toEqualTypeOf<{ items: Post[]; next: null }>();
+    const feed = Procedure.subscription(() => Stream.make(post));
+    expectTypeOf<inferOutput<typeof feed>>().toEqualTypeOf<Post>();
+  });
+
+  it('a void handler keeps Schema.Void (same as before)', () => {
+    const bare = Procedure.mutation(() => Effect.void);
+    expectTypeOf(bare.successSchema).toEqualTypeOf<Schema.Void>();
+    const never = Procedure.query(() => Effect.die('boom'));
+    expectTypeOf(never.successSchema).toEqualTypeOf<Schema.Void>();
+  });
+
+  it('without `.error`, any failure is accepted and the declared error stays Never', () => {
+    const create = Procedure.input({ title: Schema.String }).mutation(({ title }) =>
+      title === '' ? Effect.fail(new Forbidden({ reason: 'empty' })) : Effect.succeed(post),
+    );
+    expectTypeOf<inferError<typeof create>>().toEqualTypeOf<never>();
+    expectTypeOf<inferOutput<typeof create>>().toEqualTypeOf<Post>();
+    Procedure.subscription(() => Stream.fail(new Unauthorized()));
+  });
+
+  it('with `.error`, the error stays checked while the output is inferred', () => {
+    const guarded = Procedure.error(PostNotFound).query(() =>
+      Math.random() > 0.5 ? Effect.fail(new PostNotFound({ id: 1 })) : Effect.succeed(post),
+    );
+    expectTypeOf<inferOutput<typeof guarded>>().toEqualTypeOf<Post>();
+    expectTypeOf<inferError<typeof guarded>>().toEqualTypeOf<PostNotFound>();
+    // @ts-expect-error -- Unauthorized is not declared
+    Procedure.error(PostNotFound).query(() => Effect.fail(new Unauthorized()));
+  });
+
+  it('records requirements and middleware errors as in explicit mode', () => {
+    const me = Procedure.middleware(AuthMiddleware).query(
+      Effect.fn(function* () {
+        yield* Database;
+        return 'me';
+      }),
+    );
+    expectTypeOf<Procedure.HandlerRequirements<typeof me>>().toEqualTypeOf<Database>();
+    expectTypeOf<inferError<typeof me>>().toEqualTypeOf<Unauthorized>();
+    expectTypeOf<inferOutput<typeof me>>().toEqualTypeOf<string>();
+  });
+});
+
+describe('`.inferred({ output, error })` (written by the schema generator)', () => {
+  it('sets exact schemas: the output is checked, undeclared failures are allowed', () => {
+    const create = Procedure.input({ title: Schema.String })
+      .inferred({ output: Post, error: Forbidden })
+      .mutation(({ title }) =>
+        title === ''
+          ? Effect.fail(new Forbidden({ reason: 'empty' }))
+          : title === 'x'
+            ? Effect.fail(new Unauthorized()) // not declared: a defect at runtime
+            : Effect.succeed(post),
+      );
+    expectTypeOf(create.successSchema).toEqualTypeOf<typeof Post>();
+    expectTypeOf<inferOutput<typeof create>>().toEqualTypeOf<Post>();
+    expectTypeOf<inferError<typeof create>>().toEqualTypeOf<Forbidden>();
+    // @ts-expect-error -- the output is checked: a string is not a Post
+    Procedure.inferred({ output: Post }).query(() => Effect.succeed('not a post'));
+  });
+
+  it('compiles to the same rpc as `.output` / `.error`', () => {
+    const inferred = Procedure.inferred({ output: Post, error: PostNotFound }).query(() =>
+      Effect.succeed(post),
+    );
+    const explicit = Procedure.output(Post)
+      .error(PostNotFound)
+      .query(() => Effect.succeed(post));
+    expectTypeOf<
+      Equals<ProcedureDef.ToRpc<typeof inferred, 'p'>, ProcedureDef.ToRpc<typeof explicit, 'p'>>
+    >().toEqualTypeOf<true>();
+  });
+
+  it('keeps a user-declared `.error` checked', () => {
+    const declared = Procedure.error(PostNotFound)
+      .inferred({ output: Post })
+      .query(() => Effect.fail(new PostNotFound({ id: 1 })));
+    expectTypeOf<inferError<typeof declared>>().toEqualTypeOf<PostNotFound>();
+    Procedure.error(PostNotFound)
+      .inferred({ output: Post })
+      // @ts-expect-error -- Unauthorized is not declared by the user's `.error`
+      .query(() => Effect.fail(new Unauthorized()));
   });
 });

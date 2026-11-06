@@ -3,7 +3,7 @@
 import { Context, Effect, Schema, Stream } from 'effect';
 import { Procedure } from '@effect-trpc/core';
 
-import { DbError, Forbidden, Post, PostNotFound } from './models.ts';
+import { Auth, DbError, Forbidden, Post, PostNotFound, Unauthorized } from './models.ts';
 
 const posts = [
   new Post({ id: 1, title: 'Hello Effect', createdAt: new Date('2026-01-01') }),
@@ -35,6 +35,19 @@ export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
         }),
       ),
       onCreated: Procedure.subscription(() => Stream.fromIterable(posts)),
+      // A user-declared `.error` stays checked; only the output is inferred.
+      first: Procedure.error(PostNotFound).query(() => {
+        const post = posts[0];
+        return post === undefined ? Effect.fail(new PostNotFound({ id: 0 })) : Effect.succeed(post);
+      }),
+      // Explicit chains are left alone.
+      title: Procedure.output(Schema.String).query(() => Effect.succeed('Posts')),
+      // `Unauthorized` comes from the middleware: not repeated in the inferred error.
+      secret: Procedure.middleware(Auth).query((_payload, { headers }) =>
+        headers['x-token'] === 'let-me-in'
+          ? Effect.succeed('s3cret')
+          : Effect.fail(new Unauthorized()),
+      ),
     },
   }),
 }) {}

@@ -113,6 +113,36 @@ an error naming the service if forced with a cast. `Router.from(AppRouter).middl
 allowed, but it returns a new plain router, not the service: serve it with
 `Handlers.fromProcedures(router)` and give clients that same router.
 
+## Inferred schemas (experimental)
+
+Leave out `.output(...)` and `.error(...)` and the types come from the handler. Without
+`.output` the handler may return anything; without `.error` it may also fail with anything:
+
+<<< @/snippets/concepts/router-service-inferred.ts#written [router.ts]
+
+Types alone don't put a `Post` on the wire: the server needs a schema to encode it and the client
+one to decode it. A schema generator reads each handler's inferred `Effect<A, E>` with the
+TypeScript 7 checker and writes a copy of the router with the schemas filled in as
+`.inferred({ output, error })`:
+
+<<< @/snippets/concepts/router-service-inferred.ts#generated [router.gen.ts]
+
+- Schema classes (`Post`, `PostNotFound`) are imported from where they are declared, so
+  transformations, getters and `instanceof` work on the client. Plain object types become a
+  `Schema.Struct`. A plain class or a function as output stops the generator with its location.
+- Only `Schema.TaggedError`-style classes become typed errors. Anything else (a
+  `Data.TaggedError`, a raw `Error`) arrives as `RpcDefect`, and the generated client types say
+  so: `create` fails with `Forbidden`, not `DbError`.
+- `.inferred` is the generator's step. It checks the output and lets undeclared failures
+  through. By hand, write `.output` / `.error`.
+- Serve and import the generated module, both on the server and in clients. A router used
+  without the generated schemas dies with a defect that names the fix when a handler returns a
+  value, and every failure reaches the client as a defect.
+
+The generator is a prototype in
+[`packages/e2e/spike/infer-schemas`](https://github.com/rajzik/effect-rpc-experiment/tree/main/packages/e2e/spike/infer-schemas);
+a CLI and bundler plugin are not published yet.
+
 ## React, Next.js and TanStack Start
 
 Adapter functions take the class directly: `createClient(AppRouter, …)`,

@@ -43,7 +43,7 @@ with `httpLink`), for React Query (`@effect-trpc/tanstack-react-query`) or for t
 | Import path         | Exports                                                                                                                                                                                                                                                                                                                                      | Source                                   |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `@effect-trpc/core` | `query`, `mutation`, `subscription`, `isProcedureDef`, `ProcedureDef`, `PayloadInput`, `NormalizePayload`, `inferInput` / `inferOutput` / `inferError` / `inferKind`                                                                                                                                                                         | `src/Procedure.ts`                       |
-| `@effect-trpc/core` | `Procedure` (`input`, `output`, `error`, `middleware`, `query`, `mutation`, `subscription`, `hasHandler`; types `Procedure.HandlerContext`, `Procedure.HandlerRequirements`, `Procedure.Builder`), `ProcedureWithHandler`                                                                                                                    | `src/ProcedureBuilder.ts`                |
+| `@effect-trpc/core` | `Procedure` (`input`, `output`, `error`, `inferred`, `middleware`, `query`, `mutation`, `subscription`, `hasHandler`; types `Procedure.HandlerContext`, `Procedure.HandlerRequirements`, `Procedure.Builder`, `Procedure.Infer`, `Procedure.InferredSuccess`), `ProcedureWithHandler`                                                        | `src/ProcedureBuilder.ts`                |
 | `@effect-trpc/core` | `Router` (`make`, `merge`, `from`, `fromService`, `serviceValue`, `getByPath`, `getRpc`, `isPath`, `childPath`, `isRouter`, `isService`; types `Router.Input`, `Router.Of`, `Router.Shape`, `Router.ServiceShape`), `RouterService` (`RouterService.Any`), `ProcedureInfo`, `inferRouterInputs` / `inferRouterOutputs` / `inferRouterErrors` | `src/Router.ts`                          |
 | `@effect-trpc/core` | `ProcedureKind` (annotation key + `"query" \| "mutation" \| "subscription"` type)                                                                                                                                                                                                                                                            | `src/ProcedureKind.ts`                   |
 | `@effect-trpc/core` | `ClientError`, `ClientInfrastructureError`, `RpcDefect`, `RpcTransportError`, `RpcInterrupted`, `causeToClientError`, `exitToClientError`, guards                                                                                                                                                                                            | `src/ClientError.ts`                     |
@@ -101,7 +101,8 @@ console.log(await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(H
 - Definitions and routers are frozen; `.middleware(M)` returns a new value; router-level middleware is added after a procedure's own middleware.
 - `subscription` requires `success` (the element schema); it compiles to a stream rpc whose rpc-level error is `Schema.Never`.
 - A `Procedure` builder procedure is a `ProcedureDef` with a `handler`: it compiles to the same rpc (tag, schemas, `ProcedureKind`) as the equivalent `query` / `mutation` / `subscription`, and `inferInput` / `inferOutput` / `inferError` are the same. Builder defaults match `query()`: `Schema.Void` / `Schema.Void` / `Schema.Never`.
-- A builder handler may fail only with the declared `error` plus the errors of middleware added **before** the terminal; its requirements are `Procedure.HandlerRequirements<typeof proc>` (as written, including middleware-provided services).
+- With `.output(...)`, a builder handler may fail only with the declared `error` plus the errors of middleware added **before** the terminal; its requirements are `Procedure.HandlerRequirements<typeof proc>` (as written, including middleware-provided services).
+- Without `.output(...)` a builder is in **inference mode**: `inferOutput` is the handler's success type (the success schema type is `Schema.declare<A>`, or `Schema.Void` for `void`), and the handler may fail with anything unless `.error(...)` was set. The runtime output schema stays `Schema.Void`: a handler value other than `undefined` dies with a defect naming the fix, until the schema generator writes `.inferred({ output, error })` into a generated copy of the router. `.inferred` sets the schemas, keeps the output checked and lets undeclared failures through (they reach the client as `RpcDefect`); it is the generator's step, not for hand-written code.
 - `.middleware(M)` on a builder procedure and `router.middleware(M)` keep the handler (value and type); `query({...})` definitions have no `handler` key (`Procedure.hasHandler` is `false`).
 - A router service's `make` is an `Effect` **value** of type `Effect<Record, never, never>`: a `make` that needs services or may fail does not satisfy `RouterService.Any` (compile error at `Router.from`, `Router.fromService`, `Router.make` and every API taking `Router.Input`). An asynchronous `make`, or one that fails or reads a service despite its type, throws `Cannot build a router from the router service "<key>": make must not require services or be asynchronous, and must not fail …`.
 - `Router.fromService` is memoized per class: `make` runs once per process, and `Router.from`, `Router.fromService` and `Router.make({ x: Svc })` all return the same router for `Svc`. `Router.serviceValue(Svc)` is the record that same evaluation produced (nested services kept as classes), i.e. `Context.Service.Shape<typeof Svc>`.
@@ -293,6 +294,30 @@ const handler = blogRouter.record.post.byId.handler;
   `make must succeed with a record of procedures, not a router` error if forced). For a group,
   nest the router in the record: `admin: Router.make({...}).middleware(Auth)`.
 - `Procedure.hasHandler(u)` tells builder procedures from `query({...})` definitions.
+
+#### Inference mode (no `.output`)
+
+Leave out `.output(...)` and the output type comes from the handler; without `.error(...)` the
+handler may fail with anything:
+
+```ts
+const inferredRouter = Router.make({
+  byId: Procedure.input({ id: Schema.Finite }).query(({ id }) =>
+    id === 1
+      ? Effect.succeed(new Post({ id, title: 'Hello', createdAt: new Date(0) }))
+      : Effect.fail(new PostNotFound({ id })),
+  ),
+});
+
+type ById = inferOutput<typeof inferredRouter.record.byId>; // Post
+```
+
+The types are only half of it: the schemas that send a `Post` (and decode `PostNotFound` on the
+client) come from the schema generator, which reads the handler types with the TypeScript 7
+checker and writes a copy of the router with `.inferred({ output: Post, error: PostNotFound })`
+before each terminal (prototype: `packages/e2e/spike/infer-schemas`). Serve and import the
+generated copy. Without it, a handler value other than `undefined` dies with a defect that names
+the fix, and every failure arrives as `RpcDefect`.
 
 ### Routers as services
 

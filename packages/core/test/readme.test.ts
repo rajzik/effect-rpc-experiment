@@ -165,6 +165,30 @@ describe('README example', () => {
     ]);
   });
 
+  it('inference mode: the output type comes from the handler; values need the generated schemas', async () => {
+    const inferredRouter = Router.make({
+      byId: Procedure.input({ id: Schema.Finite }).query(({ id }) =>
+        id === 1
+          ? Effect.succeed(new Post({ id, title: 'Hello', createdAt: new Date(0) }))
+          : Effect.fail(new PostNotFound({ id })),
+      ),
+    });
+    expectTypeOf<inferOutput<typeof inferredRouter.record.byId>>().toEqualTypeOf<Post>();
+    const { byId: inferredById } = inferredRouter.record;
+    const exit = await Effect.runPromiseExit(
+      inferredById.handler(
+        { id: 1 },
+        {
+          client: new Rpc.ServerClient(0),
+          requestId: RpcMessage.RequestId(1),
+          headers: Headers.empty,
+          rpc: Router.getRpc(inferredRouter, 'byId'),
+        },
+      ),
+    );
+    expect(Exit.isFailure(exit) && String(exit.cause)).toMatch(/no output schema/);
+  });
+
   it('classifies client errors', async () => {
     const program = Effect.gen(function* () {
       const client = yield* RpcTest.makeClient(appRouter.group);

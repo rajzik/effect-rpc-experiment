@@ -6,12 +6,14 @@ encodes class instances, Dates and typed errors?
 
 **Answer: yes for the runtime.** TypeScript 7's checker API (`typescript/unstable/sync`, already a
 dependency via `typescript@7.0.2`) gives every handler's `A` and `E`, including `Effect.fn`
-generators, and the generator traces them back to schema declarations.
+generators, and the generator traces them back to schema declarations. The builder side is
+built in `@effect-trpc/core`: inference mode (no `.output`) and the `.inferred({ output, error })`
+step the generator writes (see `Procedure` in `packages/core/src/ProcedureBuilder.ts`).
 
 ```sh
 node packages/e2e/spike/infer-schemas/generate.mjs packages/e2e/spike/infer-schemas/tsconfig.json \
   packages/e2e/spike/infer-schemas/router.ts      # writes router.gen.ts (~65-130 ms incl. startup)
-pnpm exec vp test --root packages/e2e/spike/infer-schemas   # 6 tests against router.gen.ts
+pnpm exec vp test --root packages/e2e/spike/infer-schemas   # 9 tests against router.gen.ts
 ```
 
 | File              | Role                                                                           |
@@ -19,7 +21,7 @@ pnpm exec vp test --root packages/e2e/spike/infer-schemas   # 6 tests against ro
 | `models.ts`       | ordinary schemas (`Schema.Class`, `Schema.TaggedError`) + a `Data.TaggedError` |
 | `router.ts`       | router service with **no** `.output` / `.error`                                |
 | `generate.mjs`    | the generator (checker API → schema expressions → injected source)             |
-| `router.gen.ts`   | generated output: the same router with `.output(...)` / `.error(...)`          |
+| `router.gen.ts`   | generated output: the same router with `.inferred({ output, error })`          |
 | `runtime.test.ts` | served over HTTP, called with `createClient`                                   |
 
 ## What was proven
@@ -29,26 +31,24 @@ pnpm exec vp test --root packages/e2e/spike/infer-schemas   # 6 tests against ro
   `ast`.
 - Anonymous shapes map structurally: `{ items: Post[]; nextCursor: number | null }` →
   `Schema.Struct({ items: Schema.Array(Post), nextCursor: Schema.NullOr(Schema.Number) })`; also
-  literals, `Date`, `T | undefined`, tuples, optional properties, `boolean`.
-- Errors: Schema-class members of `E` become `.error(...)` (`DbError | Forbidden` → `Forbidden`);
-  the rest (`DbError`, a `Data.TaggedError`) is not declared and arrives as `RpcDefect`.
-- Unmappable outputs fail with the location: a plain class ("instances would arrive as plain
-  objects") or a function. An explicit `.output(...)` / `.error(...)` is never touched.
-- Control: the same test against the source `router.ts` fails 6/6.
+  literals, `Date`, `T | undefined`, tuples, optional properties, `boolean`. TS `number` maps to
+  `Schema.Number`, which round-trips `NaN` / `Infinity` through JSON.
+- Handlers returning a union of effects (`cond ? Effect.fail(a) : Effect.succeed(b)`) are read
+  member by member.
+- Errors: Schema-class members of `E` become `error` (`DbError | Forbidden` → `Forbidden`); the
+  rest (`DbError`, a `Data.TaggedError`) is not declared and arrives as `RpcDefect`. Errors the
+  chain's middleware declares are not repeated. A user `.error(...)` is kept and stays checked.
+- Explicit chains (`.output(...)`) are left alone. Unmappable outputs fail with the location: a
+  plain class ("instances would arrive as plain objects") or a function.
+- Types: `router.ts` and `router.gen.ts` both type-check; the client types of the generated
+  router are exact (`create` fails with `ClientError<Forbidden>`, not `DbError`), asserted in
+  `runtime.test.ts` and checked by `pnpm check`.
+- Control: the same runtime test against the source `router.ts` fails.
 
-## What is not solved yet
+## Not done yet
 
-1. **Types without `.output`.** The builder today requires the handler to return
-   `Success['Type']` (default `void`), so `router.ts` does not type-check (it is lint-ignored).
-   The builder needs an inference mode: no `.output` → accept any `Effect<A, E, R>`.
-2. **Client types must match the runtime.** Instance types of `Schema.TaggedError` and
-   `Data.TaggedError` are indistinguishable at the type level, so inferring the client error type
-   from `E` would type `DbError` as a typed error while it arrives as a defect. Fix: the client
-   takes its types from the **generated** module (explicit schemas), so they are exact.
-3. **Undeclared failures in the generated file.** `router.gen.ts` declares `.error(Forbidden)`
-   while the handler may fail with `DbError`; this runs (defect) but does not type-check, so the
-   gen file is lint-ignored. The inference-mode builder must allow undeclared failures.
-4. Middleware errors are re-declared if the handler propagates them (harmless duplicates in the
-   union); not filtered yet.
-5. Recursive types, generics, `Record<string, T>`, `Map`/`Set`, `bigint` JSON are not mapped.
-6. Plugin / watch mode, handler stripping for client bundles and Turbopack: not attempted.
+1. A published CLI (`effect-trpc generate`) and a bundler plugin (watch mode, stripping
+   handlers from client bundles). Turbopack does not run unplugin plugins.
+2. Recursive types, generics, `Record<string, T>`, `Map` / `Set`, `bigint` are not mapped.
+3. The generated file is a full copy of the router module: import only the generated one, or
+   module state (like `posts` here) exists twice.

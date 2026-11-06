@@ -6,7 +6,7 @@ import * as __m0 from './models.ts';
 import { Context, Effect, Schema, Stream } from 'effect';
 import { Procedure } from '@effect-trpc/core';
 
-import { DbError, Forbidden, Post, PostNotFound } from './models.ts';
+import { Auth, DbError, Forbidden, Post, PostNotFound, Unauthorized } from './models.ts';
 
 const posts = [
   new Post({ id: 1, title: 'Hello Effect', createdAt: new Date('2026-01-01') }),
@@ -15,29 +15,42 @@ const posts = [
 
 export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
   make: Effect.succeed({
-    health: Procedure.output(__Schema.Literal("ok")).query(() => Effect.succeed('ok' as const)),
+    health: Procedure.inferred({ output: __Schema.Literal("ok") }).query(() => Effect.succeed('ok' as const)),
     post: {
-      byId: Procedure.input({ id: Schema.Finite }).output(__m0.Post).error(__m0.PostNotFound).query(
+      byId: Procedure.input({ id: Schema.Finite }).inferred({ output: __m0.Post, error: __m0.PostNotFound }).query(
         Effect.fn(function* ({ id }) {
           const post = posts.find((p) => p.id === id);
           if (post === undefined) return yield* new PostNotFound({ id });
           return post;
         }),
       ),
-      list: Procedure.output(__Schema.Struct({ items: __Schema.Array(__m0.Post), nextCursor: __Schema.NullOr(__Schema.Number) })).query(() =>
+      list: Procedure.inferred({ output: __Schema.Struct({ items: __Schema.Array(__m0.Post), nextCursor: __Schema.NullOr(__Schema.Number) }) }).query(() =>
         Effect.succeed({ items: posts, nextCursor: posts.length > 1 ? 2 : null }),
       ),
-      stats: Procedure.output(__Schema.Struct({ count: __Schema.Number, latest: __Schema.UndefinedOr(__Schema.Date), tags: __Schema.Array(__Schema.String) })).query(() =>
+      stats: Procedure.inferred({ output: __Schema.Struct({ count: __Schema.Number, latest: __Schema.UndefinedOr(__Schema.Date), tags: __Schema.Array(__Schema.String) }) }).query(() =>
         Effect.succeed({ count: posts.length, latest: posts[0]?.createdAt, tags: ['a', 'b'] }),
       ),
-      create: Procedure.input({ title: Schema.String }).output(__m0.Post).error(__m0.Forbidden).mutation(
+      create: Procedure.input({ title: Schema.String }).inferred({ output: __m0.Post, error: __m0.Forbidden }).mutation(
         Effect.fn(function* ({ title }) {
           if (title === '') return yield* new Forbidden({ reason: 'empty title' });
           if (title === 'db') return yield* new DbError({ query: 'insert' });
           return new Post({ id: posts.length + 1, title, createdAt: new Date() });
         }),
       ),
-      onCreated: Procedure.output(__m0.Post).subscription(() => Stream.fromIterable(posts)),
+      onCreated: Procedure.inferred({ output: __m0.Post }).subscription(() => Stream.fromIterable(posts)),
+      // A user-declared `.error` stays checked; only the output is inferred.
+      first: Procedure.error(PostNotFound).inferred({ output: __m0.Post }).query(() => {
+        const post = posts[0];
+        return post === undefined ? Effect.fail(new PostNotFound({ id: 0 })) : Effect.succeed(post);
+      }),
+      // Explicit chains are left alone.
+      title: Procedure.output(Schema.String).query(() => Effect.succeed('Posts')),
+      // `Unauthorized` comes from the middleware: not repeated in the inferred error.
+      secret: Procedure.middleware(Auth).inferred({ output: __Schema.String }).query((_payload, { headers }) =>
+        headers['x-token'] === 'let-me-in'
+          ? Effect.succeed('s3cret')
+          : Effect.fail(new Unauthorized()),
+      ),
     },
   }),
 }) {}

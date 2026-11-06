@@ -1,19 +1,23 @@
-// Spike: infer `.output(...)` / `.error(...)` for Procedure builder chains from each handler's
-// inferred `Effect<A, E>` / `Stream<A, E>`, using the TypeScript 7 checker API
-// (`typescript/unstable/sync`), and write `<file>.gen.ts` with the schemas injected.
+// Spike: infer the schemas of Procedure builder chains from each handler's inferred
+// `Effect<A, E>` / `Stream<A, E>`, using the TypeScript 7 checker API
+// (`typescript/unstable/sync`), and write `<file>.gen.ts` with them injected as
+// `.inferred({ output, error })` right before the terminal.
 //
 // Usage: node generate.mjs <tsconfig.json> <router.ts> [<router.ts>...]
 //
-// Rules (the spike's contract):
-// - A chain that already has `.output` (or `.error`) keeps it; only missing steps are injected.
+// Rules:
+// - Only inferring chains are touched: a chain with `.output(...)` (or `.inferred(...)`) is
+//   explicit and kept as written.
 // - Output types map structurally: primitives, literals, `Date`, arrays, tuples, plain object
 //   types, unions, and Schema classes (`Schema.Class`, `Schema.TaggedClass`, ...), which are
-//   imported from their declaring module instead of re-synthesised.
-// - Error members that are Schema classes become `.error(...)`; everything else (e.g. a
-//   `Data.TaggedError`) is left out and so stays a defect on the client.
+//   imported from their declaring module instead of re-synthesised. A `void` output needs no
+//   schema.
+// - Without a user `.error(...)`, the Schema-class members of `E` become `error`; everything
+//   else (e.g. a `Data.TaggedError`) is left out and so stays a defect on the client. Errors
+//   declared by the chain's middleware are not repeated.
 // - An output type that cannot be mapped (a plain class, a function, `any`) fails the run with
 //   the procedure's location, asking for an explicit `.output(...)`.
-import { API, SymbolFlags, TypeFlags } from 'typescript/unstable/sync';
+import { API, ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync';
 import { SyntaxKind } from 'typescript/unstable/ast';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -59,6 +63,39 @@ const chainSteps = (call) => {
   return steps;
 };
 
+/** Symbol ids of the error classes declared by the `.middleware(M)` steps of a chain. */
+const middlewareErrorSymbols = (call) => {
+  const ids = new Set();
+  let node = call.expression.expression;
+  while (
+    node.kind === SyntaxKind.CallExpression &&
+    node.expression.kind === SyntaxKind.PropertyAccessExpression
+  ) {
+    if (node.expression.name.text === 'middleware' && node.arguments.length === 1) {
+      const middleware = checker.getTypeAtLocation(node.arguments[0]);
+      const errorProp = middleware && checker.getPropertyOfType(middleware, 'error');
+      const errorSchema = errorProp && checker.getTypeOfSymbol(errorProp);
+      const typeProp = errorSchema && checker.getPropertyOfType(errorSchema, 'Type');
+      const errorType = typeProp && checker.getTypeOfSymbol(typeProp);
+      if (errorType !== undefined) {
+        const members = errorType.flags & TypeFlags.Union ? errorType.getTypes() : [errorType];
+        for (const member of members) {
+          const symbol = member.getSymbol();
+          if (symbol !== undefined) ids.add(symbol.id);
+        }
+      }
+    }
+    node = node.expression.expression;
+  }
+  return ids;
+};
+
+const isBool = (type) => /^(true|false)$/.test(checker.typeToString(type));
+
+/** `Effect<A, E, R>` / `Stream<A, E, R>` are type references: their arguments can be read. */
+const isReference = (type) =>
+  (type.flags & TypeFlags.Object) !== 0 && (type.objectFlags & ObjectFlags.Reference) !== 0;
+
 const generate = (file) => {
   const text = readFileSync(file, 'utf8');
   const sourceFile = program.getSourceFile(file);
@@ -82,6 +119,26 @@ const generate = (file) => {
     return `${imports.get(specifier)}.${symbol.name}`;
   };
 
+  /** Members of a union -> schema (`boolean` collapsed, `null` / `undefined` as `NullOr` / `UndefinedOr`). */
+  const unionSchema = (members, seen = new Set()) => {
+    const flat = members.flatMap((m) => (m.flags & TypeFlags.Union ? m.getTypes() : [m]));
+    const unique = [...new Map(flat.map((m) => [m.id, m])).values()].filter(
+      (m) => (m.flags & TypeFlags.Never) === 0,
+    );
+    if (unique.length === 0) return `${S}.Never`;
+    const hasBoolean =
+      unique.some((m) => checker.typeToString(m) === 'true') &&
+      unique.some((m) => checker.typeToString(m) === 'false');
+    const parts = unique.filter((m) => !(hasBoolean && isBool(m))).map((m) => toSchema(m, seen));
+    if (hasBoolean) parts.push(`${S}.Boolean`);
+    const distinct = [...new Set(parts)];
+    const nonNullish = distinct.filter((p) => p !== `${S}.Null` && p !== `${S}.Undefined`);
+    let inner = nonNullish.length === 1 ? nonNullish[0] : `${S}.Union([${nonNullish.join(', ')}])`;
+    if (distinct.includes(`${S}.Null`)) inner = `${S}.NullOr(${inner})`;
+    if (distinct.includes(`${S}.Undefined`)) inner = `${S}.UndefinedOr(${inner})`;
+    return inner;
+  };
+
   /** Type -> schema expression, or throws `Unmappable`. */
   const toSchema = (type, seen = new Set()) => {
     const f = type.flags;
@@ -95,23 +152,7 @@ const generate = (file) => {
     if (f & TypeFlags.BigInt) return `${S}.BigInt`;
     if (f & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BooleanLiteral))
       return `${S}.Literal(${checker.typeToString(type)})`;
-    if (f & TypeFlags.Union) {
-      const members = type.getTypes();
-      // `boolean` is `true | false`: collapse it back.
-      const hasTrue = members.some((m) => checker.typeToString(m) === 'true');
-      const hasFalse = members.some((m) => checker.typeToString(m) === 'false');
-      const rest = members.filter(
-        (m) => !(hasTrue && hasFalse && /^(true|false)$/.test(checker.typeToString(m))),
-      );
-      const parts = rest.map((m) => toSchema(m, seen));
-      if (hasTrue && hasFalse) parts.push(`${S}.Boolean`);
-      const nonNullish = parts.filter((p) => p !== `${S}.Null` && p !== `${S}.Undefined`);
-      let inner =
-        nonNullish.length === 1 ? nonNullish[0] : `${S}.Union([${nonNullish.join(', ')}])`;
-      if (parts.includes(`${S}.Null`)) inner = `${S}.NullOr(${inner})`;
-      if (parts.includes(`${S}.Undefined`)) inner = `${S}.UndefinedOr(${inner})`;
-      return inner;
-    }
+    if (f & TypeFlags.Union) return unionSchema(type.getTypes(), seen);
     if (f & TypeFlags.Object) {
       const symbol = type.getSymbol();
       if (symbol !== undefined && isSchemaClass(symbol)) return importAlias(symbol);
@@ -165,16 +206,31 @@ const generate = (file) => {
         const handlerType = checker.getTypeAtLocation(node.arguments[0]);
         const signature = checker.getSignaturesOfType(handlerType, 0)[0];
         const returned = signature && checker.getReturnTypeOfSignature(signature);
-        const [success, failure] = returned ? checker.getTypeArguments(returned) : [];
-        if (success === undefined || failure === undefined) {
+        // `Effect<A, E, R>` / `Stream<A, E, R>`, or a union of them (`cond ? fail : succeed`).
+        const results =
+          returned === undefined
+            ? []
+            : returned.flags & TypeFlags.Union
+              ? returned.getTypes()
+              : [returned];
+        const args = results.every(isReference)
+          ? results.map((t) => checker.getTypeArguments(t))
+          : [];
+        const successes = args.map((a) => a[0]).filter((t) => t !== undefined);
+        const failureTypes = args.map((a) => a[1]).filter((t) => t !== undefined);
+        if (steps.includes('output') || steps.includes('inferred')) {
+          // explicit chain: nothing to infer
+        } else if (args.length === 0 || successes.length !== args.length) {
           failures.push(`${where}: cannot read the handler's Effect/Stream type`);
         } else {
-          let injected = '';
+          const parts = [];
           const summary = { where, kind: node.expression.name.text };
-          if (!steps.includes('output')) {
+          const voidLike = TypeFlags.Void | TypeFlags.Undefined | TypeFlags.Never;
+          const valued = successes.filter((t) => (t.flags & voidLike) === 0);
+          if (valued.length > 0) {
             try {
-              const schema = toSchema(success);
-              injected += `.output(${schema})`;
+              const schema = unionSchema(valued);
+              parts.push(`output: ${schema}`);
               summary.output = schema;
             } catch (error) {
               if (!(error instanceof Unmappable)) throw error;
@@ -182,22 +238,31 @@ const generate = (file) => {
             }
           }
           if (!steps.includes('error')) {
-            const members = failure.flags & TypeFlags.Union ? failure.getTypes() : [failure];
+            const fromMiddleware = middlewareErrorSymbols(node);
+            const members = [
+              ...new Map(
+                failureTypes
+                  .flatMap((t) => (t.flags & TypeFlags.Union ? t.getTypes() : [t]))
+                  .map((t) => [t.id, t]),
+              ).values(),
+            ];
             const typed = [];
             const defects = [];
             for (const member of members) {
               if (member.flags & TypeFlags.Never) continue;
               const symbol = member.getSymbol();
+              if (symbol !== undefined && fromMiddleware.has(symbol.id)) continue;
               if (symbol !== undefined && isSchemaClass(symbol)) typed.push(importAlias(symbol));
               else defects.push(checker.typeToString(member));
             }
             if (typed.length > 0) {
               const schema = typed.length === 1 ? typed[0] : `${S}.Union([${typed.join(', ')}])`;
-              injected += `.error(${schema})`;
+              parts.push(`error: ${schema}`);
               summary.error = schema;
             }
             if (defects.length > 0) summary.defects = defects;
           }
+          const injected = parts.length === 0 ? '' : `.inferred({ ${parts.join(', ')} })`;
           // Insert right after the receiver, i.e. before `.query(` / `.mutation(` / `.subscription(`.
           if (injected !== '') edits.push({ at: node.expression.expression.end, text: injected });
           report.push(summary);
