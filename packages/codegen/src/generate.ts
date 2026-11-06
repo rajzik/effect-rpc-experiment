@@ -16,7 +16,13 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { API, ObjectFlags, SymbolFlags, TypeFlags } from 'typescript/unstable/sync';
+import {
+  API,
+  NodeBuilderFlags,
+  ObjectFlags,
+  SymbolFlags,
+  TypeFlags,
+} from 'typescript/unstable/sync';
 import type {
   Checker,
   Program,
@@ -410,6 +416,27 @@ const newModule = (ctx: Ctx, routerFile: SourceFile, side: 'server' | 'client'):
   typeAliases: new Map(),
 });
 
+/**
+ * The package import of a symbol declared in another package (a workspace package or a
+ * `node_modules` dependency), as the checker would write it in the router module: it follows
+ * symlinks back to the package name, `exports` subpaths, barrels and tsconfig `paths`, exactly
+ * like declaration emit. `undefined` when the checker names it relatively (same package) or not
+ * at all.
+ */
+const packageImportOf = (
+  gen: ModuleGen,
+  symbol: TsSymbol,
+): { readonly spec: string; readonly imported: string } | undefined => {
+  const type = gen.ctx.checker.getDeclaredTypeOfSymbol(symbol);
+  const text = gen.ctx.checker.typeToString(type, gen.routerFile, NodeBuilderFlags.NoTruncation);
+  const match = /^import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)(?:<.*)?$/s.exec(text);
+  const spec = match?.[1];
+  const imported = match?.[2];
+  if (spec === undefined || imported === undefined) return undefined;
+  if (spec.startsWith('.') || path.isAbsolute(spec)) return undefined;
+  return { spec, imported };
+};
+
 /** A reference to a declared symbol (a schema class, or a named type) from the generated module. */
 const importSymbol = (gen: ModuleGen, symbol: TsSymbol, typeOnly: boolean): string => {
   const cached = (typeOnly ? gen.typeAliases : gen.aliases).get(symbol.id);
@@ -430,9 +457,15 @@ const importSymbol = (gen: ModuleGen, symbol: TsSymbol, typeOnly: boolean): stri
     const declFile = decl === undefined ? undefined : gen.ctx.program.getSourceFile(decl.path);
     if (declFile === undefined)
       throw new Unmappable(`cannot locate the declaration of ${symbol.name}`);
+    const fromPackage = packageImportOf(gen, symbol);
+    if (fromPackage !== undefined) {
+      gen.imports.add(fromPackage.spec, fromPackage.imported, local, typeOnly);
+      (typeOnly ? gen.typeAliases : gen.aliases).set(symbol.id, local);
+      return local;
+    }
     if (declFile.fileName.includes(`${path.sep}node_modules${path.sep}`))
       throw new Unmappable(
-        `import ${symbol.name} in the router module so the generator can reuse that import`,
+        `${symbol.name} is not exported by its package (no import path reaches it): import it in the router module`,
       );
     if (gen.side === 'client' && declFile.fileName === gen.routerFile.fileName)
       throw new Unmappable(

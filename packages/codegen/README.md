@@ -153,6 +153,9 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
   date: run effect-trpc-codegen`) when the client contract no longer matches the server router.
 - Errors declared by a procedure's middleware (or a nested router's `.middleware(...)`) are not
   repeated in the inferred error.
+- Schema classes from other packages are imported by package name (the router's own import,
+  else the checker's package path: workspace symlinks, `exports` subpaths, barrels, `paths`),
+  never by a relative path into another package or `node_modules`.
 - Output is deterministic: a second run with no source change reports every file unchanged.
 
 **Common mistakes**
@@ -164,6 +167,8 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
   its name (`declare it as an exported interface or type`).
 - Building router records dynamically (spreads, function calls): the generator reads the router
   statically and reports `cannot read this router entry statically`.
+- A schema class its package does not export from any import path (an internal module of a
+  dependency): reported as `is not exported by its package`; export it or import it in the router.
 - Registering the unplugin with Turbopack: Turbopack ignores plugins; use the `/loader` in
   `turbopack.rules` instead.
 
@@ -173,6 +178,22 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
 pnpm exec vp -C packages/codegen test   # generator, CLI, plugin, runtime round trip, types
 node scripts/verify-jsdoc.mjs codegen   # after `pnpm exec vp -C packages/codegen pack`
 ```
+
+## Schemas from other packages
+
+Schema classes can live in a workspace package or a published dependency, and the router does not
+have to import them (a handler can return what a function from another package returns). The
+generated modules import each class the way TypeScript's declaration emit would from the router
+module:
+
+- the router's own import of it, when there is one (copied as written);
+- otherwise its package import path, as the checker resolves it: a pnpm / npm / yarn workspace
+  symlink back to the package name, an `exports` subpath (`@acme/models/errors`), a barrel
+  re-export, tsconfig `paths`, or a published package's `.d.ts`;
+- otherwise (the same package) a relative import of the declaring module.
+
+A class its package does not export from any import path is reported
+(`… is not exported by its package`): export it, or import it in the router module.
 
 ## Limits
 

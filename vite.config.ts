@@ -33,6 +33,9 @@ export default defineConfig({
       // TS `number`. `test/generate.test.ts` type-checks them (contract check included).
       'packages/codegen/test/fixtures/**/*.gen.ts',
       'packages/codegen/test/.tmp/**',
+      // Its packages are linked into node_modules by `test/monorepo.test.ts`, so it only
+      // type-checks there.
+      'packages/codegen/test/fixtures/mono/app/**',
       // Written by `next build` / `next dev` (and rewritten with its own formatting).
       'examples/next/next-env.d.ts',
     ],

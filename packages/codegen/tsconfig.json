@@ -6,6 +6,6 @@
     "tsBuildInfoFile": "./dist-types/.tsbuildinfo"
   },
   "include": ["src/**/*", "test/**/*.ts"],
-  "exclude": ["test/fixtures/bad/**", "test/.tmp/**"],
+  "exclude": ["test/fixtures/bad/**", "test/fixtures/mono/**", "test/.tmp/**"],
   "references": [{ "path": "../core" }, { "path": "../server" }, { "path": "../client" }]
 }

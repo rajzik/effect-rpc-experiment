@@ -95,7 +95,7 @@ Commit both (and run `--check` in CI), or ignore `*.gen.ts` and generate them be
 | `Record<string, T>`                           | `Schema.Record(Schema.String, T)`                                    |
 | object types and interfaces                   | `Schema.Struct`                                                      |
 | recursive named types                         | a `Schema.suspend` declaration                                       |
-| `Schema.Class` / `Schema.TaggedError` classes | imported from their module                                           |
+| `Schema.Class` / `Schema.TaggedError` classes | imported from their module, or their package (monorepo, dependency)  |
 
 Failures that are Schema classes become the error schema. Anything else (a `Data.TaggedError`, a
 raw `Error`) reaches the client as `RpcDefect`, and the generated client types leave it out.
@@ -106,6 +106,9 @@ Errors that a procedure's middleware declares are not repeated.
 - Keep schemas, errors and middleware tags in a module the client can import, not in the router
   module: the client module would have to import the router module to reach them, and the
   generator stops with `move it to a module the client can import`.
+- Schema classes from another package (a workspace package or a dependency) are imported by
+  package name, through its `exports` and barrels, even when the router never imports them. A
+  class its package does not export is reported: export it, or import it in the router module.
 - A plain class, a function, `any` or a type parameter has no schema. The generator reports the
   procedure's location: add `.output(schema)` there.
 - The router is read statically: an exported router service class (`make: Effect.succeed({...})`)
