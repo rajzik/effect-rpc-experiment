@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Schema, Stream } from 'effect';
+import type { Scope } from 'effect';
 import type { HttpRouter, HttpServerError } from 'effect/http';
 import type { Rpc } from 'effect/rpc';
 import { Procedure, query, Router, subscription } from '@effect-trpc/core';
@@ -72,6 +73,31 @@ describe('Handlers.fromService types', () => {
     expectTypeOf(Handlers.fromService(Ticks)).toEqualTypeOf<
       Layer.Layer<Rpc.Handler<'ticks'> | Rpc.Handler<'scoped'> | Ticks, never, Clock>
     >();
+  });
+
+  it('excludes Scope from an Effect handler that adds a finalizer', () => {
+    // `Stream.unwrap` already strips `Scope`, so prove the exclusion on an Effect (query) handler.
+    class Scoped extends Context.Service<Scoped>()('Scoped', {
+      make: Effect.succeed({
+        scoped: Procedure.output(Schema.Finite).query(() =>
+          Effect.gen(function* () {
+            yield* Clock;
+            yield* Effect.addFinalizer(() => Effect.void);
+            return 1;
+          }),
+        ),
+      }),
+    }) {}
+    expectTypeOf(Router.from(Scoped).record.scoped.handler).returns.toEqualTypeOf<
+      Effect.Effect<number, never, Clock | Scope.Scope>
+    >();
+    expectTypeOf(Handlers.fromService(Scoped)).toEqualTypeOf<
+      Layer.Layer<Rpc.Handler<'scoped'> | Scoped, never, Clock>
+    >();
+    expectTypeOf(Handlers.fromProcedures(Router.from(Scoped))).toEqualTypeOf<
+      Layer.Layer<Rpc.Handler<'scoped'>, never, Clock>
+    >();
+    expectTypeOf<Handlers.ProcedureServices<Router.Of<typeof Scoped>>>().toEqualTypeOf<Clock>();
   });
 
   it('a service whose handlers need nothing has no requirements', () => {
