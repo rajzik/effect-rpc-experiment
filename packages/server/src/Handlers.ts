@@ -509,8 +509,8 @@ const fromProcedures = <R extends Router.Any>(
  * **Details**
  *
  * - `make` may read services and fail: the layer runs it (and every nested router service's
- *   `make`) with `Router.buildService` when it is built, once per layer build (not memoized), and
- *   the router (tags, schemas, handlers) comes from that run.
+ *   `make`) with `Router.buildService` when it is built, and the router (tags, schemas, handlers)
+ *   comes from that run.
  * - The layer's error is `RouterService.MakeError<Svc>` and its requirements are
  *   `RouterService.MakeServices<Svc>` (minus `Scope`) plus the handlers' requirements
  *   ({@link Handlers.ProcedureServices}, minus `Scope` and middleware-provided services such as
@@ -521,6 +521,9 @@ const fromProcedures = <R extends Router.Any>(
  *
  * **Gotchas**
  *
+ * - `make` runs once per layer build, unless the class was already built synchronously (a pure
+ *   service passed to a sync API such as `toWebHandler(AppRouter, ...)` or `Router.from`): then
+ *   that memoized router and record are reused and `make` does not run again.
  * - The synchronous APIs (`toWebHandler`, `createCaller`, `createClient`, ...) cannot run a `make`
  *   that reads services: give them the contract (a schema-only `Router.make` router, normally
  *   `router.client.gen.ts`) and serve the class with this layer. A `make` that needs nothing can

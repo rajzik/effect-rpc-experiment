@@ -146,4 +146,25 @@ describe('Router.buildService', () => {
       ...Router.fromService(PureRouter).procedures.keys(),
     ]);
   });
+
+  it('reuses a router service already built by Router.fromService', async () => {
+    let runs = 0;
+    class Memo extends Context.Service<Memo>()('MemoRouter', {
+      make: Effect.sync(() => {
+        runs++;
+        return { x: Procedure.output(Schema.Finite).query(() => Effect.succeed(1)) };
+      }),
+    }) {}
+    class Outer extends Context.Service<Outer>()('MemoOuterRouter', {
+      make: Effect.succeed({ a: Memo }),
+    }) {}
+    const router = Router.fromService(Memo);
+    const built = await Effect.runPromise(Router.buildService(Memo));
+    expect(built.router).toBe(router);
+    expect(built.value).toBe(Router.serviceValue(Memo));
+    // Nested resolution reuses it too.
+    const outer = await Effect.runPromise(Router.buildService(Outer));
+    expect(outer.router.record.a).toBe(router);
+    expect(runs).toBe(1);
+  });
 });

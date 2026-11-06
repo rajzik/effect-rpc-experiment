@@ -95,9 +95,11 @@ describe('Handlers.fromService with an effectful make', () => {
     expect(makeRuns.count - before).toBe(2);
     // Each build's router comes from its own make run, with its own services.
     const a = await callOverHttp(first);
+    if (!Exit.isSuccess(a)) throw new Error(`call failed: ${String(a.cause)}`);
     const b = await callOverHttp(second);
-    expect(Exit.isSuccess(a) && a.value.health).toBe('a');
-    expect(Exit.isSuccess(b) && b.value.health).toBe('b');
+    if (!Exit.isSuccess(b)) throw new Error(`call failed: ${String(b.cause)}`);
+    expect(a.value.health).toBe('a');
+    expect(b.value.health).toBe('b');
   });
 
   it('make failure fails the layer build with the typed error', async () => {
@@ -132,7 +134,10 @@ describe('Handlers.fromService with an effectful make', () => {
       a: { b: { x: query({ success: Schema.String }) } },
       c: { d: query({ success: Schema.String }) },
     });
-    expect([...mixContract.procedures.keys()]).toEqual(['a.b.x', 'c.d']);
+    const { router } = await Effect.runPromise(
+      Router.buildService(MixRouter).pipe(Effect.provideService(AppConfig, { prefix: 'v1' })),
+    );
+    expect([...router.procedures.keys()]).toEqual(['a.b.x', 'c.d']);
     await using caller = createCaller(mixContract, {
       handlers: Handlers.fromService(MixRouter).pipe(Layer.provide(AppConfigLive('v1'))),
     });

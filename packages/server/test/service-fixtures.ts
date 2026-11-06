@@ -36,7 +36,7 @@ export const DatabaseLive = Layer.succeed(Database)({
   titles: Stream.make('first', 'second'),
 });
 
-/** Counts evaluations of `AppRouter.make` (once per class by the sync APIs, once per layer build by `Handlers.fromService`). */
+/** Counts evaluations of `AppRouter.make` (memoized by the sync APIs; `Handlers.fromService` reuses it). */
 export const makeRuns = { count: 0 };
 
 export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {

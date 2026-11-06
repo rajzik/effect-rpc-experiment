@@ -698,9 +698,10 @@ const isPlainRecord = (u: unknown): u is Router.ServiceShape => {
 const isService = (u: unknown): u is RouterService.Any =>
   Context.isKey(u) && Predicate.hasProperty(u, 'make') && Effect.isEffect(u.make);
 
-const serviceRouters = new WeakMap<RouterService.Any, Router.Any>();
+// Keyed by `Effectful` so `buildIn` can look up any class; only pure services are ever stored.
+const serviceRouters = new WeakMap<RouterService.Effectful, Router.Any>();
 /** The record each service's `make` succeeded with, from the same (single) evaluation. */
-const serviceValues = new WeakMap<RouterService.Any, Router.ServiceShape>();
+const serviceValues = new WeakMap<RouterService.Effectful, Router.ServiceShape>();
 const resolving = new Set<RouterService.Any>();
 
 const serviceError = (svc: RouterService.Effectful, rule: string, cause?: unknown): Error =>
@@ -883,8 +884,9 @@ interface Built {
 }
 
 /**
- * One `buildService` run: `built` memoizes each class, `pending` detects cycles. The error and
- * services of the makes are erased here; `buildService`'s signature restores them.
+ * One `buildService` run: `built` memoizes each class, `pending` detects cycles. A class already
+ * built by `fromService` (a pure service) is reused. The error and services of the makes are
+ * erased here; `buildService`'s signature restores them.
  */
 const buildIn = (
   svc: RouterService.Effectful,
@@ -894,6 +896,11 @@ const buildIn = (
   Effect.suspend(() => {
     const done = built.get(svc);
     if (done !== undefined) return Effect.succeed(done);
+    const memoRouter = serviceRouters.get(svc);
+    const memoValue = serviceValues.get(svc);
+    if (memoRouter !== undefined && memoValue !== undefined) {
+      return Effect.succeed({ router: memoRouter, value: memoValue });
+    }
     if (pending.has(svc)) return Effect.die(cycleError(svc));
     pending.add(svc);
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion, effecttsgo/any-unknown-in-error-context -- erases make's error and services (see above); the success is validated by `checkRecord`
@@ -933,7 +940,8 @@ const buildIn = (
  *
  * **Gotchas**
  *
- * - Not memoized: every run runs every `make` again (unlike {@link fromService}).
+ * - Not memoized: every run runs every `make` again, except for a class {@link fromService} already
+ *   built (a pure service used by a synchronous API), whose memoized router and value are reused.
  * - A service that nests itself, a `make` that succeeds with a router or a non-record, and an
  *   invalid router key are defects (`Effect.die`), not typed failures.
  *
