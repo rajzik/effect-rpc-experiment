@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vite-plus/test';
 import { sidebar } from '../.vitepress/sidebar';
 
 const dist = join(import.meta.dirname, '..', '.vitepress', 'dist');
-const base = process.env['DOCS_BASE'] ?? '/effect-rpc-experiment/';
+const base = process.env['DOCS_BASE'] ?? '/';
 
 const htmlFiles = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>

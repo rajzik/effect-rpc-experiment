@@ -17,13 +17,17 @@ From `site/`: `pnpm docs:snippets` type-checks the samples, `pnpm docs:test` run
 
 ## Deploy
 
-| Target       | How                                                                                   | Base path                 |
-| ------------ | ------------------------------------------------------------------------------------- | ------------------------- |
-| GitHub Pages | `.github/workflows/docs.yml` on push to `main`                                        | `/effect-rpc-experiment/` |
-| Vercel       | `vercel.json` at the repo root: import the repo in Vercel, leave Root Directory empty | `/` (`DOCS_BASE=/`)       |
+The site is deployed on Vercel (project `effect-trpc-docs`, <https://effect-trpc-docs.vercel.app>)
+through its GitHub integration, configured by `vercel.json` at the repo root (Root Directory left
+empty; the root `pnpm install`, then the packages are built first, as CI does):
 
-`DOCS_BASE` sets the base path for any other host (`DOCS_BASE=/docs/ pnpm docs:build`). It must
-start and end with `/`. Vercel uses the root `pnpm install` and builds the packages first, as CI does.
+- **Production**: every push to `main`.
+- **Previews**: every push to a pull request gets its own deployment. Vercel posts the URL as a
+  `Vercel` check and a comment on the PR, and keeps it updated on new pushes.
+
+`.github/workflows/docs.yml` only builds and tests the site (dead links, API coverage, samples);
+it does not deploy. The site is served at `/`; `DOCS_BASE` sets another base path for a host that
+needs one (`DOCS_BASE=/docs/ pnpm docs:build`). It must start and end with `/`.
 
 ## Layout
 
