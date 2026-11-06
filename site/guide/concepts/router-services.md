@@ -97,11 +97,21 @@ whose procedures all come from the builder. It does not provide a service.
 
 <<< @/snippets/concepts/router-service-middleware.ts#middleware
 
-Middleware attaches in the builder (before the terminal: the handler may fail with its errors), on
-a finished procedure (`procedure.middleware(Auth)`) or on a whole router (`router.middleware(Auth)`).
-All three keep the handler. Middleware added after the terminal does not widen the handler's own
-error type. Its implementation is a separate layer, merged with the handlers as in
-[Middleware and context](../server/middleware).
+Middleware attaches in the builder (before the terminal: the handler may fail with its errors) or
+on a finished procedure (`procedure.middleware(Auth)`). Both keep the handler. Middleware added
+after the terminal does not widen the handler's own error type. Its implementation is a separate
+layer, merged with the handlers as in [Middleware and context](../server/middleware).
+
+For a group of procedures, nest a router with `.middleware(Auth)` inside the `make` record. Its
+handlers are kept, and the services `Auth` provides are not requirements of the layer:
+
+<<< @/snippets/concepts/router-service-middleware.ts#group
+
+`make` itself must succeed with a record, not a router: a `make` of
+`Effect.succeed(Router.make({...}).middleware(Auth))` is a compile error at every entry point, and
+an error naming the service if forced with a cast. `Router.from(AppRouter).middleware(Auth)` is
+allowed, but it returns a new plain router, not the service: serve it with
+`Handlers.fromProcedures(router)` and give clients that same router.
 
 ## React, Next.js and TanStack Start
 

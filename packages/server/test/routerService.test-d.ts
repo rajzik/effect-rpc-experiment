@@ -166,6 +166,48 @@ describe('Handlers.fromService types', () => {
   });
 });
 
+describe('router-level middleware in a router service (types)', () => {
+  it('a make returning a router (Router.make(...).middleware(M)) is rejected', () => {
+    class Wrapped extends Context.Service<Wrapped>()('Wrapped', {
+      make: Effect.succeed(
+        Router.make({
+          me: Procedure.output(Schema.String).query(() => Effect.map(CurrentUser, (u) => u.name)),
+        }).middleware(Auth),
+      ),
+    }) {}
+    expectTypeOf(Wrapped).not.toExtend<RouterService.Any>();
+    // @ts-expect-error - make must succeed with a record, not a router
+    Handlers.fromService(Wrapped);
+  });
+
+  it('a router with middleware nested in the make record keeps handlers and provided services', () => {
+    class Guarded extends Context.Service<Guarded>()('Guarded', {
+      make: Effect.succeed({
+        health: Procedure.output(Schema.String).query(() => Effect.succeed('ok')),
+        admin: Router.make({
+          me: Procedure.output(Schema.String).query(() => Effect.map(CurrentUser, (u) => u.name)),
+          db: Procedure.input({ id: Schema.Finite })
+            .output(Post)
+            .error(PostNotFound)
+            .query(({ id }) => Effect.flatMap(Database, (db) => db.findPost(id))),
+        }).middleware(Auth),
+      }),
+    }) {}
+    expectTypeOf(Guarded).toExtend<RouterService.Any>();
+    expectTypeOf<Router.Paths<typeof Guarded>>().toEqualTypeOf<
+      'health' | 'admin.me' | 'admin.db'
+    >();
+    // `CurrentUser` is provided by `Auth`; `Database` stays a requirement.
+    expectTypeOf(Handlers.fromService(Guarded)).toEqualTypeOf<
+      Layer.Layer<
+        Rpc.Handler<'health'> | Rpc.Handler<'admin.me'> | Rpc.Handler<'admin.db'> | Guarded,
+        never,
+        Database
+      >
+    >();
+  });
+});
+
 describe('Handlers.fromProcedures types', () => {
   it('requirements are inferred for a plain router of builder procedures', () => {
     const router = Router.make({

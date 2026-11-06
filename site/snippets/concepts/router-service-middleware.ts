@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, Schema } from 'effect';
-import { Procedure } from '@effect-trpc/core';
+import { Procedure, Router } from '@effect-trpc/core';
 import { Handlers } from '@effect-trpc/server';
 
 import { Auth, CurrentUser, Forbidden, Post, Unauthorized } from '@/router';
@@ -33,3 +33,21 @@ const AuthLive = Layer.succeed(Auth)(
 
 export const PostsLive = Layer.mergeAll(Handlers.fromService(PostsRouter), AuthLive);
 // #endregion middleware
+
+// #region group
+// Middleware for a group of procedures: nest a router with `.middleware(M)` in the `make` record.
+// (`make` itself must return a record: `Effect.succeed(Router.make({...}).middleware(Auth))` is a
+// compile error.)
+export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+  make: Effect.succeed({
+    health: Procedure.output(Schema.Literal('ok')).query(() => Effect.succeed('ok' as const)),
+    admin: Router.make({
+      whoami: Procedure.output(Schema.String).query(() =>
+        Effect.map(CurrentUser, (user) => user.name),
+      ),
+    }).middleware(Auth), // every procedure under admin.* runs Auth
+  }),
+}) {}
+
+export const AppLive = Layer.mergeAll(Handlers.fromService(AppRouter), AuthLive);
+// #endregion group

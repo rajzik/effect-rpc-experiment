@@ -288,6 +288,10 @@ const handler = blogRouter.record.post.byId.handler;
   `query({...})` and works with `Router.make`, `inferInput` & co. and every client. Defaults
   match `query()` (`Schema.Void` input and output, `Schema.Never` error).
 - `.middleware(M)` on the finished procedure and `router.middleware(M)` keep the handler.
+- In a router service, `make` must succeed with a record, not a router:
+  `Effect.succeed(Router.make({...}).middleware(Auth))` is a compile error (and a
+  `make must succeed with a record of procedures, not a router` error if forced). For a group,
+  nest the router in the record: `admin: Router.make({...}).middleware(Auth)`.
 - `Procedure.hasHandler(u)` tells builder procedures from `query({...})` definitions.
 
 ### Routers as services

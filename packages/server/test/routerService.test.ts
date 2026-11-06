@@ -6,7 +6,7 @@ import { Procedure, query, Router } from '@effect-trpc/core';
 import { describe, expect, it } from 'vite-plus/test';
 import { createCaller, Handlers, layerHttp, toWebHandler } from '../src/index.js';
 import { runServer } from '../src/node.js';
-import { AuthLive, Trace, TraceLive, Unauthorized } from './fixtures.js';
+import { Auth, AuthLive, CurrentUser, Trace, TraceLive, Unauthorized } from './fixtures.js';
 import {
   AppRouter,
   Database,
@@ -139,6 +139,43 @@ describe('Handlers.fromService', () => {
     expect(() => Handlers.fromService(AsyncRouter)).toThrow(
       'Cannot build a router from the router service "AsyncRouter": make must not require services or be asynchronous',
     );
+  });
+});
+
+describe('router-level middleware in a router service', () => {
+  it('a make returning a router is a clear runtime error', () => {
+    class Wrapped extends Context.Service<Wrapped>()('WrappedRouter', {
+      make: Effect.succeed(
+        Router.make({ ok: Procedure.query(() => Effect.void) }).middleware(Trace),
+      ),
+    }) {}
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- forces the compile error away to prove the runtime check
+    const forced = Wrapped as unknown as typeof AppRouter;
+    expect(() => Handlers.fromService(forced)).toThrow(
+      'Cannot build a router from the router service "WrappedRouter": make must succeed with a record of procedures, not a router (return the record, or nest the router under a key)',
+    );
+  });
+
+  it('serves a router with middleware nested in the make record', async () => {
+    class Guarded extends Context.Service<Guarded>()('GuardedRouter', {
+      make: Effect.succeed({
+        health: Procedure.output(Schema.String).query(() => Effect.succeed('ok')),
+        admin: Router.make({
+          me: Procedure.output(Schema.String).query(() =>
+            Effect.map(CurrentUser, (user) => `admin ${user.name}`),
+          ),
+        }).middleware(Auth),
+      }),
+    }) {}
+    await using caller = createCaller(Guarded, {
+      handlers: Layer.mergeAll(Handlers.fromService(Guarded), AuthLive()),
+    });
+    expect(await caller.$promise.health()).toBe('ok');
+    expect(await caller.$promise.admin.me(undefined, { headers: { 'x-user': 'ada' } })).toBe(
+      'admin ada',
+    );
+    const error = await caller.$promise.admin.me().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Unauthorized);
   });
 });
 

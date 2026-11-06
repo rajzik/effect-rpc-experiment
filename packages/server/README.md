@@ -318,7 +318,9 @@ there is no handler record to write:
   procedures (services nested in it included), without providing a service.
 - Requirements are inferred from the handlers (`Effect` and `Stream` alike) minus `Scope` and the
   services the procedure's middleware provides, whether the middleware was added with the
-  builder, on the finished procedure or with `router.middleware(M)`.
+  builder, on the finished procedure or with `router.middleware(M)` (in a router service: on a
+  router nested in the `make` record, `admin: Router.make({...}).middleware(Auth)`; `make` itself
+  must return a record, not a router).
 - Middleware implementations are still separate layers:
   `Layer.mergeAll(Handlers.fromService(AppRouter), AuthLive)`.
 - A procedure defined with `query` / `mutation` / `subscription({...})` has no handler. Both

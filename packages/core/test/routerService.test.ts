@@ -205,6 +205,16 @@ describe('Router.fromService', () => {
       /NotARecord.*make must succeed with a record of procedures/,
     );
   });
+
+  it('fromService rejects a make that succeeds with a router', () => {
+    class WrappedRouter extends Context.Service<WrappedRouter>()('WrappedRouter', {
+      make: Effect.succeed(Router.make({ ping: query({ success: Schema.String }) })),
+    }) {}
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a cast that hides the wrong success type
+    expect(() => Router.fromService(WrappedRouter as unknown as RouterService.Any)).toThrow(
+      /WrappedRouter.*make must succeed with a record of procedures, not a router/,
+    );
+  });
 });
 
 describe('Router.isService', () => {

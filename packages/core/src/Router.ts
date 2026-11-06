@@ -639,6 +639,12 @@ const fromService = <S extends RouterService.Any>(service: S): Router.Of<S> => {
     resolving.add(service);
     try {
       const record = runMake(service);
+      if (isRouter(record)) {
+        throw serviceError(
+          service,
+          'make must succeed with a record of procedures, not a router (return the record, or nest the router under a key)',
+        );
+      }
       if (!isPlainRecord(record)) {
         throw serviceError(service, 'make must succeed with a record of procedures');
       }
