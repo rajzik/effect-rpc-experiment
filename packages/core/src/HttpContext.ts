@@ -207,6 +207,10 @@ const setCookie = (
  *   first, so they apply until the last call of the request ends.
  * - Several calls sent in one HTTP request share one response: a header set by one of them
  *   applies to all, and (framed) only if set before the first of them writes its response chunk.
+ * - A setter registers a hook on the request that lives until the response is written. A
+ *   subscription calling one for every element keeps growing that chain for as long as it
+ *   streams (with `serialization: 'json'` the chain runs once, at the end): set headers once, up
+ *   front, not per element.
  * - Over WebSocket, `request` is the upgrade request and the setters do nothing (the upgrade
  *   response was sent before any call).
  * - `appendHeader` joins values with `", "`; use `setCookie` for cookies, never

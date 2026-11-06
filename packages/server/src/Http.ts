@@ -333,7 +333,9 @@ const layerHttpFromInput = (
  *   the whole connection.
  * - The serialization layer is provided (default `"ndjson"` for both protocols, matching `httpLink` / `wsLink`),
  *   and so is `handlers` when given. Whatever `handlers` does not provide stays a requirement of
- *   the returned layer, together with `HttpRouter`.
+ *   the returned layer, together with `HttpRouter`, except the services of `context` (provided
+ *   per call). What the `context` effect itself needs (`CR`) is read from the output of `handlers`;
+ *   when `handlers` does not provide it, it stays a requirement too.
  *
  * **Example** (Mounting the rpc route next to other routes on a Node server)
  *

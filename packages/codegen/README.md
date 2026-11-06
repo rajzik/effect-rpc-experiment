@@ -160,6 +160,10 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
   date: run effect-trpc-codegen`) when the client contract no longer matches the server router.
 - Errors declared by a procedure's middleware (or a nested router's `.middleware(...)`) are not
   repeated in the inferred error.
+- A trailing `.annotate(key, value)` (or `.middleware(...)`) after a procedure, and `.annotate`
+  as a builder step, are accepted. The server module keeps annotations (it wraps the router
+  module); the client module copies middleware but omits annotations, which are server-side
+  metadata for middleware.
 - Schema classes from other packages are imported by package name (the router's own import,
   else the checker's package path: workspace symlinks, `exports` subpaths, barrels, `paths`),
   never by a relative path into another package or `node_modules`.
@@ -219,6 +223,9 @@ A class its package does not export from any import path is reported
 - A schema expression (`.input` / `.output` / `.error` / middleware) that uses a value declared
   inside the `Effect.gen` generator (`const cfg = yield* AppConfig`) stops the generator with
   `<name> is declared in make: …` and its location: the client cannot have that value.
+- Annotations (`.annotate(key, value)`) are not part of the client contract: the client module
+  omits them, so a middleware that runs in the client (`requiredForClient`) does not see them in
+  `rpc.annotations`. Read annotations in server middleware.
 - No code transform: the plugins only write the generated modules. The client stays
   handler-free because it imports the generated client module, which works with every bundler
   and without one.

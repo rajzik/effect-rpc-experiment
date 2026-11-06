@@ -45,6 +45,31 @@ which the adapter rejects at compile time.
 
 The `Unauthorized` rejection is typed: `account.me`'s error type is `Unauthorized`.
 
+## Metadata with `.annotate`
+
+tRPC's `meta` is `.annotate(Key, value)`. It stores a value on the procedure, and a middleware reads
+it from `rpc.annotations` to decide what to do for that procedure.
+
+<<< @/snippets/server/meta.ts#declare
+
+<<< @/snippets/server/meta.ts#annotate
+
+<<< @/snippets/server/meta.ts#implement
+
+<<< @/snippets/server/meta.ts#call
+
+- The key is an ordinary `Context.Key`, so the value is typed per key. A `Context.Reference`, as
+  above, gives procedures that don't set it a default; for a plain key read it with
+  `Context.getOption`.
+- `.annotate` is on `query`, `mutation` and `subscription` definitions and on the `Procedure`
+  builder, at any step. It returns a new definition of the same type, and annotating a key again
+  replaces its value.
+- Annotations are runtime metadata of the server's rpc. They are not sent over the wire, and
+  `ProcedureKind` always wins: annotating that key does not change a procedure's kind.
+- There is no router-level `.annotate`: annotate the procedures.
+- [Codegen](../advanced/codegen) accepts a trailing `.annotate`. The generated client contract
+  (`router.client.gen.ts`) omits annotations and keeps middleware; `router.gen.ts` keeps both.
+
 ## Client-side middleware
 
 A middleware declared with `requiredForClient: true` also runs in the client, before the transport,

@@ -11,6 +11,10 @@ pieces of effect-trpc:
   return type, errors and requirements inferred.
 - **`Router.make`** — nests procedures (and other routers) into a record; tags are the dot-joined
   paths (`"post.byId"`), with literal types computed at the type level.
+- **Procedure metadata** — `.annotate(Key, value)` on a definition or a `Procedure` builder
+  (tRPC's `meta`), read by middleware from `rpc.annotations`.
+- **`HttpContext`** — read the HTTP request and set response headers and cookies from a handler or
+  a middleware, without adding a requirement, so the same handlers run under every transport.
 - **Router services** — write a router once as a plain Effect
   `Context.Service<Self>()(id, { make })` whose `make` returns the procedures; every API that takes
   a router takes the service class (`Router.from` normalises both).
@@ -30,6 +34,8 @@ Servers, clients and the TanStack Query bridge live in `@effect-trpc/server`,
 - you define the API surface: procedures (`query`, `mutation`, `subscription`, or the
   `Procedure` builder when schemas and implementation live together) and a `Router` (or a router
   service: a `Context.Service` whose `make` returns the procedures) shared by server and client;
+- a handler or middleware reads the HTTP request or sets a response header or cookie
+  (`HttpContext`), or middleware needs per-procedure metadata (`.annotate`);
 - you need the client error model (`ClientError<E>`, `causeToClientError`) or JSON codecs
   (`Codecs`) for a compiled rpc, without any transport.
 
@@ -43,9 +49,10 @@ with `httpLink`), for React Query (`@effect-trpc/tanstack-react-query`) or for t
 | Import path         | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Source                                   |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `@effect-trpc/core` | `query`, `mutation`, `subscription`, `isProcedureDef`, `ProcedureDef`, `PayloadInput`, `NormalizePayload`, `inferInput` / `inferOutput` / `inferError` / `inferKind`                                                                                                                                                                                                                                                                                     | `src/Procedure.ts`                       |
-| `@effect-trpc/core` | `Procedure` (`input`, `output`, `error`, `inferred`, `middleware`, `query`, `mutation`, `subscription`, `hasHandler`; types `Procedure.HandlerContext`, `Procedure.HandlerRequirements`, `Procedure.Builder`, `Procedure.Infer`, `Procedure.InferredSuccess`), `ProcedureWithHandler`                                                                                                                                                                    | `src/ProcedureBuilder.ts`                |
+| `@effect-trpc/core` | `Procedure` (`input`, `output`, `error`, `inferred`, `middleware`, `annotate`, `query`, `mutation`, `subscription`, `hasHandler`; types `Procedure.HandlerContext`, `Procedure.HandlerRequirements`, `Procedure.Builder`, `Procedure.Infer`, `Procedure.InferredSuccess`), `ProcedureWithHandler`                                                                                                                                                        | `src/ProcedureBuilder.ts`                |
 | `@effect-trpc/core` | `Router` (`make`, `merge`, `from`, `fromService`, `buildService`, `getByPath`, `getRpc`, `isPath`, `childPath`, `isRouter`, `isService`; types `Router.Input`, `Router.Of`, `Router.Shape`, `Router.ServiceShape`), `RouterService` (`RouterService.Any`, `RouterService.Pure`, `RouterService.MakeError`, `RouterService.MakeServices`, `RouterService.WithSchemas`), `ProcedureInfo`, `inferRouterInputs` / `inferRouterOutputs` / `inferRouterErrors` | `src/Router.ts`                          |
 | `@effect-trpc/core` | `ProcedureKind` (annotation key + `"query" \| "mutation" \| "subscription"` type)                                                                                                                                                                                                                                                                                                                                                                        | `src/ProcedureKind.ts`                   |
+| `@effect-trpc/core` | `HttpContext` (`request`, `setHeader`, `appendHeader`, `setCookie`)                                                                                                                                                                                                                                                                                                                                                                                      | `src/HttpContext.ts`                     |
 | `@effect-trpc/core` | `ClientError`, `ClientInfrastructureError`, `RpcDefect`, `RpcTransportError`, `RpcInterrupted`, `causeToClientError`, `exitToClientError`, guards                                                                                                                                                                                                                                                                                                        | `src/ClientError.ts`                     |
 | `@effect-trpc/core` | `Codecs` namespace (`payload`, `success`, `error`, `exit`, `encode*Sync` / `decode*Sync`)                                                                                                                                                                                                                                                                                                                                                                | `src/Codecs.ts` (barrel: `src/index.ts`) |
 
@@ -111,6 +118,9 @@ console.log(await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(H
 - `Router.make` resolves router-service entries (at any depth of plain records, and inside a service's own `make`) to routers: `router.record` and its type hold an ordinary nested router there. Records without services are stored as-is.
 - Type helpers (`inferRouterInputs` / `Outputs` / `Errors`, `Router.Paths`, `Router.Rpcs`, `Router.Record`) accept a router, a router service class (`typeof AppRouter`) or a record; `Router.Of<X>` is the router type of either.
 - Every compiled rpc carries the `ProcedureKind` annotation; rpcs not built by `Router.make` read as `"query"`.
+- `.annotate(key, value)` (on `query` / `mutation` / `subscription` definitions, on the `Procedure` builder at any step and as `Procedure.annotate`) is tRPC's `meta`: it returns a new definition of the same type and the compiled rpc carries the value in `rpc.annotations`, read by middleware with `Context.get(rpc.annotations, Key)` (a `Context.Reference` key gives a default for procedures that do not set it). Annotating a key again replaces the value; `ProcedureKind` is applied last, so annotating that key does not change the kind. Annotations are runtime metadata of the server's rpc: they are not sent over the wire and the codegen client contract omits them. There is no router-level `.annotate`.
+- `HttpContext.request` is `Option<HttpServerRequest>`: `Some` when the call arrived over HTTP (over WebSocket, the shared upgrade request), `None` under `createCaller`, `localLink`, Electron and the test harness. `setHeader` / `appendHeader` / `setCookie` are `Effect<void>` with no error and no requirement; a valid call is a no-op outside HTTP and over WebSocket, invalid input (CR/LF in a header, a bad cookie name) is a defect everywhere (`RpcDefect` on the client). The HTTP status cannot be set.
+- With framed serialization (`ndjson`, the default) headers and cookies apply only if set before the first response chunk (the `Exit` of a query or mutation, the first element of a subscription); with `json` the whole response is collected first. Calls sent in one HTTP request (`httpBatchLink`) share one response.
 - `Codecs.*` are memoized per rpc; `Codecs.success` of a subscription is the element codec; `*Sync` helpers throw `SchemaError` and do not support schemas with services.
 
 **Common mistakes**
@@ -132,6 +142,10 @@ console.log(await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(H
 - Don't make `make` a function or asynchronous → `make: Effect.succeed({ ... })` or `Effect.gen`; the sync APIs run a pure `make` with `Effect.runSync`.
 - Don't write `type AppRouter = typeof appRouter` for a router service → the class is the type: `inferRouterInputs<typeof AppRouter>`.
 - Don't branch on "router or service" in your own adapter → call `Router.from(input)` once at the entry.
+- Don't set headers or cookies per element of a subscription → each call registers a response hook that lives as long as the stream; set them once, before the first element (later ones are dropped with `ndjson`).
+- Don't use `appendHeader('set-cookie', …)` → `setCookie`.
+- Don't expect `HttpContext.request` to be `Some` under `createCaller` / `localLink` → handle `None`; it is `Some` only behind the HTTP adapters of `@effect-trpc/server`.
+- Don't read `.annotate` values on the client or from a codegen client router → they are server-side metadata for middleware (`rpc.annotations`).
 
 **Where to look**
 
@@ -145,6 +159,8 @@ console.log(await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(H
 | router-service inference, `Router.Of` / `Input`, `make` with services   | `test/routerService.test-d.ts`                             |
 | `causeToClientError` mapping and precedence, guards                     | `test/client-error.test.ts`, `test/client-error.test-d.ts` |
 | codec round-trips, memoization, middleware errors in `Codecs.error`     | `test/codecs.test.ts`, `test/codecs.test-d.ts`             |
+| `.annotate`: compiled rpc, builder steps, `ProcedureKind` wins, types   | `test/annotate.test.ts`, `test/annotate.test-d.ts`         |
+| `HttpContext`: no requirement, `None` outside HTTP, invalid input dies  | `test/httpContext.test.ts`, `test/httpContext.test-d.ts`   |
 | end to end through `RpcTest.makeClient(router.group)`                   | `test/e2e.test.ts`                                         |
 | this README's examples                                                  | `test/readme.test.ts`                                      |
 | JSDoc conventions (every export has examples)                           | `docs/jsdoc-style.md`                                      |
@@ -406,6 +422,85 @@ Type helpers: `Router.Rpcs<R>`, `Router.Paths<R>` (`"health" | "post.byId" | …
 Every compiled rpc carries a `ProcedureKind` annotation:
 `Context.get(rpc.annotations, ProcedureKind) // "query" | "mutation" | "subscription"`.
 Subscriptions compile to `Rpc.make(tag, { stream: true, … })`.
+
+### Metadata (`.annotate`)
+
+`.annotate(Key, value)` is tRPC's `meta`. It stores a value on the procedure, and a middleware reads
+it from the compiled rpc:
+
+```ts
+import { Context, Effect, Layer, Schema } from 'effect';
+import { RpcMiddleware } from 'effect/rpc';
+import { Procedure, query, Router } from '@effect-trpc/core';
+
+class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {}) {}
+class RequireRoles extends RpcMiddleware.Service<RequireRoles>()('RequireRoles', {
+  error: Forbidden,
+}) {}
+// A `Context.Reference` gives the default for procedures that do not set it.
+const Roles = Context.Reference<ReadonlyArray<string>>('Roles', { defaultValue: () => [] });
+
+export const appRouter = Router.make({
+  health: query({ success: Schema.Literal('ok') }),
+  stats: query({ success: Schema.Number }).annotate(Roles, ['admin']),
+  purge: Procedure.annotate(Roles, ['admin']) // the builder takes it at any step
+    .output(Schema.Void)
+    .mutation(() => Effect.void),
+}).middleware(RequireRoles);
+
+export const RequireRolesLive = Layer.succeed(RequireRoles)(
+  RequireRoles.of((effect, { rpc, headers }) => {
+    const granted = headers['x-roles']?.split(',') ?? [];
+    return Context.get(rpc.annotations, Roles).every((role) => granted.includes(role))
+      ? effect
+      : Effect.fail(new Forbidden());
+  }),
+);
+```
+
+`.annotate` returns a new definition of the same type; annotating a key again replaces its value;
+`ProcedureKind` always wins over an annotation of that key. Annotations stay on the server's rpc
+(they are not sent over the wire).
+
+## Request and response (`HttpContext`)
+
+`HttpContext` reads the HTTP request and sets response headers and cookies from a handler or a
+middleware. None of its members adds a requirement or an error, so the same handlers still run
+under `createCaller`, `localLink`, Electron and tests, where `request` is `None` and valid setter
+calls do nothing:
+
+```ts
+import { Effect, Option, Schema } from 'effect';
+import { HttpContext, Procedure, Router } from '@effect-trpc/core';
+
+export const appRouter = Router.make({
+  login: Procedure.input({ token: Schema.String }).mutation(({ token }) =>
+    Effect.gen(function* () {
+      const request = yield* HttpContext.request; // Option<HttpServerRequest>
+      const agent = Option.match(request, {
+        onNone: () => 'local',
+        onSome: (req) => req.headers['user-agent'] ?? 'unknown',
+      });
+      yield* HttpContext.setHeader('x-login-agent', agent);
+      yield* HttpContext.setCookie('session', token, { httpOnly: true, path: '/' });
+    }),
+  ),
+});
+```
+
+| API                                       | Description                                          |
+| ----------------------------------------- | ---------------------------------------------------- |
+| `HttpContext.request`                     | `Option<HttpServerRequest>` of the current call.     |
+| `HttpContext.setHeader(name, value)`      | Sets a response header (replaces earlier values).    |
+| `HttpContext.appendHeader(name, value)`   | Appends to a response header (`a, b`).               |
+| `HttpContext.setCookie(name, value, opt)` | Sets a cookie; `opt` is `Cookies.Cookie['options']`. |
+
+Gotchas: with `ndjson` (the default) headers and cookies apply only if set before the first response
+chunk (the `Exit` of a query or mutation, the first element of a subscription), so set them once and
+up front, not per stream element; calls batched into one HTTP request share one response; over
+WebSocket the setters do nothing; an invalid header or cookie is a defect everywhere. The HTTP
+adapters of `@effect-trpc/server` also take a `context` option (services computed per call) and an
+`onError` option.
 
 ## The ClientError model
 

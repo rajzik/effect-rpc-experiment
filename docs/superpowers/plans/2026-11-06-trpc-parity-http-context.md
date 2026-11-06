@@ -66,7 +66,7 @@
 
 **Interfaces:**
 
-- Produces: `annotate<I, S>(key: Context.Key<I, S>, value: S): Self` on `ProcedureDef` (returns the same definition type) and on `Procedure.Builder` (before or after other steps; kept by the terminal). Compiled rpc: `rpc.annotations` contains every annotation (applied with `rpc.annotate(key, value)` after `ProcedureKind`). Re-annotating the same key replaces the value.
+- Produces: `annotate<I, S>(key: Context.Key<I, S>, value: S): Self` on `ProcedureDef` (returns the same definition type) and on `Procedure.Builder` (before or after other steps; kept by the terminal). Compiled rpc: `rpc.annotations` contains every annotation (`ProcedureKind` is applied last, so it wins over a user annotation of that key). Re-annotating the same key replaces the value.
 
 - [ ] **Step 1: Failing tests**
   - core: `query({ success: Schema.String }).annotate(Roles, ['admin'])` → `Context.get(Router.getRpc(Router.make({ x: def }), 'x').annotations, Roles)` deep-equals `['admin']` (use the repo's existing way to get a compiled rpc — check `Router.getRpc`). Same through `Procedure.annotate(Roles, ['admin']).query(...)` and `Procedure.output(Schema.String).annotate(...).query(...)`; `.middleware(M)` after `.annotate` keeps it; `Router.withSchemas` over a builder procedure keeps it.

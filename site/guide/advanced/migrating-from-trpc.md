@@ -14,13 +14,17 @@ errors and context work (typed errors and services instead of `TRPCError` and `c
 | `throw new TRPCError({ code: 'NOT_FOUND' })` | `Effect.fail(new PostNotFound({ id }))`, declared in `error`                    |
 | `t.router({ … })`                            | `Router.make({ … })`                                                            |
 | resolvers inline in the router               | `Handlers.make(router, { … })` in a server-only module                          |
-| `createContext` + `ctx`                      | middleware that `provides` services; `yield*` in handlers                       |
+| `createContext` + `ctx`                      | middleware that `provides` services; the adapters' `context` option             |
+| `createContext` reading `req`                | `HttpContext.request`, inside `context` or a handler                            |
+| `ctx.res` headers, cookies, `responseMeta`   | `HttpContext.setHeader`, `appendHeader`, `setCookie` (no status)                |
+| `meta`, `.meta({ … })`                       | `.annotate(Key, value)`, read as `Context.get(rpc.annotations, Key)`            |
+| `onError({ error, path, input, ctx })`       | `onError({ path, cause, headers })` option of the adapters                      |
 | `t.middleware(…)`, `.use(…)`                 | `RpcMiddleware` + `.middleware(M)`                                              |
 | `createCallerFactory`                        | `createCaller(router, { handlers })`                                            |
 | fetch / standalone adapters                  | `toWebHandler`, `serve` / `runServer`                                           |
 | superjson transformer                        | nothing: Effect Schema encodes `Date`, classes, `BigInt`                        |
 | `createTRPCClient` + links                   | `createClient(router, { link })`                                                |
-| `httpBatchLink`                              | `httpLink` (no batching) or `wsLink`                                            |
+| `httpBatchLink`                              | `httpBatchLink` (queries only)                                                  |
 | `TRPCClientError`, `error.data.code`         | `ClientError<E>`, narrow on `_tag`                                              |
 | `@trpc/tanstack-react-query`                 | `@effect-trpc/tanstack-react-query` ([differences](../react-query/differences)) |
 | `@trpc/next`, RSC helpers                    | `@effect-trpc/next`                                                             |
@@ -31,11 +35,15 @@ errors and context work (typed errors and services instead of `TRPCError` and `c
    `success` schema. Domain objects become `Schema.Class`es.
 2. **Errors.** For each `TRPCError` code a client branches on, add a `Schema.TaggedError` and declare
    it on the procedure. Everything else becomes a defect.
-3. **Context.** Each field of `ctx` becomes a service, provided by middleware (the user, the tenant)
-   or by the server layer (the database).
+3. **Context.** Each field of `ctx` becomes a service, provided by middleware (the user, the tenant),
+   by the `context` option (a request id, anything computed per call) or by the server layer (the
+   database). What `createContext` read from `req` is read with `HttpContext.request`; what
+   resolvers wrote to `res` is `HttpContext.setHeader` / `setCookie`
+   ([request, response, context](../server/http-context)).
 4. **Resolvers.** Move them into `Handlers.make`, as Effects. `async` code fits in `Effect.tryPromise`.
 5. **Adapter.** Replace the fetch adapter with `toWebHandler` (or `createRouteHandler` in Next.js).
-6. **Client.** Replace `createTRPCClient` with `createClient`, `httpBatchLink` with `httpLink`.
+6. **Client.** Replace `createTRPCClient` with `createClient`. `httpBatchLink` keeps its name, with
+   the options of `httpLink` plus `maxItems`.
 7. **React.** Rename the context hooks; error handling switches from `error.data.code` to
    `error._tag`.
 
@@ -48,5 +56,11 @@ errors and context work (typed errors and services instead of `TRPCError` and `c
 ## What to plan for
 
 - The router value ships to the browser (it holds schemas). Keep it free of server code.
-- No HTTP batching: many small parallel calls are separate requests. Use `wsLink` if that matters.
+- `httpBatchLink` batches queries only. Mutations and subscriptions get a request each, and the
+  calls of a batch share one response, so headers and cookies set by one apply to all.
+- `onError` is not called for calls the server rejects before or after running them: a payload that
+  fails to decode, an unknown procedure, a success value that fails to encode. They reach the client
+  as `RpcDefect`. tRPC's `BAD_REQUEST` input errors do reach `onError`. It also receives `cause`
+  and `headers` instead of `error`, `input`, `type` and `ctx`.
+- A handler cannot set the HTTP status, so there is no `responseMeta` for status codes.
 - See [known limits](./limits).

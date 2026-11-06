@@ -34,16 +34,16 @@ that read the cache, and server actions that keep typed errors.
 **Entry points** (all from `@effect-trpc/next`; the package has no subpaths and no
 `'use client'` / `'use server'` directives of its own):
 
-| export                                                          | side   | what                                                        | source                                 |
-| --------------------------------------------------------------- | ------ | ----------------------------------------------------------- | -------------------------------------- |
-| `createRouteHandler`                                            | server | `{ GET, POST, dispose }` for `route.ts`                     | `src/routeHandler.ts`                  |
-| `createRscHelpers`                                              | server | `{ getQueryClient, rpc, prefetch, HydrateClient, caller? }` | `src/rsc.tsx`                          |
-| `createServerActionCaller`                                      | server | `actions(path)` → server action resolving an encoded `Exit` | `src/serverActions.ts`                 |
-| `createNextRpcClient`                                           | client | `{ RpcProvider, useRpc, useRpcClient, HydrationBoundary }`  | `src/client.tsx`                       |
-| `useServerAction`                                               | client | hook: `{ run, data, error, status, isPending, reset }`      | `src/useServerAction.ts`               |
-| `decodeActionResult`, `unwrapActionResult`                      | both   | encoded action result → `Exit` / `Promise` of instances     | `src/serverActions.ts`                 |
-| `makeQueryClient`, `getBaseUrl`                                 | both   | App Router `QueryClient` defaults; app origin               | `src/queryClient.ts`, `src/client.tsx` |
-| `InputAt`, `OutputAt`, `ErrorAt`, `ActionPath`, `ServerAction…` | types  | per-path types for action wrappers                          | `src/types.ts`, `src/serverActions.ts` |
+| export                                                          | side   | what                                                                   | source                                 |
+| --------------------------------------------------------------- | ------ | ---------------------------------------------------------------------- | -------------------------------------- |
+| `createRouteHandler`                                            | server | `{ GET, POST, dispose }` for `route.ts` (`context`, `onError` options) | `src/routeHandler.ts`                  |
+| `createRscHelpers`                                              | server | `{ getQueryClient, rpc, prefetch, HydrateClient, caller? }`            | `src/rsc.tsx`                          |
+| `createServerActionCaller`                                      | server | `actions(path)` → server action resolving an encoded `Exit`            | `src/serverActions.ts`                 |
+| `createNextRpcClient`                                           | client | `{ RpcProvider, useRpc, useRpcClient, HydrationBoundary }`             | `src/client.tsx`                       |
+| `useServerAction`                                               | client | hook: `{ run, data, error, status, isPending, reset }`                 | `src/useServerAction.ts`               |
+| `decodeActionResult`, `unwrapActionResult`                      | both   | encoded action result → `Exit` / `Promise` of instances                | `src/serverActions.ts`                 |
+| `makeQueryClient`, `getBaseUrl`                                 | both   | App Router `QueryClient` defaults; app origin                          | `src/queryClient.ts`, `src/client.tsx` |
+| `InputAt`, `OutputAt`, `ErrorAt`, `ActionPath`, `ServerAction…` | types  | per-path types for action wrappers                                     | `src/types.ts`, `src/serverActions.ts` |
 
 **Golden path** (paths in the app):
 
@@ -66,6 +66,13 @@ that read the cache, and server actions that keep typed errors.
   your handlers). Client-only: `createNextRpcClient`'s module, `useServerAction`.
 - `createRouteHandler` requires `handlers`; `path` defaults to `/api/rpc`; `serialization`
   (default `"ndjson"`) must match `createNextRpcClient`.
+- `createRouteHandler` takes the `context` and `onError` options of `toWebHandler` unchanged
+  (`@effect-trpc/server`): `context` provides services per call (the `handlers` layer may require
+  them) and `onError({ path, cause, headers })` reports failed calls. They apply to the HTTP route
+  only: `createRscHelpers({ handlers })` and `createServerActionCaller` run the handlers in-process
+  and need handlers with no requirements left, so services of `context` must be provided to those
+  handlers directly. Handlers can read the request and set response headers and cookies with
+  `HttpContext` (`@effect-trpc/core`) over HTTP.
 - `GET` always answers `405`; every call (subscriptions included) is a `POST`.
 - Server actions never reject with a procedure error: they resolve with an encoded `Exit`
   (`EncodedActionResult`), decoded on the client with the router's schemas.
@@ -84,6 +91,9 @@ that read the cache, and server actions that keep typed errors.
   `createRscHelpers` (per request) or `makeQueryClient()` per request.
 - Don't import `trpc/server.tsx` or `server/handlers.ts` from a `'use client'` file → client code
   imports only the router (schemas), `trpc/client.tsx` and action functions.
+- Don't share handlers that `yield*` a `context` service with `createRscHelpers` /
+  `createServerActionCaller` → they run in-process without `context` (a type error); provide the
+  service to the layer you give them.
 - Don't leave `createRscHelpers` on its default `HydrationBoundary` in a real app → pass the one
   exported by your `'use client'` module.
 - Don't `throw` procedure errors from a server action or export `actions` from a `'use server'`
@@ -104,7 +114,8 @@ that read the cache, and server actions that keep typed errors.
 
 **Where to look**
 
-- Route handler (POST/GET/404/basePath/lazy build/dispose): `test/routeHandler.test.ts`.
+- Route handler (POST/GET/404/basePath/lazy build/dispose, `context` and `onError` pass-through):
+  `test/routeHandler.test.ts`; the `context` types: `test/types.test-d.tsx`.
 - RSC helpers (per-request client, in-process prefetch, Schema dehydration, `caller`, headers,
   `keyPrefix`, remote client): `test/rsc.test.tsx`.
 - Server actions (encoding, typed errors, defects, invalid input, headers, `dispose`):
@@ -208,6 +219,9 @@ export const { GET, POST } = createRouteHandler(appRouter, { handlers: HandlersL
 - The handler layer is built **lazily on the first request**, then shared. If it fails to build,
   that request rejects (Next answers 500) and the next request retries. `dispose()` releases it.
 - `serialization` (`"ndjson"` default, or `"json"`) must match the client.
+- `context` (tRPC's `createContext`: an `Effect` of services evaluated per call, before middleware
+  and the handler) and `onError({ path, cause, headers })` are the options of `toWebHandler`; see
+  [Request context, response headers and `onError`](../server/README.md#request-context-response-headers-and-onerror).
 - Both exports are `(request: Request) => Promise<Response>`, so they are valid Next route
   handlers (`NextRequest` extends `Request`). The package never imports `next` at runtime.
 

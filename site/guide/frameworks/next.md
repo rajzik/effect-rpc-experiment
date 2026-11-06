@@ -28,6 +28,9 @@ module server-only (`import 'server-only'`): it holds handlers, database access 
   request answers 500 and the next one retries.
 - The package does not import `next` at runtime: the exports are plain
   `(request: Request) => Promise<Response>` functions.
+- `context` and `onError` are the options of `toWebHandler`, passed through: see
+  [request, response, context](../server/http-context). They apply to this route; the in-process
+  helpers below run their handlers without `context`, so give them handlers with no requirements.
 
 ## Client provider
 
