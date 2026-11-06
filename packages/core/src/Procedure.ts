@@ -2,14 +2,14 @@
  * Builds tRPC-style procedure definitions (`query`, `mutation`, `subscription`) from Effect
  * Schemas.
  *
- * A procedure definition is a plain description: payload/success/error schemas, a kind and
- * optional `RpcMiddleware`. `Router.make` compiles definitions into `effect/rpc` rpcs whose tags
- * are the dot-joined router paths; `@effect-trpc/server` implements them and
- * `@effect-trpc/client` calls them.
+ * A procedure definition is a plain description: payload/success/error schemas, a kind,
+ * optional `RpcMiddleware` and optional annotations (tRPC's `meta`). `Router.make` compiles
+ * definitions into `effect/rpc` rpcs whose tags are the dot-joined router paths;
+ * `@effect-trpc/server` implements them and `@effect-trpc/client` calls them.
  *
  * @since 0.1.0
  */
-import { Predicate, Schema } from 'effect';
+import { Context, Predicate, Schema } from 'effect';
 import { Rpc } from 'effect/rpc';
 import type { RpcMiddleware, RpcSchema } from 'effect/rpc';
 import type { ProcedureWithHandler } from './ProcedureBuilder.js';
@@ -73,7 +73,11 @@ export type NormalizePayload<P> = P extends Schema.Struct.Fields ? Schema.Struct
  *
  * - The tag (`"post.byId"`) is assigned by `Router.make` from the procedure's path in the router
  *   record, so the same definition can live under several paths.
- * - Definitions are frozen; `.middleware(M)` returns a new definition.
+ * - Definitions are frozen; `.middleware(M)` and `.annotate(key, value)` return a new definition.
+ * - `.annotate(key, value)` is tRPC's `.meta()`: runtime metadata on the compiled rpc
+ *   (`rpc.annotations`, after the {@link ProcedureKind} annotation) that middleware reads with
+ *   `Context.get(rpc.annotations, key)`. It does not change the definition's type; annotating the
+ *   same key again replaces the value.
  * - `Payload` – input schema (`Schema.Void` when the procedure takes no input)
  * - `Success` – output schema; for subscriptions this is the schema of each streamed element
  * - `Error` – typed failure schema (`Schema.Never` when the procedure cannot fail)
@@ -93,6 +97,35 @@ export type NormalizePayload<P> = P extends Schema.Struct.Fields ? Schema.Struct
  *
  * const create = mutation({ payload: { title: Schema.String }, success: Post }).middleware(Auth);
  * type CreateError = inferError<typeof create>; // Unauthorized (from the middleware)
+ * ```
+ *
+ * **Example** (Meta read by middleware)
+ *
+ * ```ts
+ * import { Context, Effect, Layer, Schema } from 'effect';
+ * import { RpcMiddleware } from 'effect/rpc';
+ * import { query, Router } from '@effect-trpc/core';
+ *
+ * class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {}) {}
+ * class RequireRoles extends RpcMiddleware.Service<RequireRoles>()('RequireRoles', {
+ *   error: Forbidden,
+ * }) {}
+ * // A `Context.Reference` gives the default for procedures that do not set it.
+ * const Roles = Context.Reference<ReadonlyArray<string>>('Roles', { defaultValue: () => [] });
+ *
+ * export const appRouter = Router.make({
+ *   health: query({ success: Schema.Literal('ok') }),
+ *   stats: query({ success: Schema.Number }).annotate(Roles, ['admin']),
+ * }).middleware(RequireRoles);
+ *
+ * export const RequireRolesLive = Layer.succeed(RequireRoles)(
+ *   RequireRoles.of((effect, { rpc, headers }) => {
+ *     const granted = headers['x-roles']?.split(',') ?? [];
+ *     return Context.get(rpc.annotations, Roles).every((role) => granted.includes(role))
+ *       ? effect
+ *       : Effect.fail(new Forbidden());
+ *   }),
+ * );
  * ```
  *
  * @see {@link query}
@@ -136,6 +169,14 @@ export interface ProcedureDef<
     Middleware | M,
     RpcMiddleware.ApplyServices<M['Identifier'], Requires>
   >;
+  /**
+   * Returns a new definition annotated with `key` = `value` (tRPC's `.meta()`); the compiled rpc
+   * carries it in `rpc.annotations`. The type is unchanged; a later value of the same key wins.
+   */
+  annotate<I, S>(
+    key: Context.Key<I, S>,
+    value: NoInfer<S>,
+  ): ProcedureDef<Kind, Payload, Success, Error, Middleware, Requires>;
   /** Compiles the definition to an `effect/rpc` `Rpc` with the given tag. */
   toRpc<const Tag extends string>(
     tag: Tag,
@@ -422,6 +463,8 @@ interface DefState {
   readonly successSchema: Schema.Top;
   readonly errorSchema: Schema.Top;
   readonly middlewares: ReadonlyArray<RpcMiddleware.AnyService>;
+  /** User annotations, applied to the compiled rpc after `ProcedureKind`. */
+  readonly annotations: Context.Context<never>;
   /** Only procedures built with `Procedure` have one; plain definitions omit the key. */
   readonly handler?: AnyHandler;
 }
@@ -435,6 +478,7 @@ class ProcedureDefImpl implements DefState {
   readonly successSchema: Schema.Top;
   readonly errorSchema: Schema.Top;
   readonly middlewares: ReadonlyArray<RpcMiddleware.AnyService>;
+  readonly annotations: Context.Context<never>;
   // `declare`: no own `handler` key is emitted for plain definitions.
   declare readonly handler?: AnyHandler;
 
@@ -444,19 +488,30 @@ class ProcedureDefImpl implements DefState {
     this.successSchema = state.successSchema;
     this.errorSchema = state.errorSchema;
     this.middlewares = Object.freeze([...state.middlewares]);
+    this.annotations = state.annotations;
     if (state.handler !== undefined) this.handler = state.handler;
     Object.freeze(this);
   }
 
   middleware(middleware: RpcMiddleware.AnyService): ProcedureDefImpl {
+    return this.copy({ middlewares: [...this.middlewares, middleware] });
+  }
+
+  annotate<I, S>(key: Context.Key<I, S>, value: S): ProcedureDefImpl {
+    return this.copy({ annotations: Context.add(this.annotations, key, value) });
+  }
+
+  // The handler travels with the definition, so a step never drops an implementation.
+  private copy(changes: Partial<Pick<DefState, 'middlewares' | 'annotations'>>): ProcedureDefImpl {
     const next: DefState = {
       kind: this.kind,
       payloadSchema: this.payloadSchema,
       successSchema: this.successSchema,
       errorSchema: this.errorSchema,
-      middlewares: [...this.middlewares, middleware],
+      middlewares: this.middlewares,
+      annotations: this.annotations,
+      ...changes,
     };
-    // The handler travels with the definition, so middleware never drops an implementation.
     return new ProcedureDefImpl(
       this.handler === undefined ? next : { ...next, handler: this.handler },
     );
@@ -472,7 +527,7 @@ class ProcedureDefImpl implements DefState {
     for (const middleware of this.middlewares) {
       rpc = rpc.middleware(middleware);
     }
-    return rpc.annotate(ProcedureKind, this.kind);
+    return rpc.annotate(ProcedureKind, this.kind).annotateMerge(this.annotations);
   }
 }
 
@@ -502,6 +557,7 @@ export const define = (
     readonly payload?: PayloadInput;
     readonly success?: Schema.Top;
     readonly error?: Schema.Top;
+    readonly annotations?: Context.Context<never>;
     readonly handler?: AnyHandler;
   },
 ): any => {
@@ -511,6 +567,7 @@ export const define = (
     successSchema: options.success ?? Schema.Void,
     errorSchema: options.error ?? Schema.Never,
     middlewares: [],
+    annotations: options.annotations ?? Context.empty(),
   };
   return new ProcedureDefImpl(
     options.handler === undefined ? state : { ...state, handler: options.handler },
@@ -531,7 +588,8 @@ export const define = (
  * - `success` omitted → `Schema.Void`; `error` omitted → `Schema.Never`.
  * - Errors must be `Schema.TaggedError` classes (or a `Schema.Union` of them) so clients receive
  *   real instances discriminated by `_tag`.
- * - Returns a frozen {@link ProcedureDef}; `.middleware(M)` adds `effect/rpc` middleware.
+ * - Returns a frozen {@link ProcedureDef}; `.middleware(M)` adds `effect/rpc` middleware and
+ *   `.annotate(key, value)` adds metadata for it (tRPC's `.meta()`).
  *
  * **Example** (A query with a typed error)
  *
