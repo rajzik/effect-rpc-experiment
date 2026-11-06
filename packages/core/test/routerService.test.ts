@@ -123,7 +123,7 @@ describe('Router.fromService', () => {
     }) {}
     const run = () => Router.fromService(Slow);
     expect(run).toThrow(/SlowRouter/);
-    expect(run).toThrow(/make must not require services or be asynchronous/);
+    expect(run).toThrow(/make must be synchronous and must not fail/);
     expect(run).not.toThrow(/AsyncFiber/);
     await new Promise((resolve) => setTimeout(resolve, 50));
     // the fibers started by the failed synchronous runs were interrupted
@@ -143,7 +143,7 @@ describe('Router.fromService', () => {
     }) {}
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a cast that hides the failure from the types
     expect(() => Router.fromService(Failing as unknown as RouterService.Any)).toThrow(
-      /FailingRouter.*make must not require services or be asynchronous/,
+      /FailingRouter.*make must be synchronous and must not fail/,
     );
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a cast that hides the requirement from the types
     expect(() => Router.fromService(NeedsDb as unknown as RouterService.Any)).toThrow(

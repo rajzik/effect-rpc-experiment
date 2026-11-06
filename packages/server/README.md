@@ -19,8 +19,9 @@ pieces:
 - **`Middleware`** — `effect/rpc`'s `RpcMiddleware` plus `Middleware.make` for auth/context.
 - **`@effect-trpc/server/node`** — `serve` (a Layer) and `runServer` (a Promise) on Node's `http`.
 
-Every function that takes a `router` also takes a router service class (`toWebHandler(AppRouter,
-...)`); it is normalised with `Router.from` once at the call.
+Every function that takes a `router` also takes a pure router service class (`toWebHandler(AppRouter,
+...)`); it is normalised with `Router.from` once at the call. A service whose `make` reads services
+goes to `Handlers.fromService`; the other functions take its contract (`router.client.gen.ts`).
 
 Every HTTP endpoint uses `protocol: "http"` and `disableFatalDefects: true`: typed failures and
 defects are encoded into that call's `Exit` and later calls keep working. `Schema.Class` results
@@ -140,7 +141,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - Every function taking a `router` takes a `Router.Input` (a router or a router service class) and calls `Router.from` once; types are computed with `Router.Of<X>`, so a service and the equivalent `Router.make` router infer the same caller / handler types. Type helpers (`Caller<R>`, `Handlers.Requirements<R>`, ...) take a router type: `Router.Of<typeof AppRouter>`.
 - `toWebHandler` / `runServer` build the handler layer eagerly (the promise rejects on failure); `createCaller` builds it on the first call.
 - `$promise`, `$router` and `dispose` are reserved top-level keys on a caller: `createCaller` throws for a router that uses them.
-- `Handlers.fromService` / `Handlers.fromProcedures` produce the same handler layer as `Handlers.make` (same tags) from the procedures' `handler`s; their requirements are the handlers' services minus `Scope` and middleware-provided services. `fromService` also provides the service (`yield* AppRouter` is exactly what that build's `make` produced; nested router services stay classes). It accepts a router service whose `make` reads services and fails: it runs `make` (and nested makes) with `Router.buildService` once per layer build, and adds `RouterService.MakeError` / `RouterService.MakeServices` (minus `Scope`) to the layer's error and requirements. A pure class already built by a sync API (`toWebHandler(AppRouter, …)`, `Router.from`) is reused instead of re-run.
+- `Handlers.fromService` / `Handlers.fromProcedures` produce the same handler layer as `Handlers.make` (same tags) from the procedures' `handler`s; their requirements are the handlers' services minus `Scope` and middleware-provided services. `fromService` also provides the service (`yield* AppRouter` is exactly what that build's `make` produced; nested router services stay classes). It accepts a router service whose `make` reads services and fails: it runs `make` (and nested makes) with `Router.buildService` once per layer build, and adds `RouterService.MakeError` to the layer's error and `RouterService.MakeServices` to its requirements (only `Scope` is excluded from those; middleware-provided services are excluded from the handlers' requirements only). A pure class already built by a sync API (`toWebHandler(AppRouter, …)`, `Router.from`) is reused instead of re-run.
 - Every other API taking a router (`toWebHandler`, `serve` / `runServer`, `createCaller`, `layerHttp`, `Handlers.make` / `flat` / `of`) needs it synchronously: for a router service whose `make` reads services pass the contract (a schema-only `Router.make` router, normally `router.client.gen.ts`) and serve the class with `Handlers.fromService`.
 
 **Common mistakes**

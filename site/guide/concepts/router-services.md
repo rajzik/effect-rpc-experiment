@@ -56,8 +56,9 @@ through a **contract**, because only the server has the services:
 
 - Passing the class to one of those APIs is a compile error. If you force it with a cast, it throws
   `Cannot build a router from the router service "AppRouter": make reads services, so this API cannot build the router: give it the contract (router.client.gen.ts) and serve the class with Handlers.fromService`.
-- Router services nest as before, pure or effectful, at any depth. Their `make` effects run in the
-  same layer, and their errors and requirements join the layer's.
+- Router services nest inside an effectful service's `make`, pure or effectful, at any depth. Their
+  `make` effects run in the same layer, and their errors and requirements join the layer's. An
+  effectful service cannot nest in a plain `Router.make({...})` record (a compile error).
 - `yield* AppRouter` returns the record that build's `make` produced.
 - `Router.buildService(AppRouter)` is the same build as an `Effect`, if you provide the services
   yourself.
@@ -93,8 +94,8 @@ A client imports the router module (never the server module) and passes the same
 
 <<< @/snippets/concepts/router-service-nesting.ts#nesting
 
-A service can nest inside another service's `make`, inside a plain `Router.make` record, or inside a
-plain record at any depth, and a router can nest inside a service. `Router.make` resolves the
+A service can nest inside another service's `make`, or (a pure one) inside a plain `Router.make`
+record or a plain record at any depth, and a router can nest inside a service. `Router.make` resolves the
 service to a router, memoized, so the same class is the same router everywhere. Tags are the
 dot-joined paths, as ever.
 

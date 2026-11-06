@@ -8,7 +8,8 @@
  *
  * A router can also be written as an Effect `Context.Service` whose `make` returns the record (a
  * router service, see {@link RouterService}). `Router.from` turns either form into a `Router`, so
- * every API that takes a router takes the service class too.
+ * every API that takes a router takes a pure service class too. A service whose `make` reads
+ * services is served with `Handlers.fromService`; the synchronous APIs take its contract instead.
  *
  * @since 0.1.0
  */
@@ -740,7 +741,7 @@ const runMake = (svc: RouterService.Any): unknown => {
       : // a defect (e.g. `Router.withSchemas`' stale path) says what is wrong itself
         !isAsync && !Cause.hasFails(exit.cause) && cause instanceof Error
         ? cause.message
-        : 'make must not require services or be asynchronous, and must not fail (read services inside the procedure handlers instead)',
+        : 'make must be synchronous and must not fail to build the router synchronously (a make that reads services, fails or is asynchronous is served with Handlers.fromService; give sync APIs the contract)',
     cause,
   );
 };
@@ -783,8 +784,8 @@ const checkRecord = (svc: RouterService.Effectful, record: unknown): Router.Serv
  *   compile error. A `make` that reads a service despite its type throws an `Error` naming the
  *   fix ("make reads services, so this API cannot build the router: give it the contract
  *   (router.client.gen.ts) and serve the class with Handlers.fromService"). One that is
- *   asynchronous (e.g. sleeps) or fails throws "make must not require services or be
- *   asynchronous", with the Effect failure as `cause`. A `make` that dies with an `Error` throws
+ *   asynchronous (e.g. sleeps) or fails throws "make must be synchronous and must not
+ *   fail", with the Effect failure as `cause`. A `make` that dies with an `Error` throws
  *   with that error's message instead. For a `make` that reads services use {@link buildService}.
  * - A failed `make` is not memoized: the next call runs it again.
  *
