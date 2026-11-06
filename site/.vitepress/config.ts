@@ -1,13 +1,13 @@
-// VitePress config for the effect-trpc reference site (GitHub Pages and Vercel).
+// VitePress config for the effect-trpc reference site (deployed on Vercel).
 import { defineConfig } from 'vitepress';
 
 import { sidebar } from './sidebar';
 
 const repo = 'https://github.com/rajzik/effect-rpc-experiment';
 
-// Where the site is served: GitHub Pages serves it under the repo name, Vercel at the root
-// (`DOCS_BASE=/`, set by vercel.json). Must start and end with `/`.
-const base = process.env['DOCS_BASE'] ?? '/effect-rpc-experiment/';
+// Where the site is served: Vercel serves it at the root. `DOCS_BASE` overrides it for a host that
+// serves it under a path (`DOCS_BASE=/docs/`). Must start and end with `/`.
+const base = process.env['DOCS_BASE'] ?? '/';
 
 export default defineConfig({
   base,
