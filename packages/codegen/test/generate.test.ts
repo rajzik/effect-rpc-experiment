@@ -232,6 +232,31 @@ describe('router services whose make is Effect.gen', () => {
     },
   );
 
+  it('emits a router service with a procedure named make in a nested record', () => {
+    const generated = generate({
+      project: path.join(fixtureDir('nested'), 'tsconfig.json'),
+      routers: [path.join(fixtureDir('nested'), 'make-key.ts')],
+      write: false,
+    });
+    expect(generated.errors).toEqual([]);
+    const client = generated.files.find((f) => f.path.endsWith('.client.gen.ts'))?.content ?? '';
+    expect(client).toContain(
+      'export const NestedRouter = __Router.make({\n  admin: {\n    make: __mutation(',
+    );
+  });
+
+  it('emits a router service whose procedures are nested more than eight records deep', () => {
+    const generated = generate({
+      project: path.join(fixtureDir('nested'), 'tsconfig.json'),
+      routers: [path.join(fixtureDir('nested'), 'deep.ts')],
+      write: false,
+    });
+    expect(generated.errors).toEqual([]);
+    const client = generated.files.find((f) => f.path.endsWith('.client.gen.ts'))?.content ?? '';
+    expect(client).toContain('export const NestedRouter = __Router.make(');
+    expect(client).toContain('i: __query(');
+  });
+
   it('inlines a nested effectful service into the client record', () => {
     expect(readOut('router.client.gen.ts')).toContain(
       [

@@ -26,6 +26,7 @@ import {
   API,
   NodeBuilderFlags,
   ObjectFlags,
+  SignatureKind,
   SymbolFlags,
   TypeFlags,
 } from 'typescript/unstable/sync';
@@ -852,27 +853,33 @@ const ENTRY_BRANDS = ['~@effect-trpc/core/ProcedureDef', '~@effect-trpc/core/Rou
  * Whether a service's `make` (an `Effect`) yields a router record: one of its entries, in a nested
  * record too, is a procedure, a router or a router service. Other services are not routers.
  */
-const yieldsRouter = (ctx: Ctx, make: Type | undefined, depth: number): boolean => {
+const yieldsRouter = (ctx: Ctx, make: Type | undefined, seen = new Set<number>()): boolean => {
   const record =
     make !== undefined && isReference(make) ? ctx.checker.getTypeArguments(make)[0] : undefined;
-  return record !== undefined && isRouterRecord(ctx, record, depth);
+  return record !== undefined && isRouterRecord(ctx, record, seen);
 };
 
-const isRouterRecord = (ctx: Ctx, record: Type, depth: number): boolean =>
-  depth < 8 &&
-  ctx.checker.getPropertiesOfType(record).some((prop) => {
+// `seen` (type ids) stops recursive types; there is no depth limit.
+const isRouterRecord = (ctx: Ctx, record: Type, seen: Set<number>): boolean => {
+  if (seen.has(record.id)) return false;
+  seen.add(record.id);
+  return ctx.checker.getPropertiesOfType(record).some((prop) => {
     const type = ctx.checker.getTypeOfSymbol(prop);
     if (type === undefined) return false;
     if (ENTRY_BRANDS.some((brand) => ctx.checker.getPropertyOfType(type, brand) !== undefined))
       return true;
-    const make = ctx.checker.getPropertyOfType(type, 'make');
-    if (make !== undefined) return yieldsRouter(ctx, ctx.checker.getTypeOfSymbol(make), depth + 1);
+    // A service class (constructable, with a static `make`); a record key named `make` is not one.
+    if (ctx.checker.getSignaturesOfType(type, SignatureKind.Construct).length > 0) {
+      const make = ctx.checker.getPropertyOfType(type, 'make');
+      return make !== undefined && yieldsRouter(ctx, ctx.checker.getTypeOfSymbol(make), seen);
+    }
     return (
       type.isObjectType() &&
-      ctx.checker.getSignaturesOfType(type, 0).length === 0 &&
-      isRouterRecord(ctx, type, depth + 1)
+      ctx.checker.getSignaturesOfType(type, SignatureKind.Call).length === 0 &&
+      isRouterRecord(ctx, type, seen)
     );
   });
+};
 
 /** The router a declaration defines (a router service class or a `Router.make` constant). */
 const routerOfDeclaration = (
@@ -882,7 +889,7 @@ const routerOfDeclaration = (
 ): RouterNode | undefined => {
   if (isClassDeclaration(decl)) {
     const make = serviceMake(decl);
-    if (make === undefined || !yieldsRouter(ctx, ctx.checker.getTypeAtLocation(make), 0))
+    if (make === undefined || !yieldsRouter(ctx, ctx.checker.getTypeAtLocation(make)))
       return undefined;
     const record = makeRecord(make);
     if (record !== undefined && isObjectLiteralExpression(record))
