@@ -104,7 +104,7 @@ describe('generated modules at runtime (the committed fixture output)', () => {
     );
     const LogLive = Layer.succeed(Log)(Log.of((effect) => effect));
     web = await toWebHandler(ServerRouter, {
-      handlers: Handlers.fromProcedures(ServerRouter).pipe(
+      handlers: Handlers.fromService(ServerRouter).pipe(
         Layer.provideMerge(Layer.mergeAll(AuthLive, LogLive)),
       ),
     });

@@ -72,8 +72,10 @@ For `router.ts`, two modules next to it:
 
 - **`router.gen.ts` is for the server.** It wraps the router module with
   `Router.withSchemas`: the module is imported once, so state like a connection pool or an
-  in-memory cache exists once. It is a plain router: serve it with
-  `Handlers.fromProcedures(AppRouter)` (imported from `./router.gen`) plus your middleware layers.
+  in-memory cache exists once. For a router service it is a router service with the same key that
+  runs nothing until it is served: serve it with `Handlers.fromService(AppRouter)` (imported from
+  `./router.gen`) plus your middleware layers (`Handlers.fromProcedures` for a `Router.make`
+  router).
 - **`router.client.gen.ts` is for clients.** Schema-only `query({...})` definitions with the same
   tags, middleware and schemas, and no handlers. It never imports the router module, so handler
   code and server-only imports (database clients, secrets) stay out of client bundles, with any

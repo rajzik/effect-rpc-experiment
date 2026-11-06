@@ -135,7 +135,8 @@ one to decode it. [`@effect-trpc/codegen`](../advanced/codegen) reads each handl
   `Data.TaggedError`, a raw `Error`) arrives as `RpcDefect`, and the generated client types say
   so: `create` fails with `Forbidden`, not `DbError`.
 - The server module wraps the router module (`Router.withSchemas`): it is imported once, its
-  state is not copied. Serve it with `Handlers.fromProcedures`.
+  state is not copied. It is a router service with the same key: serve it with
+  `Handlers.fromService`.
 - The client module has no handlers and does not import the router module, so handler code and
   server-only imports stay out of client bundles. A compile-time check in it fails when it no
   longer matches the server router.

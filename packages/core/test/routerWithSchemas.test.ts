@@ -1,7 +1,7 @@
 // `Router.withSchemas`: the overlay the schema generator writes. It re-creates the inferred
 // procedures of a router (or router service) with the generated schemas, without copying the
-// module that defines them.
-import { Context, Effect, Exit, Schema, Stream } from 'effect';
+// module that defines them. Over a service it is a lazy service: nothing runs until it is built.
+import { Cause, Context, Effect, Exit, Schema, Stream } from 'effect';
 import { Headers } from 'effect/http';
 import { Rpc, RpcMessage } from 'effect/rpc';
 import { describe, expect, it } from 'vite-plus/test';
@@ -41,13 +41,36 @@ class App extends Context.Service<App>()('App', {
   }),
 }) {}
 
-const patched = Router.withSchemas(App, {
+const wrapped = Router.withSchemas(App, {
   byId: { output: Post, error: PostNotFound },
   first: { output: Post },
   feed: { output: Post },
   admin: { count: { output: Schema.Finite } },
   guarded: { ping: { output: Schema.String } },
 });
+const makeRunsAtImport = makeRuns;
+const patched = Router.from(wrapped);
+
+class Database extends Context.Service<Database, { readonly latest: Effect.Effect<Post> }>()(
+  'Database',
+) {}
+
+let effectfulRuns = 0;
+class DbRouter extends Context.Service<DbRouter>()('DbRouter', {
+  make: Effect.gen(function* () {
+    effectfulRuns += 1;
+    const db = yield* Database;
+    return { latest: Procedure.query(() => db.latest) };
+  }),
+}) {}
+
+/** The defect `effect` died with (it must not fail with a typed error). */
+const defectOf = async (effect: Effect.Effect<unknown, unknown>): Promise<unknown> => {
+  const exit = await Effect.runPromiseExit(effect);
+  if (!Exit.isFailure(exit)) throw new Error('expected a failure');
+  expect(Cause.hasFails(exit.cause)).toBe(false);
+  return Cause.squash(exit.cause);
+};
 
 describe('Router.withSchemas', () => {
   it('sets the schemas of inferred procedures, keeping payload, kind and middleware', () => {
@@ -91,10 +114,32 @@ describe('Router.withSchemas', () => {
     expect(patched.record.legacy).toBe(Router.from(App).record.legacy);
   });
 
-  it('reuses the memoized make of the source service', () => {
+  it('over a service, returns a service with the same key and runs no make until built', () => {
+    expect(makeRunsAtImport).toBe(0);
+    expect(Router.isService(wrapped)).toBe(true);
+    expect(wrapped.key).toBe(App.key);
     const before = makeRuns;
-    Router.withSchemas(App, { admin: { count: { output: Schema.Finite } } });
+    expect(
+      Router.isService(Router.withSchemas(App, { admin: { count: { output: Schema.Finite } } })),
+    ).toBe(true);
     expect(makeRuns).toBe(before);
+  });
+
+  it('withSchemas over an effectful service runs no make at import', async () => {
+    const out = Router.withSchemas(DbRouter, { latest: { output: Post } });
+    expect(effectfulRuns).toBe(0);
+    expect(out.key).toBe(DbRouter.key);
+    const { router } = await Effect.runPromise(
+      Router.buildService(out).pipe(
+        Effect.provideService(Database, { latest: Effect.succeed(post) }),
+      ),
+    );
+    expect(effectfulRuns).toBe(1);
+    const { latest } = router.record;
+    expect(latest.successSchema).toBe(Post);
+    expect(await Effect.runPromise(latest.handler(undefined, ctx(latest.toRpc('latest'))))).toBe(
+      post,
+    );
   });
 
   it('does not change the source router', async () => {
@@ -104,19 +149,30 @@ describe('Router.withSchemas', () => {
     expect(Exit.isFailure(exit)).toBe(true); // still guarded: no output schema
   });
 
-  it('rejects schemas for paths that are not inferred procedures (a stale generated file)', () => {
-    expect(() =>
+  it('rejects schemas for paths that are not inferred procedures (a stale generated file)', async () => {
+    const stale = (schemas: object) =>
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a generated file older than the router
-      Router.withSchemas(App, { missing: { output: Post } } as never),
-    ).toThrow(/no procedure "missing"/);
-    expect(() =>
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a generated file older than the router
-      Router.withSchemas(App, { legacy: { output: Schema.String } } as never),
-    ).toThrow(/"legacy" has no handler/);
-    expect(() =>
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a generated file older than the router
-      Router.withSchemas(App, { admin: { nope: { output: Post } } } as never),
-    ).toThrow(/no procedure "admin.nope"/);
+      Router.buildService(Router.withSchemas(App, schemas as never));
+    expect(await defectOf(stale({ missing: { output: Post } }))).toEqual(
+      expect.objectContaining({ message: expect.stringMatching(/no procedure "missing"/) }),
+    );
+    expect(await defectOf(stale({ legacy: { output: Schema.String } }))).toEqual(
+      expect.objectContaining({ message: expect.stringMatching(/"legacy" has no handler/) }),
+    );
+    expect(await defectOf(stale({ admin: { nope: { output: Post } } }))).toEqual(
+      expect.objectContaining({ message: expect.stringMatching(/no procedure "admin.nope"/) }),
+    );
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a generated file older than the router
+    const forced = Router.withSchemas(App, { missing: { output: Post } } as never);
+    // `Router.from` builds it synchronously: the stale path is the cause of the build error
+    expect(() => Router.from(forced)).toThrow(
+      expect.objectContaining({
+        message: expect.stringMatching(/router service "App"/),
+        cause: expect.objectContaining({
+          message: expect.stringMatching(/no procedure "missing"/),
+        }),
+      }),
+    );
   });
 
   it('accepts a plain router', () => {
@@ -129,6 +185,6 @@ describe('Router.withSchemas', () => {
     const out = Router.withSchemas(App, {
       byId: { output: Post, error: Schema.Union([PostNotFound, Forbidden]) },
     });
-    expect(out.record.byId.errorSchema.ast._tag).toBe('Union');
+    expect(Router.from(out).record.byId.errorSchema.ast._tag).toBe('Union');
   });
 });

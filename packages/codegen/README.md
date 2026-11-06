@@ -32,7 +32,7 @@ effect-trpc-codegen --check src/router.ts    # CI: exit 1 when a generated modul
 ```ts
 // server.ts
 import { AppRouter } from './router.gen.js';
-const web = await toWebHandler(AppRouter, { handlers: Handlers.fromProcedures(AppRouter) });
+const web = await toWebHandler(AppRouter, { handlers: Handlers.fromService(AppRouter) });
 
 // client.ts (browser bundle: no handler code, no server imports)
 import { AppRouter } from './router.client.gen.js';
@@ -135,7 +135,8 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
 2. `effect-trpc-codegen src/router.ts`, or the bundler plugin of your bundler
    (`@effect-trpc/codegen/<bundler>`; Turbopack: `@effect-trpc/codegen/loader`).
 3. Server: `import { AppRouter } from './router.gen.js'`, serve with
-   `Handlers.fromProcedures(AppRouter)` plus the middleware layers.
+   `Handlers.fromService(AppRouter)` (a router service) or `Handlers.fromProcedures(AppRouter)`
+   (a `Router.make` router) plus the middleware layers.
 4. Clients: `import { AppRouter } from './router.client.gen.js'` for `createClient`,
    `createRpcContext`, framework adapters.
 5. CI: `effect-trpc-codegen --check src/router.ts`.
@@ -146,7 +147,9 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
   (and stays checked). Explicit chains and `query({...})` entries are copied to the client module
   as written.
 - The server module imports the router module once (`Router.withSchemas`): no duplicated module
-  state. It is a plain router: serve it with `Handlers.fromProcedures`, not `Handlers.fromService`.
+  state. For a router service it exports a router service with the same key whose `make` runs only
+  when it is built: serve it with `Handlers.fromService`. For a `Router.make` router it exports a
+  router: serve it with `Handlers.fromProcedures`.
 - The client module imports only what its copied schema expressions reference (resolved through
   the router module's imports; top-level `const` schemas of the router module are copied).
 - `__contract_<Router>` in the client module is a compile error (`router.client.gen.ts is out of

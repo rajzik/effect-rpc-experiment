@@ -6,7 +6,7 @@
  *
  * - `router.gen.ts` (server): `Router.withSchemas(AppRouter, { ... })` over the router module
  *   itself, with the inferred `output` / `error` schemas of every procedure written without
- *   `.output`. Serve this router.
+ *   `.output`. Serve this one (a router service with the source's key for a service source).
  * - `router.client.gen.ts` (client): the same contract as a schema-only router (`query({...})`
  *   definitions, no handlers, no import of the router module). Give this router to clients, so
  *   handler code and server-only imports stay out of client bundles. A compile-time check in it

@@ -402,6 +402,24 @@ export declare namespace RouterService {
    * @since 0.1.0
    */
   export type MakeServices<S> = MakeOf<S, 'services'>;
+
+  /**
+   * What `Router.withSchemas(source, schemas)` returns for a router service `X`: a service with
+   * `X`'s key whose `make` builds `X` (with `X`'s error and services) and succeeds with the
+   * patched record ({@link Router.WithSchemas}). Pure when `X` is pure.
+   *
+   * @since 0.1.0
+   */
+  export type WithSchemas<X, S> = Context.Key<
+    Context.Service.Identifier<X>,
+    Context.Service.Shape<X>
+  > & {
+    readonly make: Effect.Effect<
+      Router.WithSchemas<Router.Record<X>, S>,
+      MakeError<X>,
+      MakeServices<X>
+    >;
+  };
 }
 
 /** The `E` (`'error'`) or `R` (`'services'`) of a router service's `make`, nested makes included. */
@@ -1224,30 +1242,34 @@ const patchRecord = (
 };
 
 /**
- * Returns a router whose inferred procedures carry the given schemas: the overlay the schema
- * generator (`@effect-trpc/codegen`) writes for a router written without `.output` / `.error`.
+ * Overlays the given schemas on the inferred procedures of a router or router service: the
+ * module the schema generator (`@effect-trpc/codegen`) writes for a router written without
+ * `.output` / `.error`.
  *
  * **When to use**
  *
  * Normally only generated code calls it. The generated module imports the router module and
- * exports `Router.withSchemas(AppRouter, { ... })`; serve that router and give it to clients.
+ * exports `Router.withSchemas(AppRouter, { ... })`; serve that and give it to clients.
  *
  * **Details**
  *
  * - Each named procedure is re-created as `.inferred({ output, error })` before its terminal
  *   would have made it: same kind, payload, middleware and handler (without the inference-mode
  *   guard once an `output` is given). A user `.error(...)` stays unless `error` is given.
- * - `source` is a router or a router service class; a service's memoized `make` is reused, so the
- *   router module is evaluated once and its state is not copied.
+ * - For a router source the result is a router.
+ * - For a router service source (pure, or whose `make` reads services) the result is a router
+ *   service with the same key: its `make` builds the source with {@link buildService} and
+ *   patches the record. Nothing runs at the call, so the router module is imported once and its
+ *   `make` runs only when the result is built. Serve it with `Handlers.fromService(wrapped)`;
+ *   `Router.from(wrapped)` builds the router of a pure one.
  * - Nested routers (and nested services) are patched recursively and keep router-level
  *   middleware. Procedures not named in `schemas` are kept as they are.
- * - The result is a plain router: serve it with `Handlers.fromProcedures(router)` (or any
- *   adapter taking `Router.Input`).
  *
  * **Gotchas**
  *
  * - A path that is not a procedure with a handler is a compile error and, if forced, throws
  *   (`no procedure "<path>"`, `"<path>" has no handler`): regenerate after changing the router.
+ *   Over a service it throws when the result is built (a defect of its `make`), not at the call.
  *
  * **Example** (The overlay the generator writes)
  *
@@ -1264,27 +1286,40 @@ const patchRecord = (
  *   }),
  * }) {}
  *
- * // router.gen.ts
+ * // router.gen.ts: a router service with AppRouter's key (nothing runs here)
  * export const appRouter = Router.withSchemas(AppRouter, { latest: { output: Post } });
  *
- * type Latest = inferOutput<typeof appRouter.record.latest>; // Post
+ * type Latest = inferOutput<Router.Record<typeof appRouter>['latest']>; // Post
+ * Router.from(appRouter).record.latest.successSchema === Post; // true
  * ```
  *
+ * @see {@link buildService}
  * @category combinators
  * @since 0.1.0
  */
-const withSchemas = <
-  const X extends Router.Input,
-  const S extends Router.SchemasOf<Router.Record<X>>,
->(
-  source: X,
-  schemas: S & Router.NoExtraSchemas<S, Router.SchemasOf<Router.Record<X>>>,
-): Router<Router.WithSchemas<Router.Record<X>, S>> => {
-  const record: Router.Shape = from(source).record;
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `patchRecord` replaces exactly the entries `WithSchemas` describes
-  return build(patchRecord(record, schemas, [])) as unknown as Router<
-    Router.WithSchemas<Router.Record<X>, S>
-  >;
+const withSchemas: {
+  <const X extends Router.Any, const S extends Router.SchemasOf<Router.Record<X>>>(
+    source: X,
+    schemas: S & Router.NoExtraSchemas<S, Router.SchemasOf<Router.Record<X>>>,
+  ): Router<Router.WithSchemas<Router.Record<X>, S>>;
+  <const X extends RouterService.Effectful, const S extends Router.SchemasOf<Router.Record<X>>>(
+    source: X,
+    schemas: S & Router.NoExtraSchemas<S, Router.SchemasOf<Router.Record<X>>>,
+  ): RouterService.WithSchemas<X, S>;
+} = (
+  source: Router.Any | RouterService.Effectful,
+  schemas: { readonly [key: string]: unknown },
+): never => {
+  if (isRouter(source)) {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `patchRecord` replaces exactly the entries `WithSchemas` describes
+    return build(patchRecord(source.record, schemas, [])) as never;
+  }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erases `make`'s error and services; the overloads restore them (`RouterService.WithSchemas`)
+  const patched = Effect.flatMap(buildService(source as RouterService.Any), ({ router }) =>
+    Effect.sync(() => patchRecord(router.record, schemas, [])),
+  );
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a key with `source`'s key string is `source`'s key; `make` succeeds with the record `RouterService.WithSchemas` describes
+  return Context.Service<any, any>()(source.key, { make: patched }) as never;
 };
 
 /**

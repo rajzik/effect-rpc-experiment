@@ -1,7 +1,8 @@
 import { Context, Effect, Schema, Stream } from 'effect';
+import type { Rpc } from 'effect/rpc';
 import { describe, expectTypeOf, it } from 'vite-plus/test';
 import { Procedure, query, Router } from '../src/index.js';
-import type { inferError, inferOutput, ProcedureWithHandler } from '../src/index.js';
+import type { inferError, inferOutput, ProcedureWithHandler, RouterService } from '../src/index.js';
 import { AuthMiddleware, Post, PostNotFound, Unauthorized } from './fixtures.js';
 
 const post = new Post({ id: 1, title: 'Hello', createdAt: new Date(0) });
@@ -24,13 +25,29 @@ class App extends Context.Service<App>()('App', {
   }),
 }) {}
 
+class DbError extends Schema.TaggedError<DbError>()('DbError', {}) {}
+
+class Database extends Context.Service<
+  Database,
+  { readonly ready: Effect.Effect<void, DbError>; readonly latest: Effect.Effect<Post> }
+>()('Database') {}
+
+class DbRouter extends Context.Service<DbRouter>()('DbRouter', {
+  make: Effect.gen(function* () {
+    const db = yield* Database;
+    yield* db.ready;
+    return { latest: Procedure.query(() => db.latest) };
+  }),
+}) {}
+
 describe('Router.withSchemas types', () => {
   it('replaces the schema types of the given paths only', () => {
-    const out = Router.withSchemas(App, {
+    const wrapped = Router.withSchemas(App, {
       byId: { output: Post, error: PostNotFound },
       first: { output: Post },
       admin: { count: { output: Schema.Finite } },
     });
+    const out = Router.from(wrapped);
     expectTypeOf(out.record.byId.successSchema).toEqualTypeOf<typeof Post>();
     expectTypeOf<inferError<typeof out.record.byId>>().toEqualTypeOf<PostNotFound>();
     expectTypeOf<inferError<typeof out.record.first>>().toEqualTypeOf<
@@ -52,6 +69,30 @@ describe('Router.withSchemas types', () => {
         never
       >
     >();
+  });
+
+  it('over a router service, returns a service (pure for a pure source)', () => {
+    const wrapped = Router.withSchemas(App, { byId: { output: Post } });
+    expectTypeOf(wrapped).toExtend<Router.Input>();
+    expectTypeOf<RouterService.MakeServices<typeof wrapped>>().toEqualTypeOf<never>();
+    expectTypeOf<Context.Service.Identifier<typeof wrapped>>().toEqualTypeOf<App>();
+    const router = Router.withSchemas(Router.from(App), { byId: { output: Post } });
+    expectTypeOf(router.record.byId.successSchema).toEqualTypeOf<typeof Post>();
+  });
+
+  it('over an effectful service, keeps its make error and services', () => {
+    const wrapped = Router.withSchemas(DbRouter, { latest: { output: Post } });
+    type Latest = Rpc.ExtractTag<Router.Rpcs<typeof wrapped>, 'latest'>;
+    expectTypeOf<Rpc.Success<Latest>>().toEqualTypeOf<Post>();
+    expectTypeOf<RouterService.MakeServices<typeof wrapped>>().toEqualTypeOf<
+      RouterService.MakeServices<typeof DbRouter>
+    >();
+    expectTypeOf<RouterService.MakeServices<typeof wrapped>>().toEqualTypeOf<Database>();
+    expectTypeOf<RouterService.MakeError<typeof wrapped>>().toEqualTypeOf<DbError>();
+    expectTypeOf(wrapped).toExtend<RouterService.Effectful>();
+    expectTypeOf(wrapped).not.toExtend<Router.Input>();
+    // @ts-expect-error -- no such procedure
+    Router.withSchemas(DbRouter, { missing: { output: Post } });
   });
 
   it('rejects paths that are not procedures with handlers', () => {
