@@ -389,6 +389,10 @@ interface ModuleGen {
   readonly aliases: Map<number, string>;
   readonly counter: { next: number };
   readonly recursion: Map<number, { name: string; used: boolean; typeRef: string }>;
+  /** Recursive types already hoisted (type id -> declaration name): each is declared once. */
+  readonly hoistedNames: Map<number, string>;
+  /** Type-only imports already added (symbol id -> local name). */
+  readonly typeAliases: Map<number, string>;
 }
 
 const newModule = (ctx: Ctx, routerFile: SourceFile, side: 'server' | 'client'): ModuleGen => ({
@@ -402,11 +406,13 @@ const newModule = (ctx: Ctx, routerFile: SourceFile, side: 'server' | 'client'):
   aliases: new Map(),
   counter: { next: 0 },
   recursion: new Map(),
+  hoistedNames: new Map(),
+  typeAliases: new Map(),
 });
 
 /** A reference to a declared symbol (a schema class, or a named type) from the generated module. */
 const importSymbol = (gen: ModuleGen, symbol: TsSymbol, typeOnly: boolean): string => {
-  const cached = typeOnly ? undefined : gen.aliases.get(symbol.id);
+  const cached = (typeOnly ? gen.typeAliases : gen.aliases).get(symbol.id);
   if (cached !== undefined) return cached;
   const local = `__i${gen.counter.next++}`;
   const found = findImportOf(gen.ctx, gen.routerFile, symbol);
@@ -447,7 +453,7 @@ const importSymbol = (gen: ModuleGen, symbol: TsSymbol, typeOnly: boolean): stri
       typeOnly,
     );
   }
-  if (!typeOnly) gen.aliases.set(symbol.id, local);
+  (typeOnly ? gen.typeAliases : gen.aliases).set(symbol.id, local);
   return local;
 };
 
@@ -505,8 +511,15 @@ const toSchema = (gen: ModuleGen, type: Type): string => {
   if (f & TypeFlags.Number) return `${S}.Number`;
   if (f & TypeFlags.Boolean) return `${S}.Boolean`;
   if (f & TypeFlags.BigInt) return `${S}.BigInt`;
-  if (f & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral | TypeFlags.BooleanLiteral))
-    return `${S}.Literal(${checker.typeToString(type)})`;
+  // An enum member is also a string / number literal type; its text (`Status.Active`) would
+  // reference an enum the generated module does not import.
+  if (f & TypeFlags.EnumLiteral || f & TypeFlags.Enum)
+    throw new Unmappable(
+      `the enum ${type.getSymbol()?.getParent()?.name ?? checker.typeToString(type)} has no schema mapping: add .output(Schema.Enum(...))`,
+    );
+  if (type.isStringLiteralType() || type.isNumberLiteralType())
+    return `${S}.Literal(${JSON.stringify(type.value)})`;
+  if (f & TypeFlags.BooleanLiteral) return `${S}.Literal(${checker.typeToString(type)})`;
   if (f & TypeFlags.TypeParameter)
     throw new Unmappable(
       `the type parameter ${checker.typeToString(type)} has no schema (make the handler concrete)`,
@@ -557,6 +570,8 @@ const toSchema = (gen: ModuleGen, type: Type): string => {
 /** A plain object type: `Struct`, `Record`, or a hoisted recursive declaration. */
 const objectSchema = (gen: ModuleGen, type: Type): string => {
   const { checker } = gen.ctx;
+  const hoisted = gen.hoistedNames.get(type.id);
+  if (hoisted !== undefined) return hoisted;
   const active = gen.recursion.get(type.id);
   if (active !== undefined) {
     active.used = true;
@@ -565,7 +580,7 @@ const objectSchema = (gen: ModuleGen, type: Type): string => {
   const named = type.getAliasSymbol() ?? type.getSymbol();
   const canName = named !== undefined && named.name !== '__type' && named.name !== '__object';
   const entry = {
-    name: `__r${gen.recursion.size}`,
+    name: `__r${gen.counter.next++}`,
     used: false,
     // Only resolved if the type turns out to be recursive (see below).
     typeRef: '',
@@ -585,10 +600,15 @@ const objectSchema = (gen: ModuleGen, type: Type): string => {
     } else {
       const fields = properties.map((prop) => {
         const optional = (prop.flags & SymbolFlags.Optional) !== 0;
-        let propType = checker.getTypeOfSymbol(prop);
+        const propType = checker.getTypeOfSymbol(prop);
         if (propType === undefined) throw new Unmappable(`property ${prop.name}`);
-        if (optional) propType = checker.getNonNullableType(propType) ?? propType;
-        const value = toSchema(gen, propType);
+        // `x?: T | null`: the `?` already allows `undefined`; keep `null` in the schema.
+        const value = optional
+          ? unionSchema(
+              gen,
+              membersOf(propType).filter((m) => (m.flags & TypeFlags.Undefined) === 0),
+            )
+          : toSchema(gen, propType);
         const key = /^[A-Za-z_$][\w$]*$/.test(prop.name) ? prop.name : JSON.stringify(prop.name);
         return `${key}: ${optional ? `${S}.optional(${value})` : value}`;
       });
@@ -605,6 +625,7 @@ const objectSchema = (gen: ModuleGen, type: Type): string => {
       `${S}.Codec<${typeLocal}, unknown>`,
     );
     gen.hoisted.push(`const ${entry.name}: ${S}.Codec<${typeLocal}, unknown> = ${finalSchema};`);
+    gen.hoistedNames.set(type.id, entry.name);
     return entry.name;
   } finally {
     gen.recursion.delete(type.id);

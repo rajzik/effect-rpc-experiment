@@ -127,6 +127,9 @@ describe('Vite', () => {
         router,
         readFileSync(router, 'utf8').replace("Effect.succeed('ok' as const)", 'Effect.succeed(1)'),
       );
+      // Through Vite's own watcher pipeline, emitted directly so the test does not depend on how
+      // fast the OS file watcher reports the write (inotify on CI runners can lag).
+      server.watcher.emit('change', router);
       await expect
         .poll(() => readFileSync(gen, 'utf8'), { timeout: 10_000, interval: 100 })
         .toContain('health: { output: __Schema.Number }');

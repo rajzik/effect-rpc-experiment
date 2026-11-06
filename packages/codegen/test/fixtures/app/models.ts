@@ -31,3 +31,15 @@ export interface Tree {
   readonly value: number;
   readonly children: ReadonlyArray<Tree>;
 }
+
+/** A second recursive type: hoisted under its own name. */
+export interface Thread {
+  readonly text: string;
+  readonly replies: ReadonlyArray<Thread>;
+}
+
+/** An optional property that may also be `null`: only `undefined` is stripped. */
+export interface Archive {
+  readonly archivedAt?: Date | null;
+  readonly note: 'it\'s "quoted"';
+}

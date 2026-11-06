@@ -5,12 +5,14 @@ import { Procedure, query, Router } from '@effect-trpc/core';
 import { AdminRouter } from './admin.js';
 import { db } from './db.js';
 import { Auth, DbError, Forbidden, Log, Post, PostNotFound, Unauthorized } from './models.js';
-import type { Tree } from './models.js';
+import type { Archive, Thread, Tree } from './models.js';
 
 // A local schema used as input: copied into the client module.
 const PostById = Schema.Struct({ id: Schema.Finite });
 
 const tree: Tree = { value: 1, children: [{ value: 2, children: [] }] };
+const thread: Thread = { text: 'root', replies: [{ text: 'reply', replies: [] }] };
+const archive: Archive = { archivedAt: null, note: 'it\'s "quoted"' };
 const counts: Record<string, number> = { drafts: 1 };
 
 export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
@@ -42,6 +44,10 @@ export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
     },
     data: {
       tree: Procedure.query(() => Effect.succeed(tree)),
+      // The same recursive type again, and a second one: one hoisted declaration each.
+      forest: Procedure.query(() => Effect.succeed([tree])),
+      thread: Procedure.query(() => Effect.succeed(thread)),
+      archive: Procedure.query(() => Effect.succeed(archive)),
       stats: Procedure.query(() =>
         Effect.succeed({
           total: BigInt(db.posts.length),

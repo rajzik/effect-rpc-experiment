@@ -66,14 +66,14 @@ exist already: commit them, or run `effect-trpc-codegen` once before the first b
 
 For `router.ts`, two modules next to it:
 
-<<< @/snippets/concepts/router-service-inferred.ts#generated [router.gen.ts]
+<<< @/snippets/concepts/router-service-inferred.gen.ts#generated [router.gen.ts]
 
-<<< @/snippets/concepts/router-service-inferred.ts#client [router.client.gen.ts]
+<<< @/snippets/concepts/router-service-inferred.client.gen.ts#client [router.client.gen.ts]
 
 - **`router.gen.ts` is for the server.** It wraps the router module with
   `Router.withSchemas`: the module is imported once, so state like a connection pool or an
   in-memory cache exists once. It is a plain router: serve it with
-  `Handlers.fromProcedures(ServerRouter)` plus your middleware layers.
+  `Handlers.fromProcedures(AppRouter)` (imported from `./router.gen`) plus your middleware layers.
 - **`router.client.gen.ts` is for clients.** Schema-only `query({...})` definitions with the same
   tags, middleware and schemas, and no handlers. It never imports the router module, so handler
   code and server-only imports (database clients, secrets) stay out of client bundles, with any

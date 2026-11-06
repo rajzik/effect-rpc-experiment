@@ -1,6 +1,6 @@
 import { Context, Data, Effect, Schema } from 'effect';
-import { mutation, Procedure, query, Router } from '@effect-trpc/core';
-import type { inferError, inferOutput } from '@effect-trpc/core';
+import { Procedure } from '@effect-trpc/core';
+import type { inferOutput, Router } from '@effect-trpc/core';
 
 import { Forbidden, Post, PostNotFound } from '@/router';
 
@@ -32,22 +32,4 @@ export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
 type ById = inferOutput<Router.Of<typeof AppRouter>['record']['byId']>; // Post
 // #endregion written
 
-// #region generated
-// router.gen.ts (server): the router module with the inferred schemas. Serve this one.
-export const ServerRouter = Router.withSchemas(AppRouter, {
-  byId: { output: Post, error: PostNotFound },
-  create: { output: Post, error: Forbidden }, // DbError is not a schema: a defect
-});
-// #endregion generated
-
-// #region client
-// router.client.gen.ts (clients): the same contract, schemas only. No handlers, no router import.
-export const ClientRouter = Router.make({
-  byId: query({ payload: { id: Schema.Finite }, success: Post, error: PostNotFound }),
-  create: mutation({ payload: { title: Schema.String }, success: Post, error: Forbidden }),
-});
-
-type CreateError = inferError<typeof ClientRouter.record.create>; // Forbidden
-// #endregion client
-
-export type { ById, CreateError };
+export type { ById };

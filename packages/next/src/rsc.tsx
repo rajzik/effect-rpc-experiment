@@ -484,7 +484,8 @@ export function createRscHelpers<
  * export const { rpc, prefetch, HydrateClient, caller } = createRscHelpers(AppRouter, {
  *   handlers: Handlers.fromService(AppRouter),
  * });
- * const post = await caller.post.byId({ id: 1 }); // a Post instance
+ * // `caller` is the Effect API; `caller.$promise` the Promise API.
+ * const post = await caller.$promise.post.byId({ id: 1 }); // a Post instance
  * ```
  *
  * @see {@link RscHandlersSource}

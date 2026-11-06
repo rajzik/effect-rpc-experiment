@@ -149,6 +149,14 @@ describe('generated modules at runtime (the committed fixture output)', () => {
     expect(stats.latest).toBeInstanceOf(Date);
     expect(stats.titles).toEqual(['Hello Effect', 'Typed errors']);
     expect(await client.data.ping()).toBeUndefined();
+    expect(await client.data.forest()).toEqual([
+      { value: 1, children: [{ value: 2, children: [] }] },
+    ]);
+    expect(await client.data.thread()).toEqual({
+      text: 'root',
+      replies: [{ text: 'reply', replies: [] }],
+    });
+    expect(await client.data.archive()).toEqual({ archivedAt: null, note: 'it\'s "quoted"' });
   });
 
   it('nested services, router-level middleware and subscriptions', async () => {
@@ -198,6 +206,7 @@ describe('drift and errors', () => {
         /router\.ts:\d+: .*Local is declared in the router module|Local is a class declared next to the router/,
       );
       expect(errors).toMatch(/the recursive type .* needs a name|is not exported/);
+      expect(errors).toMatch(/router\.ts:\d+: the enum Status has no schema mapping/);
     } finally {
       removeDir(bad);
     }

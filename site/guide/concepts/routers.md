@@ -77,6 +77,8 @@ thenable or a React element. The shared rule is
 
 :::
 
-See also: [Routers as services](./router-services), the same router written once as an Effect
-service with `Procedure` handlers. [`query`](/api/core#query), [`Router`](/api/core#router),
+To write the same router once, as an Effect service with `Procedure` handlers, see
+[Routers as services](./router-services).
+
+See also: [`query`](/api/core#query), [`Router`](/api/core#router),
 [`Router.make`](/api/core#router-make), [`ProcedureDef`](/api/core#proceduredef).

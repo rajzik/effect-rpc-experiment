@@ -4,7 +4,14 @@ import type { ClientError, Router } from '@effect-trpc/core';
 import type { Client } from '@effect-trpc/client';
 import type { AppRouter as ClientRouter } from './fixtures/app/router.client.gen.js';
 import type { AppRouter as ServerRouter } from './fixtures/app/router.gen.js';
-import type { Forbidden, Post, PostNotFound, Tree, Unauthorized } from './fixtures/app/models.js';
+import type {
+  Forbidden,
+  Post,
+  PostNotFound,
+  Thread,
+  Tree,
+  Unauthorized,
+} from './fixtures/app/models.js';
 
 type C = Router.Record<typeof ClientRouter>;
 
@@ -27,6 +34,11 @@ describe('generated client contract types', () => {
       readonly titles: Array<string>;
     }>();
     expectTypeOf<Client.Output<C['data']['ping']>>().toEqualTypeOf<void>();
+    expectTypeOf<Client.Output<C['data']['thread']>>().toEqualTypeOf<Thread>();
+    expectTypeOf<Client.Output<C['data']['archive']>>().toEqualTypeOf<{
+      readonly archivedAt?: Date | null | undefined;
+      readonly note: 'it\'s "quoted"';
+    }>();
     expectTypeOf<Client.Output<C['admin']['count']>>().toEqualTypeOf<number>();
   });
 

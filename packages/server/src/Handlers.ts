@@ -483,6 +483,9 @@ const proceduresHandlers = (router: Router.Any, owner: string): FlatHandlers => 
  *   Layer.provide(Layer.succeed(Greeting)({ word: 'Hello' })),
  * );
  * ```
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 const fromProcedures = <R extends Router.Any>(
   router: R & Handlers.RequireHandlers<R>,
@@ -563,6 +566,9 @@ const fromProcedures = <R extends Router.Any>(
  *   handlers: HandlersLive.pipe(Layer.provide(DatabaseLive)),
  * });
  * ```
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 const fromService = <S extends RouterService.Any>(
   service: S & Handlers.RequireHandlers<Router.Of<S>>,

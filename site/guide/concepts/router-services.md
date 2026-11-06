@@ -124,9 +124,9 @@ Types alone don't put a `Post` on the wire: the server needs a schema to encode 
 one to decode it. [`@effect-trpc/codegen`](../advanced/codegen) reads each handler's inferred
 `Effect<A, E>` with the TypeScript 7 checker and writes two modules next to the router:
 
-<<< @/snippets/concepts/router-service-inferred.ts#generated [router.gen.ts]
+<<< @/snippets/concepts/router-service-inferred.gen.ts#generated [router.gen.ts]
 
-<<< @/snippets/concepts/router-service-inferred.ts#client [router.client.gen.ts]
+<<< @/snippets/concepts/router-service-inferred.client.gen.ts#client [router.client.gen.ts]
 
 - Schema classes (`Post`, `PostNotFound`) are imported from where they are declared, so
   transformations, getters and `instanceof` work on the client. Plain object types become a

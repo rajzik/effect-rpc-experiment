@@ -9,6 +9,10 @@ class Plain {
 // A Schema class declared in the router module: fine for the server, not for the client.
 class Local extends Schema.Class<Local>('Local')({ n: Schema.Finite }) {}
 
+enum Status {
+  Active = 'active',
+}
+
 interface Node {
   readonly next: Node | null;
 }
@@ -20,5 +24,6 @@ export class BadRouter extends Context.Service<BadRouter>()('BadRouter', {
     fn: Procedure.query(() => Effect.succeed({ run: () => 1 })),
     local: Procedure.input(Local).query(() => Effect.void),
     recursive: Procedure.query(() => Effect.succeed(node)),
+    status: Procedure.query(() => Effect.succeed(Status.Active)),
   }),
 }) {}
