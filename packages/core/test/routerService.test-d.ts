@@ -192,6 +192,16 @@ describe('router services (types)', () => {
     expectTypeOf(Router.make(record)).toEqualTypeOf(makeGeneric(record));
   });
 
+  it('serviceValue is typed as the service shape (nested services stay classes)', () => {
+    class Outer extends Context.Service<Outer>()('Outer', {
+      make: Effect.succeed({ admin: AdminRouter, ping: query({ success: Schema.String }) }),
+    }) {}
+    expectTypeOf(Router.serviceValue(Outer)).toEqualTypeOf<Context.Service.Shape<typeof Outer>>();
+    expectTypeOf(Router.serviceValue(Outer).admin).toEqualTypeOf<typeof AdminRouter>();
+    // @ts-expect-error -- make requires Database
+    Router.serviceValue(NeedsDb);
+  });
+
   it('isService narrows to RouterService.Any', () => {
     const u: unknown = AppRouter;
     if (Router.isService(u)) {

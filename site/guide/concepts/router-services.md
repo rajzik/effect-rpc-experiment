@@ -51,7 +51,9 @@ handlers. The layer's requirements are the union of what the handlers read: `Dat
 exclude `Scope` and the services a procedure's middleware provides, so a handler may `yield*` a
 `CurrentUser` that `Auth` provides without it becoming a requirement.
 
-The layer also provides the class itself: `yield* AppRouter` returns the record `make` produced.
+The layer also provides the class itself: `yield* AppRouter` returns exactly the record `make`
+produced (`Router.serviceValue(AppRouter)`, from the same single evaluation), so a router service
+nested in it is the class, as its type says.
 
 Every adapter takes the class and the layer, exactly as it takes a router and `Handlers.make`:
 
@@ -126,9 +128,6 @@ The router from the [quick start](../quick-start), written in this style, is in
   handler body and out of the module's imports. A build step that strips handlers is not part of
   effect-trpc yet. If the handlers must not ship at all, use `Router.make` with `query({...})` and
   keep `Handlers.make` in a server-only module.
-- `yield* AppRouter` returns the resolved record. When `make` nests another router service
-  (`admin: AdminRouter`), that entry is the resolved router, while the service's type calls it the
-  class. A service that nests nothing returns exactly what `make` returned.
 - `make` runs once per class. A subclass (`class B extends AppRouter {}`) gets its own evaluation. A
   `make` that fails is not cached.
 - A second `.input`, `.output` or `.error` call replaces the earlier schema. `.middleware`

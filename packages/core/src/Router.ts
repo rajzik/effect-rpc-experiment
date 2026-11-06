@@ -553,6 +553,8 @@ const isService = (u: unknown): u is RouterService.Any =>
   Context.isKey(u) && Predicate.hasProperty(u, 'make') && Effect.isEffect(u.make);
 
 const serviceRouters = new WeakMap<RouterService.Any, Router.Any>();
+/** The record each service's `make` succeeded with, from the same (single) evaluation. */
+const serviceValues = new WeakMap<RouterService.Any, Router.ServiceShape>();
 const resolving = new Set<RouterService.Any>();
 
 const serviceError = (svc: RouterService.Any, rule: string, cause?: unknown): Error =>
@@ -589,6 +591,8 @@ const runMake = (svc: RouterService.Any): unknown => {
  * - Memoized per class: `make` runs once per process, however many APIs use the service, and
  *   every call returns the same router.
  * - Nested router services (in the record `make` returns) are resolved the same way.
+ * - The record `make` produced (nested services kept as classes) is memoized from the same
+ *   evaluation: read it with {@link serviceValue}.
  *
  * **Gotchas**
  *
@@ -639,6 +643,7 @@ const fromService = <S extends RouterService.Any>(service: S): Router.Of<S> => {
         throw serviceError(service, 'make must succeed with a record of procedures');
       }
       router = build(record);
+      serviceValues.set(service, record);
     } finally {
       resolving.delete(service);
     }
@@ -646,6 +651,61 @@ const fromService = <S extends RouterService.Any>(service: S): Router.Of<S> => {
   }
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the router is built from `service.make`'s record, which is what `Router.Of<S>` describes
   return router as unknown as Router.Of<S>;
+};
+
+/**
+ * Returns the value of a router service: the record its `make` succeeded with, exactly as `make`
+ * produced it (what `yield* Svc` returns once the service is provided).
+ *
+ * **When to use**
+ *
+ * Use when you provide the service yourself, e.g. `Layer.succeed(Svc)(Router.serviceValue(Svc))`
+ * (this is what `Handlers.fromService` does from `@effect-trpc/server`).
+ *
+ * **Details**
+ *
+ * - Shares the evaluation of {@link fromService}: `make` runs once per class, and the value is the
+ *   record that evaluation produced. For a service whose `make` nests no router service it is the
+ *   router's `record` itself.
+ * - A router service nested in the record stays the class, as `Context.Service.Shape<S>` types
+ *   it; `Router.fromService(Svc).record` holds the resolved router there instead.
+ *
+ * **Gotchas**
+ *
+ * - Throws the errors of {@link fromService} (an async, failing or service-reading `make`).
+ *
+ * **Example** (Providing a router service)
+ *
+ * ```ts
+ * import { Context, Effect, Layer, Schema } from 'effect';
+ * import { Procedure, Router } from '@effect-trpc/core';
+ *
+ * class AdminRouter extends Context.Service<AdminRouter>()('AdminRouter', {
+ *   make: Effect.succeed({ count: Procedure.output(Schema.Finite).query(() => Effect.succeed(1)) }),
+ * }) {}
+ * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+ *   make: Effect.succeed({
+ *     health: Procedure.output(Schema.String).query(() => Effect.succeed('ok')),
+ *     admin: AdminRouter,
+ *   }),
+ * }) {}
+ *
+ * const AppRouterLive = Layer.succeed(AppRouter)(Router.serviceValue(AppRouter));
+ *
+ * const program = Effect.gen(function* () {
+ *   const procedures = yield* AppRouter;
+ *   return procedures.admin === AdminRouter; // true: the class, as make returned it
+ * }).pipe(Effect.provide(AppRouterLive));
+ * ```
+ *
+ * @see {@link fromService}
+ * @category getters
+ * @since 0.1.0
+ */
+const serviceValue = <S extends RouterService.Any>(service: S): Context.Service.Shape<S> => {
+  fromService(service);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `fromService` succeeded, so the value of `service` (its `make` result, which `Context.Service.Shape<S>` describes) is memoized
+  return serviceValues.get(service) as Context.Service.Shape<S>;
 };
 
 /**
@@ -1137,8 +1197,8 @@ const childPath = (
 };
 
 /**
- * Router constructors and helpers: `make`, `merge`, `from`, `fromService`, `getByPath`, `getRpc`,
- * `isPath`, `childPath`, `isRouter` and `isService`.
+ * Router constructors and helpers: `make`, `merge`, `from`, `fromService`, `serviceValue`,
+ * `getByPath`, `getRpc`, `isPath`, `childPath`, `isRouter` and `isService`.
  *
  * **When to use**
  *
@@ -1153,6 +1213,7 @@ const childPath = (
  * | `Router.merge(a, b)`                        | Merge two routers; overlapping keys throw.       |
  * | `Router.from(routerOrService)`              | Normalise a `Router.Input` to a router.          |
  * | `Router.fromService(AppRouter)`             | The router of a service (memoized per class).    |
+ * | `Router.serviceValue(AppRouter)`            | What the service's `make` produced (memoized).   |
  * | `Router.getByPath(router, ['post','byId'])` | `Option<ProcedureInfo>`.                         |
  * | `Router.getRpc(router, 'post.byId')`        | The compiled rpc, precisely typed.               |
  * | `Router.isPath(router, ['post'])`           | Is the path a namespace or procedure?            |
@@ -1194,6 +1255,7 @@ export const Router = {
   merge,
   from,
   fromService,
+  serviceValue,
   getByPath,
   getRpc,
   isPath,

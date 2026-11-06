@@ -503,7 +503,9 @@ const fromProcedures = <R extends Router.Any>(
  * - The router is `Router.fromService(Svc)`: `make` is evaluated once per class per process,
  *   shared with every other API that uses the class.
  * - The layer provides one `Rpc.Handler<Tag>` per procedure (tags as `Router.make` assigns them)
- *   and `Svc`, so `yield* Svc` returns the procedures record (`Router.from(Svc).record`).
+ *   and `Svc`, so `yield* Svc` returns exactly the record `make` produced
+ *   (`Router.serviceValue(Svc)`, from the same single evaluation), nested router services
+ *   included as their classes.
  * - Requirements are inferred ({@link Handlers.ProcedureServices}): the union of the handlers'
  *   requirements minus `Scope` and middleware-provided services (e.g. `CurrentUser`).
  *
@@ -514,8 +516,6 @@ const fromProcedures = <R extends Router.Any>(
  *   for routers mixing both styles.
  * - A `make` that needs services is a compile error; an async or failing `make` throws the
  *   error of `Router.fromService`.
- * - A router service nested in `make` is provided as its resolved router
- *   (`Router.from(Nested)`), not as the class.
  *
  * **Example** (Serving a router service)
  *
@@ -576,8 +576,11 @@ const fromService = <S extends RouterService.Any>(
     proceduresHandlers(router, `Handlers.fromService: the router service "${service.key}"`),
   );
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a service key's identifier is its class (`Context.Service.Identifier<S>`); `RouterService.Any` erases it to `any`
-  const key = service as unknown as Context.Key<Context.Service.Identifier<S>, Router.Shape>;
-  return Layer.merge(handlers, Layer.succeed(key)(router.record));
+  const key = service as unknown as Context.Key<
+    Context.Service.Identifier<S>,
+    Context.Service.Shape<S>
+  >;
+  return Layer.merge(handlers, Layer.succeed(key)(Router.serviceValue(service)));
 };
 
 /** `of` for a router or a router service: validates the input with `Router.from`. */

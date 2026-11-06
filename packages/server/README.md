@@ -140,7 +140,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - Every function taking a `router` takes a `Router.Input` (a router or a router service class) and calls `Router.from` once; types are computed with `Router.Of<X>`, so a service and the equivalent `Router.make` router infer the same caller / handler types. Type helpers (`Caller<R>`, `Handlers.Requirements<R>`, ...) take a router type: `Router.Of<typeof AppRouter>`.
 - `toWebHandler` / `runServer` build the handler layer eagerly (the promise rejects on failure); `createCaller` builds it on the first call.
 - `$promise`, `$router` and `dispose` are reserved top-level keys on a caller: `createCaller` throws for a router that uses them.
-- `Handlers.fromService` / `Handlers.fromProcedures` produce the same handler layer as `Handlers.make` (same tags) from the procedures' `handler`s; their requirements are the handlers' services minus `Scope` and middleware-provided services. `fromService` also provides the service (`yield* AppRouter` is `Router.from(AppRouter).record`) and evaluates `make` once per class (memoized `Router.fromService`).
+- `Handlers.fromService` / `Handlers.fromProcedures` produce the same handler layer as `Handlers.make` (same tags) from the procedures' `handler`s; their requirements are the handlers' services minus `Scope` and middleware-provided services. `fromService` also provides the service (`yield* AppRouter` is exactly what `make` produced, `Router.serviceValue(AppRouter)`; nested router services stay classes) and evaluates `make` once per class (memoized `Router.fromService`).
 
 **Common mistakes**
 
@@ -310,8 +310,8 @@ there is no handler record to write:
 - `Handlers.fromService(AppRouter)` takes a router service (a `Context.Service` class whose `make`
   returns `Procedure` procedures) and returns
   `Layer<Handlers.Provides<Router.Of<typeof AppRouter>> | AppRouter, never, Handlers.ProcedureServices<...>>`:
-  one handler per procedure plus the service itself, so `yield* AppRouter` returns the procedures
-  record. `make` runs once per class (the memoized `Router.fromService`, shared with every other
+  one handler per procedure plus the service itself, so `yield* AppRouter` returns exactly the
+  record `make` produced (`Router.serviceValue(AppRouter)`). `make` runs once per class (the memoized `Router.fromService`, shared with every other
   API that uses the class).
 - `Handlers.fromProcedures(router)` does the same for a plain `Router.make` router of `Procedure`
   procedures (services nested in it included), without providing a service.

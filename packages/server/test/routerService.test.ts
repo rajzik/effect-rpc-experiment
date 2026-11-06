@@ -90,6 +90,32 @@ describe('Handlers.fromService', () => {
     expect(Procedure.hasHandler(procedures.post.byId)).toBe(true);
   });
 
+  it('provides the raw make record: a nested router service stays the class', async () => {
+    let runs = 0;
+    class AdminRouter extends Context.Service<AdminRouter>()('NestedAdminRouter', {
+      make: Effect.succeed({ x: Procedure.output(Schema.Finite).query(() => Effect.succeed(1)) }),
+    }) {}
+    class OuterRouter extends Context.Service<OuterRouter>()('NestedOuterRouter', {
+      make: Effect.sync(() => {
+        runs++;
+        return { ping: Procedure.query(() => Effect.void), admin: AdminRouter };
+      }),
+    }) {}
+    const procedures = await Effect.runPromise(
+      Effect.provide(OuterRouter, Handlers.fromService(OuterRouter)),
+    );
+    // Exactly what `make` produced, as `Context.Service.Shape<typeof OuterRouter>` types it.
+    expect(procedures.admin).toBe(AdminRouter);
+    expect(Effect.isEffect(procedures.admin.make)).toBe(true);
+    expect(procedures.ping).toBe(Router.from(OuterRouter).record.ping);
+    // The router still resolves the nested service.
+    expect(Router.from(OuterRouter).record.admin).toBe(Router.from(AdminRouter));
+    expect(
+      await Effect.runPromise(Effect.provide(OuterRouter, Handlers.fromService(OuterRouter))),
+    ).toBe(procedures);
+    expect(runs).toBe(1);
+  });
+
   it('evaluates make once per class, whichever APIs use it', () => {
     Handlers.fromService(AppRouter);
     Handlers.fromProcedures(Router.from(AppRouter));

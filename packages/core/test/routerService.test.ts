@@ -160,6 +160,28 @@ describe('Router.fromService', () => {
     expect(() => Router.fromService(Loop)).toThrow(/LoopRouter.*nests the service itself/);
   });
 
+  it('serviceValue is the record make produced, from the same evaluation', () => {
+    let runs = 0;
+    class Inner extends Context.Service<Inner>()('ValueInnerRouter', {
+      make: Effect.succeed({ x: query({ success: Schema.String }) }),
+    }) {}
+    class Outer extends Context.Service<Outer>()('ValueOuterRouter', {
+      make: Effect.sync(() => {
+        runs++;
+        return { inner: Inner, ns: { inner: Inner }, ping: query({ success: Schema.String }) };
+      }),
+    }) {}
+    const value = Router.serviceValue(Outer);
+    expect(value.inner).toBe(Inner);
+    expect(value.ns.inner).toBe(Inner);
+    expect(Router.fromService(Outer).record.inner).toBe(Router.fromService(Inner));
+    expect(value.ping).toBe(Router.fromService(Outer).record.ping);
+    expect(Router.serviceValue(Outer)).toBe(value);
+    expect(runs).toBe(1);
+    // Without nested services the value is the router's record itself.
+    expect(Router.serviceValue(Inner)).toBe(Router.fromService(Inner).record);
+  });
+
   it('a failed make is not memoized', () => {
     let runs = 0;
     class Flaky extends Context.Service<Flaky>()('FlakyRouter', {
