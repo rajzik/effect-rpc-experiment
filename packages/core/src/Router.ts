@@ -721,12 +721,16 @@ const runMake = (svc: RouterService.Any): unknown => {
   if (Exit.isSuccess(exit)) return exit.value;
   const cause = Cause.squash(exit.cause);
   // `runSyncExit` leaves an asynchronous `make` running: stop it so it has no later effects.
-  if (Cause.isAsyncFiberError(cause)) Effect.runFork(Fiber.interrupt(cause.fiber));
+  const isAsync = Cause.isAsyncFiberError(cause);
+  if (isAsync) Effect.runFork(Fiber.interrupt(cause.fiber));
   throw serviceError(
     svc,
     isServiceNotFound(cause)
       ? 'make reads services, so this API cannot build the router: give it the contract (router.client.gen.ts) and serve the class with Handlers.fromService'
-      : 'make must not require services or be asynchronous, and must not fail (read services inside the procedure handlers instead)',
+      : // a defect (e.g. `Router.withSchemas`' stale path) says what is wrong itself
+        !isAsync && !Cause.hasFails(exit.cause) && cause instanceof Error
+        ? cause.message
+        : 'make must not require services or be asynchronous, and must not fail (read services inside the procedure handlers instead)',
     cause,
   );
 };
@@ -769,6 +773,7 @@ const checkRecord = (svc: RouterService.Effectful, record: unknown): Router.Serv
  *   compile error. A `make` that is asynchronous (e.g. sleeps), or that fails or reads a service
  *   despite its type, throws an `Error` naming the service key and the rule
  *   ("make must not require services or be asynchronous"), with the Effect failure as `cause`.
+ *   A `make` that dies with an `Error` throws with that error's message instead.
  * - A failed `make` is not memoized: the next call runs it again.
  *
  * **Example** (Getting the router of a service)

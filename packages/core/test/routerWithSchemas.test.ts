@@ -164,14 +164,9 @@ describe('Router.withSchemas', () => {
     );
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a generated file older than the router
     const forced = Router.withSchemas(App, { missing: { output: Post } } as never);
-    // `Router.from` builds it synchronously: the stale path is the cause of the build error
+    // `Router.from` builds it synchronously: the error names the service and the stale path
     expect(() => Router.from(forced)).toThrow(
-      expect.objectContaining({
-        message: expect.stringMatching(/router service "App"/),
-        cause: expect.objectContaining({
-          message: expect.stringMatching(/no procedure "missing"/),
-        }),
-      }),
+      'Cannot build a router from the router service "App": Router.withSchemas: no procedure "missing" in the router (is the generated file out of date?)',
     );
   });
 
