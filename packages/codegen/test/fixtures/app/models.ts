@@ -1,4 +1,4 @@
-// Spike fixture: ordinary Effect schemas. Nothing here knows about inference.
+// Client-safe declarations: schemas, errors and middleware tags.
 import { Data, Schema } from 'effect';
 import { RpcMiddleware } from 'effect/rpc';
 
@@ -15,15 +15,19 @@ export class Post extends Schema.Class<Post>('Post')({
 export class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
   id: Schema.Finite,
 }) {}
-
 export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
   reason: Schema.String,
 }) {}
-
-// Not a schema: an internal failure that must stay a defect on the client.
-export class DbError extends Data.TaggedError('DbError')<{ readonly query: string }> {}
-
 export class Unauthorized extends Schema.TaggedError<Unauthorized>()('Unauthorized', {}) {}
 
-// Middleware declaring its own error: the generator must not declare `Unauthorized` again.
+// Not a schema: stays a defect on the client.
+export class DbError extends Data.TaggedError('DbError')<{ readonly query: string }> {}
+
 export class Auth extends RpcMiddleware.Service<Auth>()('Auth', { error: Unauthorized }) {}
+export class Log extends RpcMiddleware.Service<Log>()('Log') {}
+
+/** A recursive type: generated as a hoisted `Schema.suspend` declaration. */
+export interface Tree {
+  readonly value: number;
+  readonly children: ReadonlyArray<Tree>;
+}

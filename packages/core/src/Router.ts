@@ -13,10 +13,13 @@
  * @since 0.1.0
  */
 import { Cause, Context, Effect, Exit, Fiber, Option, Predicate } from 'effect';
+import type { Schema } from 'effect';
 import { RpcGroup } from 'effect/rpc';
 import type { Rpc, RpcMiddleware } from 'effect/rpc';
 import { addDefMiddleware, compileDef, isProcedureDef } from './Procedure.js';
 import type { inferError, inferInput, inferOutput, ProcedureDef } from './Procedure.js';
+import { Procedure, withInferredSchemas } from './ProcedureBuilder.js';
+import type { ProcedureWithHandler } from './ProcedureBuilder.js';
 import type { ProcedureKind } from './ProcedureKind.js';
 
 const TypeId = '~@effect-trpc/core/Router' as const;
@@ -240,6 +243,75 @@ export declare namespace Router {
    */
   export type Merge<A, B> = {
     readonly [K in keyof A | keyof B]: K extends keyof A ? A[K] : K extends keyof B ? B[K] : never;
+  };
+
+  /**
+   * The schemas `Router.withSchemas` accepts for a router record: `{ output?, error? }` for each
+   * procedure with a handler, the same shape again for nested routers and records. Schema-only
+   * definitions (`query({...})`) take none.
+   *
+   * @since 0.1.0
+   */
+  export type SchemasOf<Rec> = {
+    readonly [K in keyof Rec]?: Rec[K] extends ProcedureWithHandler.Any
+      ? Procedure.InferredSchemas
+      : Rec[K] extends ProcedureDef.Any
+        ? never
+        : Rec[K] extends Router<infer Sub>
+          ? SchemasOf<Sub>
+          : SchemasOf<Rec[K]>;
+  };
+
+  /**
+   * The record `Router.withSchemas(source, schemas)` produces: the procedures named in `S` with
+   * its `output` / `error` schema types, everything else unchanged.
+   *
+   * @since 0.1.0
+   */
+  export type WithSchemas<Rec, S> = {
+    readonly [K in keyof Rec]: K extends keyof S ? WithSchemasEntry<Rec[K], S[K]> : Rec[K];
+  };
+
+  /**
+   * One entry of {@link WithSchemas}.
+   *
+   * @since 0.1.0
+   */
+  export type WithSchemasEntry<V, S> =
+    V extends ProcedureWithHandler<
+      infer Kind,
+      infer Payload,
+      infer Success,
+      infer Error,
+      infer Middleware,
+      infer Requires,
+      infer R
+    >
+      ? ProcedureWithHandler<
+          Kind,
+          Payload,
+          S extends { readonly output: infer O extends Schema.Top } ? O : Success,
+          S extends { readonly error: infer X extends Schema.Top } ? X : Error,
+          Middleware,
+          Requires,
+          R
+        >
+      : V extends Router<infer Sub>
+        ? Router<WithSchemas<Sub, S>>
+        : WithSchemas<V, S>;
+
+  /**
+   * `S` with every key that is not in `Allowed` (at any depth) mapped to `never`, so a schema for
+   * a path the router does not have is a compile error.
+   *
+   * @since 0.1.0
+   */
+  export type NoExtraSchemas<S, Allowed> = {
+    readonly [K in keyof S]: K extends keyof Allowed
+      ? S[K] extends Procedure.InferredSchemas
+        ? S[K]
+        : NoExtraSchemas<S[K], NonNullable<Allowed[K]>>
+      : never;
   };
 }
 
@@ -938,6 +1010,107 @@ const make: {
   // any other record (second overload, what `Resolve` describes).
   build;
 
+const patchRecord = (
+  record: Router.Shape,
+  schemas: { readonly [key: string]: unknown },
+  path: ReadonlyArray<string>,
+): Router.Shape => {
+  const out: { [key: string]: ProcedureDef.Any | Router.Any | Router.Shape } = { ...record };
+  for (const key of Object.keys(schemas)) {
+    const given = schemas[key];
+    const value: unknown = record[key];
+    const at = [...path, key].join('.');
+    if (given === undefined) continue;
+    if (value === undefined)
+      throw new Error(
+        `Router.withSchemas: no procedure "${at}" in the router (is the generated file out of date?)`,
+      );
+    if (Procedure.hasHandler(value)) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the typed signature makes procedure entries `Procedure.InferredSchemas`
+      out[key] = withInferredSchemas(value, given as Procedure.InferredSchemas);
+    } else if (isProcedureDef(value)) {
+      throw new Error(
+        `Router.withSchemas: "${at}" has no handler (a schema-only definition already has its schemas)`,
+      );
+    } else if (isRouter(value)) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the typed signature makes nested entries records of schemas
+      const nested = given as { readonly [key: string]: unknown };
+      out[key] = build(patchRecord(value.record, nested, [...path, key]));
+    } else if (isPlainRecord(value)) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a resolved record holds no services, see `resolveRecord`
+      out[key] = patchRecord(value as Router.Shape, given as { readonly [key: string]: unknown }, [
+        ...path,
+        key,
+      ]);
+    }
+  }
+  return out;
+};
+
+/**
+ * Returns a router whose inferred procedures carry the given schemas: the overlay the schema
+ * generator (`@effect-trpc/codegen`) writes for a router written without `.output` / `.error`.
+ *
+ * **When to use**
+ *
+ * Normally only generated code calls it. The generated module imports the router module and
+ * exports `Router.withSchemas(AppRouter, { ... })`; serve that router and give it to clients.
+ *
+ * **Details**
+ *
+ * - Each named procedure is re-created as `.inferred({ output, error })` before its terminal
+ *   would have made it: same kind, payload, middleware and handler (without the inference-mode
+ *   guard once an `output` is given). A user `.error(...)` stays unless `error` is given.
+ * - `source` is a router or a router service class; a service's memoized `make` is reused, so the
+ *   router module is evaluated once and its state is not copied.
+ * - Nested routers (and nested services) are patched recursively and keep router-level
+ *   middleware. Procedures not named in `schemas` are kept as they are.
+ * - The result is a plain router: serve it with `Handlers.fromProcedures(router)` (or any
+ *   adapter taking `Router.Input`).
+ *
+ * **Gotchas**
+ *
+ * - A path that is not a procedure with a handler is a compile error and, if forced, throws
+ *   (`no procedure "<path>"`, `"<path>" has no handler`): regenerate after changing the router.
+ *
+ * **Example** (The overlay the generator writes)
+ *
+ * ```ts
+ * import { Context, Effect, Schema } from 'effect';
+ * import { Procedure, Router } from '@effect-trpc/core';
+ * import type { inferOutput } from '@effect-trpc/core';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Finite, title: Schema.String }) {}
+ *
+ * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+ *   make: Effect.succeed({
+ *     latest: Procedure.query(() => Effect.succeed(new Post({ id: 1, title: 'Hello' }))),
+ *   }),
+ * }) {}
+ *
+ * // router.gen.ts
+ * export const appRouter = Router.withSchemas(AppRouter, { latest: { output: Post } });
+ *
+ * type Latest = inferOutput<typeof appRouter.record.latest>; // Post
+ * ```
+ *
+ * @category combinators
+ * @since 0.1.0
+ */
+const withSchemas = <
+  const X extends Router.Input,
+  const S extends Router.SchemasOf<Router.Record<X>>,
+>(
+  source: X,
+  schemas: S & Router.NoExtraSchemas<S, Router.SchemasOf<Router.Record<X>>>,
+): Router<Router.WithSchemas<Router.Record<X>, S>> => {
+  const record: Router.Shape = from(source).record;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `patchRecord` replaces exactly the entries `WithSchemas` describes
+  return build(patchRecord(record, schemas, [])) as unknown as Router<
+    Router.WithSchemas<Router.Record<X>, S>
+  >;
+};
+
 /**
  * Merges two routers into one (tRPC's `mergeRouters`).
  *
@@ -1259,6 +1432,7 @@ export const Router = {
   make,
   merge,
   from,
+  withSchemas,
   fromService,
   serviceValue,
   getByPath,

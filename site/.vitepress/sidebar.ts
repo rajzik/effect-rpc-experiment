@@ -79,6 +79,7 @@ const guide: DefaultTheme.SidebarItem[] = [
       { text: 'Live data over WebSocket', link: '/guide/advanced/live-data' },
       { text: 'Cancellation and timeouts', link: '/guide/advanced/cancellation' },
       { text: 'Defects vs domain errors', link: '/guide/advanced/defects' },
+      { text: 'Schemas from handler types', link: '/guide/advanced/codegen' },
       { text: 'Writing a custom link', link: '/guide/advanced/custom-link' },
       { text: 'Migrating from tRPC', link: '/guide/advanced/migrating-from-trpc' },
       { text: 'Known limits', link: '/guide/advanced/limits' },
@@ -103,6 +104,8 @@ const api: DefaultTheme.SidebarItem[] = [
       { text: '@effect-trpc/electron/preload', link: '/api/electron-preload' },
       { text: '@effect-trpc/electron/renderer', link: '/api/electron-renderer' },
       { text: '@effect-trpc/test-utils', link: '/api/test-utils' },
+      { text: '@effect-trpc/codegen', link: '/api/codegen' },
+      { text: '@effect-trpc/codegen/vite', link: '/api/codegen-vite' },
     ],
   },
 ];

@@ -1,6 +1,6 @@
 import { Context, Data, Effect, Schema } from 'effect';
-import { Procedure } from '@effect-trpc/core';
-import type { inferError, inferOutput, Router } from '@effect-trpc/core';
+import { mutation, Procedure, query, Router } from '@effect-trpc/core';
+import type { inferError, inferOutput } from '@effect-trpc/core';
 
 import { Forbidden, Post, PostNotFound } from '@/router';
 
@@ -33,31 +33,21 @@ type ById = inferOutput<Router.Of<typeof AppRouter>['record']['byId']>; // Post
 // #endregion written
 
 // #region generated
-// router.gen.ts: written by the generator. Serve and import this one.
-export class GeneratedRouter extends Context.Service<GeneratedRouter>()('AppRouter', {
-  make: Effect.succeed({
-    byId: Procedure.input({ id: Schema.Finite })
-      .inferred({ output: Post, error: PostNotFound })
-      .query(
-        Effect.fn(function* ({ id }) {
-          const post = posts.find((p) => p.id === id);
-          if (post === undefined) return yield* new PostNotFound({ id });
-          return post;
-        }),
-      ),
-    create: Procedure.input({ title: Schema.String })
-      .inferred({ output: Post, error: Forbidden }) // DbError is not a schema: a defect
-      .mutation(
-        Effect.fn(function* ({ title }) {
-          if (title === '') return yield* new Forbidden({ reason: 'empty title' });
-          if (title === 'db') return yield* new DbError({ query: 'insert' });
-          return new Post({ id: 2, title, createdAt: new Date() });
-        }),
-      ),
-  }),
-}) {}
-
-type CreateError = inferError<Router.Of<typeof GeneratedRouter>['record']['create']>; // Forbidden
+// router.gen.ts (server): the router module with the inferred schemas. Serve this one.
+export const ServerRouter = Router.withSchemas(AppRouter, {
+  byId: { output: Post, error: PostNotFound },
+  create: { output: Post, error: Forbidden }, // DbError is not a schema: a defect
+});
 // #endregion generated
+
+// #region client
+// router.client.gen.ts (clients): the same contract, schemas only. No handlers, no router import.
+export const ClientRouter = Router.make({
+  byId: query({ payload: { id: Schema.Finite }, success: Post, error: PostNotFound }),
+  create: mutation({ payload: { title: Schema.String }, success: Post, error: Forbidden }),
+});
+
+type CreateError = inferError<typeof ClientRouter.record.create>; // Forbidden
+// #endregion client
 
 export type { ById, CreateError };

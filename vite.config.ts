@@ -29,9 +29,10 @@ export default defineConfig({
       'site/api/**',
       // Written by the TanStack Router plugin on every build; it asks to be left unlinted.
       'examples/*/src/routeTree.gen.ts',
-      // Written by the schema generator spike: one-line chains, `Schema.Number` for TS `number`.
-      // Its types are checked through `runtime.test.ts`, which imports it.
-      'packages/e2e/spike/**/*.gen.ts',
+      // Written by @effect-trpc/codegen (its test fixtures): one-line chains, `Schema.Number` for
+      // TS `number`. `test/generate.test.ts` type-checks them (contract check included).
+      'packages/codegen/test/fixtures/**/*.gen.ts',
+      'packages/codegen/test/.tmp/**',
       // Written by `next build` / `next dev` (and rewritten with its own formatting).
       'examples/next/next-env.d.ts',
     ],
@@ -126,7 +127,8 @@ export default defineConfig({
       'site/.vitepress/dist/**',
       'site/api/**',
       'examples/*/src/routeTree.gen.ts',
-      'packages/e2e/spike/**/*.gen.ts',
+      'packages/codegen/test/fixtures/**/*.gen.ts',
+      'packages/codegen/test/.tmp/**',
       // Written by `next build` / `next dev` (and rewritten with its own formatting).
       'examples/next/next-env.d.ts',
     ],

@@ -28,16 +28,17 @@ type-checked **Example**, `@category`, `@since`): hover it, or read it in `packa
 
 **Pick the package by job**
 
-| You need to…                                              | Use                                                        |
-| --------------------------------------------------------- | ---------------------------------------------------------- |
-| Declare procedures and a router (shared by server+client) | `@effect-trpc/core`                                        |
-| Implement handlers and serve them (Node, fetch, caller)   | `@effect-trpc/server` (`/node` for a Node listener)        |
-| Call procedures from TS (Promise or Effect)               | `@effect-trpc/client`                                      |
-| Use procedures in React with TanStack Query               | `@effect-trpc/tanstack-react-query`                        |
-| Wire it into Next.js App Router / RSC / server actions    | `@effect-trpc/next`                                        |
-| Wire it into TanStack Start (server route + loaders)      | `@effect-trpc/start`                                       |
-| Run the server in Electron main, call it from a renderer  | `@effect-trpc/electron` (`/main`, `/preload`, `/renderer`) |
-| Write tests against a real server                         | `@effect-trpc/test-utils`                                  |
+| You need to…                                              | Use                                                         |
+| --------------------------------------------------------- | ----------------------------------------------------------- |
+| Declare procedures and a router (shared by server+client) | `@effect-trpc/core`                                         |
+| Implement handlers and serve them (Node, fetch, caller)   | `@effect-trpc/server` (`/node` for a Node listener)         |
+| Call procedures from TS (Promise or Effect)               | `@effect-trpc/client`                                       |
+| Use procedures in React with TanStack Query               | `@effect-trpc/tanstack-react-query`                         |
+| Wire it into Next.js App Router / RSC / server actions    | `@effect-trpc/next`                                         |
+| Wire it into TanStack Start (server route + loaders)      | `@effect-trpc/start`                                        |
+| Run the server in Electron main, call it from a renderer  | `@effect-trpc/electron` (`/main`, `/preload`, `/renderer`)  |
+| Write tests against a real server                         | `@effect-trpc/test-utils`                                   |
+| Generate schemas from handler types (no `.output`)        | `@effect-trpc/codegen` (CLI `effect-trpc-codegen`, `/vite`) |
 
 **Golden path:** `Router.make({...})` in a shared module (core) → `Handlers.make(router, {...})` and
 `toWebHandler` / `serve` (server) → `createClient(router, { link: httpLink({ url }) })` (client) →
@@ -71,6 +72,7 @@ changed exports follow [`docs/jsdoc-style.md`](docs/jsdoc-style.md).
 | `@effect-trpc/start`                | TanStack Start server route handler, isomorphic client, loader helpers                                                                                                                                     |
 | `@effect-trpc/electron`             | Main-process server and renderer link over `MessagePort`, preload bridge                                                                                                                                   |
 | `@effect-trpc/test-utils`           | Shared test harness (real Node HTTP server + clients)                                                                                                                                                      |
+| `@effect-trpc/codegen`              | Schema generator for routers written without `.output` / `.error`: server overlay (`router.gen.ts`), handler-free client contract (`router.client.gen.ts`), CLI and Vite plugin                            |
 
 ## Toolchain
 

@@ -102,7 +102,8 @@ console.log(await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(H
 - `subscription` requires `success` (the element schema); it compiles to a stream rpc whose rpc-level error is `Schema.Never`.
 - A `Procedure` builder procedure is a `ProcedureDef` with a `handler`: it compiles to the same rpc (tag, schemas, `ProcedureKind`) as the equivalent `query` / `mutation` / `subscription`, and `inferInput` / `inferOutput` / `inferError` are the same. Builder defaults match `query()`: `Schema.Void` / `Schema.Void` / `Schema.Never`.
 - With `.output(...)`, a builder handler may fail only with the declared `error` plus the errors of middleware added **before** the terminal; its requirements are `Procedure.HandlerRequirements<typeof proc>` (as written, including middleware-provided services).
-- Without `.output(...)` a builder is in **inference mode**: `inferOutput` is the handler's success type (the success schema type is `Schema.declare<A>`, or `Schema.Void` for `void`), and the handler may fail with anything unless `.error(...)` was set. The runtime output schema stays `Schema.Void`: a handler value other than `undefined` dies with a defect naming the fix, until the schema generator writes `.inferred({ output, error })` into a generated copy of the router. `.inferred` sets the schemas, keeps the output checked and lets undeclared failures through (they reach the client as `RpcDefect`); it is the generator's step, not for hand-written code.
+- `Router.withSchemas(source, schemas)` re-creates the named procedures with handlers with the given `{ output?, error? }` (the source router is unchanged and its service `make` is reused); unknown paths and schema-only definitions are compile errors and throw `no procedure "<path>"` / `"<path>" has no handler` if forced. It returns a plain router (serve with `Handlers.fromProcedures`).
+- Without `.output(...)` a builder is in **inference mode**: `inferOutput` is the handler's success type (the success schema type is `Schema.declare<A>`, or `Schema.Void` for `void`), and the handler may fail with anything unless `.error(...)` was set. The runtime output schema stays `Schema.Void`: a handler value other than `undefined` dies with a defect naming the fix, until the schema generator writes `.inferred({ output, error })` into a generated copy of the router. `.inferred` sets the schemas, keeps the output checked and lets undeclared failures through (they reach the client as `RpcDefect`); it is what `Router.withSchemas` applies, not for hand-written code.
 - `.middleware(M)` on a builder procedure and `router.middleware(M)` keep the handler (value and type); `query({...})` definitions have no `handler` key (`Procedure.hasHandler` is `false`).
 - A router service's `make` is an `Effect` **value** of type `Effect<Record, never, never>`: a `make` that needs services or may fail does not satisfy `RouterService.Any` (compile error at `Router.from`, `Router.fromService`, `Router.make` and every API taking `Router.Input`). An asynchronous `make`, or one that fails or reads a service despite its type, throws `Cannot build a router from the router service "<key>": make must not require services or be asynchronous, and must not fail …`.
 - `Router.fromService` is memoized per class: `make` runs once per process, and `Router.from`, `Router.fromService` and `Router.make({ x: Svc })` all return the same router for `Svc`. `Router.serviceValue(Svc)` is the record that same evaluation produced (nested services kept as classes), i.e. `Context.Service.Shape<typeof Svc>`.
@@ -313,11 +314,16 @@ type ById = inferOutput<typeof inferredRouter.record.byId>; // Post
 ```
 
 The types are only half of it: the schemas that send a `Post` (and decode `PostNotFound` on the
-client) come from the schema generator, which reads the handler types with the TypeScript 7
-checker and writes a copy of the router with `.inferred({ output: Post, error: PostNotFound })`
-before each terminal (prototype: `packages/e2e/spike/infer-schemas`). Serve and import the
-generated copy. Without it, a handler value other than `undefined` dies with a defect that names
-the fix, and every failure arrives as `RpcDefect`.
+client) come from [`@effect-trpc/codegen`](../codegen/README.md), which reads the handler types
+with the TypeScript 7 checker and writes `router.gen.ts` (`Router.withSchemas(router, { byId:
+{ output: Post, error: PostNotFound } })`: serve it) and `router.client.gen.ts` (the schema-only
+contract: give it to clients). Without them, a handler value other than `undefined` dies with a
+defect that names the fix, and every failure arrives as `RpcDefect`.
+
+`Router.withSchemas(source, schemas)` re-creates the named inferred procedures of a router (or
+router service) with the given schemas, as `.inferred({ output, error })` would have: the router
+module is evaluated once (no copy), nested routers keep their middleware, and a path that is not a
+procedure with a handler is a compile error (and throws if forced).
 
 ### Routers as services
 

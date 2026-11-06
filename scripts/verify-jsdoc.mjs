@@ -45,8 +45,9 @@ for (const pkg of packages) {
     const lines = src.split('\n');
     const isBarrel = basename(file).startsWith('index.');
 
-    // 1. Module header: the file must open with a /** ... @since ... */ block.
-    const first = lines.findIndex((l) => l.trim() !== '');
+    // 1. Module header: the file must open with a /** ... @since ... */ block (after a `#!`
+    //    line, for a package `bin` entry).
+    const first = lines.findIndex((l, i) => l.trim() !== '' && !(i === 0 && l.startsWith('#!')));
     if (!lines[first]?.trim().startsWith('/**')) {
       report(
         file,

@@ -22,6 +22,8 @@ const pages = {
   'electron-preload': ['electron', 'preload'],
   'electron-renderer': ['electron', 'renderer'],
   'test-utils': ['test-utils', 'index'],
+  codegen: ['codegen', 'index'],
+  'codegen-vite': ['codegen', 'vite'],
 } as const;
 
 /** Exported names of a bundled declaration file: `export { … }` lists and `export declare …`. */

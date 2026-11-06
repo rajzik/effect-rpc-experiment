@@ -232,8 +232,8 @@ export declare namespace Procedure {
    * The success schema type of a procedure whose output is inferred from a handler succeeding
    * with `A`: `Schema.Void` for `void` (and `undefined` / `never`), else a `Schema.declare<A>`
    * that carries `A` for the client types. At runtime the schema is `Schema.Void`; a handler
-   * value other than `undefined` is a defect until the schema generator (or `.output`) sets a
-   * real schema.
+   * value other than `undefined` is a defect until `@effect-trpc/codegen` (or `.output`) sets
+   * a real schema.
    *
    * @since 0.1.0
    */
@@ -337,8 +337,8 @@ export declare namespace Procedure {
       schema: E,
     ) => Builder<Payload, Success, E, Middleware, Requires, Exclude<Infer_, 'error'>>;
     /**
-     * Sets the schemas the schema generator inferred from the handler. Written by the
-     * generator: by hand, use `.output` / `.error`. The output is checked; failures not in
+     * Sets the schemas inferred from the handler (what `@effect-trpc/codegen` applies through
+     * `Router.withSchemas`). By hand, use `.output` / `.error`. The output is checked; failures not in
      * `error` stay allowed (they reach the client as defects).
      */
     readonly inferred: <const S extends InferredSchemas>(
@@ -395,7 +395,7 @@ const missingOutputSchema = (): Error =>
   new Error(
     'effect-trpc: this procedure has no output schema, so the value its handler returned cannot ' +
       'be sent. Add `.output(schema)` to the procedure, or generate the schemas from the handler ' +
-      'types with the effect-trpc schema generator and serve the generated router.',
+      'types with `effect-trpc-codegen` (@effect-trpc/codegen) and serve the generated router.',
   );
 
 const checkVoid = (value: unknown): Effect.Effect<unknown> =>
@@ -403,9 +403,18 @@ const checkVoid = (value: unknown): Effect.Effect<unknown> =>
 
 // Without an output schema the success is encoded with `Schema.Void`, which turns any value into
 // `null`: fail loudly instead of sending `undefined` to a client typed with the handler's value.
-const guardInferredOutput =
-  (kind: ProcedureKind.Value, handler: AnyHandler): RuntimeHandler =>
-  (payload, ctx) => {
+interface DefFields {
+  readonly payloadSchema: Schema.Top;
+  readonly successSchema: Schema.Top;
+  readonly errorSchema: Schema.Top;
+  readonly middlewares: ReadonlyArray<RpcMiddleware.AnyService>;
+}
+
+/** Guarded handler -> the handler as written (for `withInferredSchemas`). */
+const originalHandlers = new WeakMap<RuntimeHandler, AnyHandler>();
+
+const guardInferredOutput = (kind: ProcedureKind.Value, handler: AnyHandler): RuntimeHandler => {
+  const guarded: RuntimeHandler = (payload, ctx) => {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the builder's typed terminal guarantees the handler's signature for this kind
     const run = handler as unknown as RuntimeHandler;
     // The services (`R`) are erased: the server provides them; only the success is inspected.
@@ -415,6 +424,35 @@ const guardInferredOutput =
       : // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/any-unknown-in-error-context -- a query/mutation handler returns an Effect (typed terminal); its failures pass through untouched, so the error type is erased
         Effect.flatMap(run(payload, ctx) as Effect.Effect<unknown, unknown>, checkVoid);
   };
+  originalHandlers.set(guarded, handler);
+  return guarded;
+};
+
+/**
+ * @internal Re-creates a builder procedure with the given schemas, as `.inferred(schemas)` before its
+ * terminal would have: the handler as written (without the inference guard once an output is
+ * given) and the same kind, payload and middleware. Used by `Router.withSchemas`.
+ */
+export const withInferredSchemas = (
+  procedure: ProcedureWithHandler.Any,
+  schemas: Procedure.InferredSchemas,
+): ProcedureWithHandler.Any => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every procedure carries these fields; `ProcedureDef.Any` only brands it
+  const fields = procedure as unknown as DefFields;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erased handler: the map is keyed by the same function value
+  const current = procedure.handler as unknown as RuntimeHandler;
+  const handler =
+    schemas.output === undefined ? current : (originalHandlers.get(current) ?? current);
+  let def: ProcedureDef.Any = define(procedure.kind, {
+    payload: fields.payloadSchema,
+    success: schemas.output ?? fields.successSchema,
+    error: schemas.error ?? fields.errorSchema,
+    handler,
+  });
+  for (const middleware of fields.middlewares) def = addDefMiddleware(def, middleware);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `define` with a handler creates a procedure with a handler
+  return def as ProcedureWithHandler.Any;
+};
 
 const finish = (kind: ProcedureKind.Value, state: BuilderState, handler: AnyHandler): any => {
   // Same path as `query({...}).middleware(...)`: `define`, then one `middleware` per step.
@@ -502,10 +540,11 @@ const hasHandler = (u: unknown): u is ProcedureWithHandler.Any =>
  *   before the terminal.
  * - Without `.output(...)` the builder is in inference mode: the output type is the handler's
  *   success type (`inferOutput` gives it), and the handler may fail with anything unless
- *   `.error(...)` was set (then failures stay checked). The schemas themselves come from the
- *   schema generator, which reads the handler types and writes `.inferred({ output, error })`
- *   into a generated copy of the router: serve and import that copy. `.inferred` is the
- *   generator's step; by hand, write `.output` / `.error`.
+ *   `.error(...)` was set (then failures stay checked). The schemas themselves come from
+ *   `@effect-trpc/codegen`, which reads the handler types and writes `router.gen.ts`
+ *   (`Router.withSchemas` over the router: serve it) and `router.client.gen.ts` (the
+ *   handler-free contract: give it to clients). `.inferred({ output, error })` is the same step
+ *   on a single chain; by hand, write `.output` / `.error`.
  * - The handler's requirements are inferred and recorded on the procedure
  *   ({@link Procedure.HandlerRequirements}); read services inside the handler with `yield*`.
  * - Subscription handlers return a `Stream` of output elements.

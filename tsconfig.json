@@ -26,6 +26,9 @@
       "path": "packages/electron"
     },
     {
+      "path": "packages/codegen"
+    },
+    {
       "path": "packages/e2e"
     }
   ]

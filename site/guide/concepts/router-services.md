@@ -121,11 +121,12 @@ Leave out `.output(...)` and `.error(...)` and the types come from the handler. 
 <<< @/snippets/concepts/router-service-inferred.ts#written [router.ts]
 
 Types alone don't put a `Post` on the wire: the server needs a schema to encode it and the client
-one to decode it. A schema generator reads each handler's inferred `Effect<A, E>` with the
-TypeScript 7 checker and writes a copy of the router with the schemas filled in as
-`.inferred({ output, error })`:
+one to decode it. [`@effect-trpc/codegen`](../advanced/codegen) reads each handler's inferred
+`Effect<A, E>` with the TypeScript 7 checker and writes two modules next to the router:
 
 <<< @/snippets/concepts/router-service-inferred.ts#generated [router.gen.ts]
+
+<<< @/snippets/concepts/router-service-inferred.ts#client [router.client.gen.ts]
 
 - Schema classes (`Post`, `PostNotFound`) are imported from where they are declared, so
   transformations, getters and `instanceof` work on the client. Plain object types become a
@@ -133,15 +134,16 @@ TypeScript 7 checker and writes a copy of the router with the schemas filled in 
 - Only `Schema.TaggedError`-style classes become typed errors. Anything else (a
   `Data.TaggedError`, a raw `Error`) arrives as `RpcDefect`, and the generated client types say
   so: `create` fails with `Forbidden`, not `DbError`.
-- `.inferred` is the generator's step. It checks the output and lets undeclared failures
-  through. By hand, write `.output` / `.error`.
-- Serve and import the generated module, both on the server and in clients. A router used
-  without the generated schemas dies with a defect that names the fix when a handler returns a
-  value, and every failure reaches the client as a defect.
+- The server module wraps the router module (`Router.withSchemas`): it is imported once, its
+  state is not copied. Serve it with `Handlers.fromProcedures`.
+- The client module has no handlers and does not import the router module, so handler code and
+  server-only imports stay out of client bundles. A compile-time check in it fails when it no
+  longer matches the server router.
+- A router used without the generated schemas dies with a defect that names the fix when a
+  handler returns a value, and every failure reaches the client as a defect.
 
-The generator is a prototype in
-[`packages/e2e/spike/infer-schemas`](https://github.com/rajzik/effect-rpc-experiment/tree/main/packages/e2e/spike/infer-schemas);
-a CLI and bundler plugin are not published yet.
+Run it with `effect-trpc-codegen src/router.ts` (`--watch` in dev, `--check` in CI) or the Vite
+plugin: see [Schemas from handler types](../advanced/codegen).
 
 ## React, Next.js and TanStack Start
 
@@ -165,9 +167,10 @@ The router from the [quick start](../quick-start), written in this style, is in
 - Handler code ships to the browser. The client imports the module that holds `make`, so the
   handlers are in the client bundle. That is logic, not secrets: services are interfaces and the
   live layers (`DatabaseLive`, API keys) stay on the server. Keep anything secret out of the
-  handler body and out of the module's imports. A build step that strips handlers is not part of
-  effect-trpc yet. If the handlers must not ship at all, use `Router.make` with `query({...})` and
-  keep `Handlers.make` in a server-only module.
+  handler body and out of the module's imports. If the handlers must not ship at all, give
+  clients the handler-free `router.client.gen.ts` that
+  [`@effect-trpc/codegen`](../advanced/codegen) writes, or use `Router.make` with `query({...})`
+  and keep `Handlers.make` in a server-only module.
 - `make` runs once per class. A subclass (`class B extends AppRouter {}`) gets its own evaluation. A
   `make` that fails is not cached.
 - A second `.input`, `.output` or `.error` call replaces the earlier schema. `.middleware`

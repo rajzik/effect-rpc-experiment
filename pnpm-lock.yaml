@@ -313,6 +313,27 @@ importers:
         specifier: 'catalog:'
         version: 4.0.1(effect@4.0.1)(redis@6.3.0)
 
+  packages/codegen:
+    devDependencies:
+      '@effect-trpc/client':
+        specifier: workspace:*
+        version: link:../client
+      '@effect-trpc/core':
+        specifier: workspace:*
+        version: link:../core
+      '@effect-trpc/server':
+        specifier: workspace:*
+        version: link:../server
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.1
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
   packages/core:
     dependencies:
       effect:
