@@ -91,7 +91,13 @@ export type SerializationOption =
  */
 export type HeadersOption = Headers.Input | (() => Headers.Input | PromiseLike<Headers.Input>);
 
-const serializationLayer = (
+/**
+ * The `RpcSerialization` layer of a {@link SerializationOption} (default NDJSON).
+ *
+ * @internal
+ * @since 0.1.0
+ */
+export const serializationLayer = (
   option: SerializationOption | undefined,
 ): Layer.Layer<RpcSerialization.RpcSerialization> =>
   option === undefined || option === 'ndjson'
@@ -165,7 +171,17 @@ export const Link = {
   fromProtocol,
 } as const;
 
-const assertAbsoluteUrl = (link: string, url: string, schemes: ReadonlyArray<string>): void => {
+/**
+ * Throws when `url` is not an absolute URL with one of `schemes` (checked when a link is created).
+ *
+ * @internal
+ * @since 0.1.0
+ */
+export const assertAbsoluteUrl = (
+  link: string,
+  url: string,
+  schemes: ReadonlyArray<string>,
+): void => {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -183,6 +199,7 @@ const assertAbsoluteUrl = (link: string, url: string, schemes: ReadonlyArray<str
 };
 
 const resolveHeaders = (
+  link: string,
   headers: HeadersOption,
   request: HttpClientRequest.HttpClientRequest,
 ): Effect.Effect<Headers.Headers, HttpClientError.HttpClientError> =>
@@ -194,11 +211,43 @@ const resolveHeaders = (
             reason: new HttpClientError.TransportError({
               request,
               cause,
-              description: 'The headers() function of httpLink threw',
+              description: `The headers() function of ${link} threw`,
             }),
           }),
       })
     : Effect.succeed(Headers.fromInput(headers));
+
+/**
+ * The `HttpClient` of the HTTP links: the global or custom `fetch`, non-2xx responses as errors
+ * and the `headers` option resolved once per request.
+ *
+ * @internal
+ * @since 0.1.0
+ */
+export const httpClientLayer = (
+  link: string,
+  options: HttpLinkOptions,
+): Layer.Layer<HttpClient.HttpClient> => {
+  const { headers, fetch } = options;
+  const fetchLayer =
+    fetch === undefined
+      ? FetchHttpClient.layer
+      : FetchHttpClient.layer.pipe(Layer.provide(Layer.succeed(FetchHttpClient.Fetch)(fetch)));
+  return Layer.effect(HttpClient.HttpClient)(
+    Effect.gen(function* () {
+      const ok = HttpClient.filterStatusOk(yield* HttpClient.HttpClient);
+      return headers === undefined
+        ? ok
+        : ok.pipe(
+            HttpClient.mapRequestEffect((request) =>
+              Effect.map(resolveHeaders(link, headers, request), (resolved) =>
+                HttpClientRequest.setHeaders(request, resolved),
+              ),
+            ),
+          );
+    }),
+  ).pipe(Layer.provide(fetchLayer));
+};
 
 /**
  * Options of {@link httpLink}.
@@ -272,28 +321,12 @@ export interface HttpLinkOptions {
 export const httpLink = (options: HttpLinkOptions): Link => {
   const url = String(options.url);
   assertAbsoluteUrl('httpLink', url, ['http', 'https']);
-  const { headers, fetch } = options;
-  const fetchLayer =
-    fetch === undefined
-      ? FetchHttpClient.layer
-      : FetchHttpClient.layer.pipe(Layer.provide(Layer.succeed(FetchHttpClient.Fetch)(fetch)));
-  const httpClientLayer = Layer.effect(HttpClient.HttpClient)(
-    Effect.gen(function* () {
-      const ok = HttpClient.filterStatusOk(yield* HttpClient.HttpClient);
-      return headers === undefined
-        ? ok
-        : ok.pipe(
-            HttpClient.mapRequestEffect((request) =>
-              Effect.map(resolveHeaders(headers, request), (resolved) =>
-                HttpClientRequest.setHeaders(request, resolved),
-              ),
-            ),
-          );
-    }),
-  ).pipe(Layer.provide(fetchLayer));
   return fromProtocol(
     RpcClient.layerProtocolHttp({ url }).pipe(
-      Layer.provide([httpClientLayer, serializationLayer(options.serialization)]),
+      Layer.provide([
+        httpClientLayer('httpLink', options),
+        serializationLayer(options.serialization),
+      ]),
     ),
   );
 };

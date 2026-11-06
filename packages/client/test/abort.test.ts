@@ -2,6 +2,7 @@ import { Effect, Fiber, Stream } from 'effect';
 import { describe, expect, it } from 'vite-plus/test';
 import {
   createClient,
+  httpBatchLink,
   httpLink,
   localLink,
   RpcInterrupted,
@@ -27,6 +28,13 @@ const setups: ReadonlyArray<readonly [string, Setup]> = [
     async (handlers) => {
       const server = await startServer({ protocol: 'http', handlers });
       return { link: httpLink({ url: server.url }), dispose: server.dispose };
+    },
+  ],
+  [
+    'httpBatchLink',
+    async (handlers) => {
+      const server = await startServer({ protocol: 'http', handlers });
+      return { link: httpBatchLink({ url: server.url }), dispose: server.dispose };
     },
   ],
   [
