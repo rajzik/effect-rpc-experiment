@@ -1,4 +1,4 @@
-// Every procedure here has an output the generator cannot map.
+// Every procedure here has a schema the generator cannot map.
 import { Context, Effect, Schema } from 'effect';
 import { Procedure } from '@effect-trpc/core';
 
@@ -25,5 +25,28 @@ export class BadRouter extends Context.Service<BadRouter>()('BadRouter', {
     local: Procedure.input(Local).query(() => Effect.void),
     recursive: Procedure.query(() => Effect.succeed(node)),
     status: Procedure.query(() => Effect.succeed(Status.Active)),
+  }),
+}) {}
+
+const ById = Schema.Struct({ id: Schema.Finite });
+class AppConfig extends Context.Service<AppConfig, { readonly schema: typeof ById }>()(
+  'AppConfig',
+) {}
+
+// Schemas built from values read in `make`: the client cannot have them.
+class InnerRouter extends Context.Service<InnerRouter>()('InnerRouter', {
+  make: Effect.gen(function* () {
+    const limits = yield* AppConfig;
+    return { byId: Procedure.input(limits.schema).query(() => Effect.void) };
+  }),
+}) {}
+
+export class ConfigRouter extends Context.Service<ConfigRouter>()('ConfigRouter', {
+  make: Effect.gen(function* () {
+    const cfg = yield* AppConfig;
+    return {
+      byId: Procedure.input(cfg.schema).query(() => Effect.void),
+      inner: InnerRouter,
+    };
   }),
 }) {}

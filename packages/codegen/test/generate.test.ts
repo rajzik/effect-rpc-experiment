@@ -15,6 +15,13 @@ import { copyFixture, fixtureDir, removeDir, typeCheck } from './helpers.js';
 import { AppRouter as ClientRouter } from './fixtures/app/router.client.gen.js';
 import { AppRouter as ServerRouter } from './fixtures/app/router.gen.js';
 import { Auth, Forbidden, Log, Post, PostNotFound, Unauthorized } from './fixtures/app/models.js';
+import { AppRouter as EffectfulClient } from './fixtures/effectful/router.client.gen.js';
+import { AppRouter as EffectfulServer } from './fixtures/effectful/router.gen.js';
+import { Database } from './fixtures/effectful/db.js';
+import {
+  Post as EffectfulPost,
+  PostNotFound as EffectfulNotFound,
+} from './fixtures/effectful/models.js';
 
 const failure = (promise: Promise<unknown>): Promise<unknown> => promise.catch((e: unknown) => e);
 
@@ -167,6 +174,127 @@ describe('generated modules at runtime (the committed fixture output)', () => {
   });
 });
 
+describe('router services whose make is Effect.gen', () => {
+  let effectful: string;
+  let out: GenerateResult;
+  const readOut = (file: string): string => readFileSync(path.join(effectful, file), 'utf8');
+  beforeAll(() => {
+    effectful = copyFixture('effectful');
+    out = generate({
+      project: path.join(effectful, 'tsconfig.json'),
+      routers: [path.join(effectful, 'router.ts')],
+    });
+  });
+  afterAll(() => {
+    removeDir(effectful);
+  });
+
+  it('reads the record the generator returns', () => {
+    expect(out.errors).toEqual([]);
+    const client = readOut('router.client.gen.ts');
+    expect(client).toContain(
+      [
+        'export const PostRouter = __Router.make({',
+        '  byId: __query({ payload: { id: Schema.Finite }, success: __i0, error: __i1 }),',
+        '});',
+      ].join('\n'),
+    );
+    expect(client).toMatch(
+      /import \{ Post as __i0, PostNotFound as __i1 \} from '\.\/models\.js';/,
+    );
+    expect(client).not.toMatch(/from '\.\/(router|db)(\.js)?'/);
+    expect(client).not.toContain('yield*');
+    const server = readOut('router.gen.ts');
+    expect(server).toContain(
+      'export const PostRouter = __Router.withSchemas(__source_PostRouter, {\n  byId: { output: __i0, error: __i1 },\n});',
+    );
+  });
+
+  it('inlines a nested effectful service into the client record', () => {
+    expect(readOut('router.client.gen.ts')).toContain(
+      [
+        'export const AppRouter = __Router.make({',
+        '  count: __query({ success: __Schema.Number }),',
+        '  post: {',
+        '    byId: __query({ payload: { id: Schema.Finite }, success: __i0, error: __i1 }),',
+        '  },',
+        '});',
+      ].join('\n'),
+    );
+  });
+
+  it('type-checks, including the client contract check against the lazy server service', () => {
+    expect(typeCheck(effectful)).toBe('');
+  });
+
+  it('the committed fixture output is up to date', () => {
+    const fresh = generate({
+      project: path.join(fixtureDir('effectful'), 'tsconfig.json'),
+      routers: [path.join(fixtureDir('effectful'), 'router.ts')],
+      write: false,
+    });
+    expect(fresh.errors).toEqual([]);
+    expect(fresh.files.filter((f) => f.changed).map((f) => f.path)).toEqual([]);
+  });
+
+  it('the contract check fails when only the server procedure gains a middleware', () => {
+    const drifted = copyFixture('effectful');
+    try {
+      generate({
+        project: path.join(drifted, 'tsconfig.json'),
+        routers: [path.join(drifted, 'router.ts')],
+      });
+      const file = path.join(drifted, 'router.ts');
+      writeFileSync(
+        file,
+        readFileSync(file, 'utf8')
+          .replace(
+            "import { Database } from './db.js';",
+            "import { Database } from './db.js';\nimport { Auth } from './models.js';",
+          )
+          .replace(
+            '.query(({ id }) => db.find(id))',
+            '.middleware(Auth).query(({ id }) => db.find(id))',
+          ),
+      );
+      expect(typeCheck(drifted)).toMatch(
+        /router\.client\.gen\.ts is out of date: run effect-trpc-codegen/,
+      );
+    } finally {
+      removeDir(drifted);
+    }
+  });
+
+  it('serves the generated server module with Handlers.fromService and the contract', async () => {
+    const DatabaseLive = Layer.succeed(Database)(
+      Database.of({
+        find: (id) =>
+          id === 1
+            ? Effect.succeed(new EffectfulPost({ id, title: 'Hello' }))
+            : Effect.fail(new EffectfulNotFound({ id })),
+        count: Effect.succeed(1),
+      }),
+    );
+    const web = await toWebHandler(EffectfulClient, {
+      handlers: Handlers.fromService(EffectfulServer).pipe(Layer.provide(DatabaseLive)),
+    });
+    const client = createClient(EffectfulClient, {
+      link: httpLink({
+        url: 'http://localhost/rpc',
+        fetch: (input, init) => web.handler(new Request(input, init)),
+      }),
+    });
+    try {
+      expect(await client.count()).toBe(1);
+      expect(await client.post.byId({ id: 1 })).toBeInstanceOf(EffectfulPost);
+      expect(await failure(client.post.byId({ id: 2 }))).toBeInstanceOf(EffectfulNotFound);
+    } finally {
+      await client.dispose();
+      await web.dispose();
+    }
+  });
+});
+
 describe('drift and errors', () => {
   it('the contract check fails when the client module no longer matches the server router', () => {
     const drifted = copyFixture('app');
@@ -207,6 +335,28 @@ describe('drift and errors', () => {
       );
       expect(errors).toMatch(/the recursive type .* needs a name|is not exported/);
       expect(errors).toMatch(/router\.ts:\d+: the enum Status has no schema mapping/);
+    } finally {
+      removeDir(bad);
+    }
+  });
+
+  it('a schema built from a value read in make is an error at its location', () => {
+    const bad = copyFixture('bad');
+    try {
+      const out = generate({
+        project: path.join(bad, 'tsconfig.json'),
+        routers: [path.join(bad, 'router.ts')],
+      });
+      const source = readFileSync(path.join(bad, 'router.ts'), 'utf8').split('\n');
+      const line = (text: string): number => source.findIndex((l) => l.includes(text)) + 1;
+      const errors = out.errors.join('\n');
+      expect(errors).toContain(
+        `router.ts:${line('Procedure.input(cfg.schema)')}: cfg is read in make: schemas must not depend on values read in make (declare the schema at module level)`,
+      );
+      // The same in a nested service's make.
+      expect(errors).toContain(
+        `router.ts:${line('Procedure.input(limits.schema)')}: limits is read in make`,
+      );
     } finally {
       removeDir(bad);
     }

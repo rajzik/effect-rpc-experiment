@@ -6,11 +6,16 @@
  *
  * - `router.gen.ts` (server): `Router.withSchemas(AppRouter, { ... })` over the router module
  *   itself, with the inferred `output` / `error` schemas of every procedure written without
- *   `.output`. Serve this one (a router service with the source's key for a service source).
+ *   `.output`. Serve this one (for a service source, a router service with the source's key: serve
+ *   it with `Handlers.fromService`).
  * - `router.client.gen.ts` (client): the same contract as a schema-only router (`query({...})`
  *   definitions, no handlers, no import of the router module). Give this router to clients, so
  *   handler code and server-only imports stay out of client bundles. A compile-time check in it
  *   fails when it no longer matches the server router.
+ *
+ * A router service's `make` may be `Effect.succeed({...})`, `Effect.sync(() => ({...}))` or
+ * `Effect.gen(function* () { ...; return {...} })` (it may read services); a schema must not
+ * depend on a value read in `make`.
  *
  * @since 0.1.0
  */
@@ -35,6 +40,8 @@ import {
   isArrowFunction,
   isCallExpression,
   isClassDeclaration,
+  isFunctionExpression,
+  isHeritageClause,
   isIdentifier,
   isImportClause,
   isImportDeclaration,
@@ -44,7 +51,9 @@ import {
   isParenthesizedExpression,
   isPropertyAccessExpression,
   isPropertyAssignment,
+  isReturnStatement,
   isShorthandPropertyAssignment,
+  isSourceFile,
   isStringLiteral,
   isVariableDeclaration,
   isVariableStatement,
@@ -209,7 +218,10 @@ const asRouterMake = (node: Expression): ObjectLiteralExpression | undefined => 
   return value !== undefined && isObjectLiteralExpression(value) ? value : undefined;
 };
 
-/** The record literal of a `make` of `Effect.succeed({...})` or `Effect.sync(() => ({...}))`. */
+/**
+ * The record literal of a `make` of `Effect.succeed({...})`, `Effect.sync(() => ({...}))` or
+ * `Effect.gen(function* () { ...; return {...} })` (the generator's last top-level `return`).
+ */
 const makeRecord = (make: Expression): ObjectLiteralExpression | undefined => {
   const call = asMethodCall(unwrap(make));
   if (call === undefined || !isNamed(call.receiver, 'Effect')) return undefined;
@@ -224,7 +236,22 @@ const makeRecord = (make: Expression): ObjectLiteralExpression | undefined => {
     const value = body.kind === SyntaxKind.Block ? undefined : unwrap(body);
     return value !== undefined && isObjectLiteralExpression(value) ? value : undefined;
   }
+  if (call.name === 'gen' && isFunctionExpression(arg) && arg.asteriskToken !== undefined) {
+    const returned = arg.body.statements.findLast(isReturnStatement)?.expression;
+    const value = returned === undefined ? undefined : unwrap(returned);
+    return value !== undefined && isObjectLiteralExpression(value) ? value : undefined;
+  }
   return undefined;
+};
+
+/** Whether a node is inside the `make` of a service class (a value read in `make`). */
+const isInMake = (node: Node): boolean => {
+  let inMake = false;
+  for (let n = node.parent; !isSourceFile(n); n = n.parent) {
+    if (isPropertyAssignment(n) && isNamed(n.name, 'make')) inMake = true;
+    else if (inMake && isHeritageClause(n)) return true;
+  }
+  return false;
 };
 
 /** The `make` record literal of `class X extends Context.Service<X>()('X', { make }) {}`. */
@@ -923,6 +950,10 @@ const copyExpression = (gen: ModuleGen, expr: Node, copied: Map<string, string>)
     }
     // Declared inside the copied expression (a parameter, a local): nothing to bring along.
     if (declSf.fileName === sf.fileName && decl.pos >= start && decl.end <= end) return;
+    if (isInMake(decl))
+      throw new Unmappable(
+        `${identifier.text} is read in make: schemas must not depend on values read in make (declare the schema at module level)`,
+      );
     if (isImportSpecifier(decl) || isImportClause(decl) || isNamespaceImport(decl)) {
       let importDecl: Node = decl;
       while (!isImportDeclaration(importDecl)) importDecl = importDecl.parent;
@@ -1183,7 +1214,7 @@ const emitModules = (
   const source = `./${path.basename(sf.fileName)}`;
   const serverText = [
     HEADER(source) +
-      '// The server router: serve this one (it imports the router module once; no copy).',
+      '// The server router: serve this one (router services with `Handlers.fromService`); it imports the router module once, no copy.',
     server.imports.render(),
     '',
     ...server.hoisted,
