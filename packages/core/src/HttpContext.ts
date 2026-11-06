@@ -6,7 +6,7 @@
  * request fiber's context, so Effect's `HttpServerRequest` is available and response changes can
  * be registered with `HttpEffect.appendPreResponseHandler`. These helpers wrap both without adding
  * a requirement, so handlers that use them still run under `createCaller`, `localLink`, Electron
- * and tests (there they read `None` and the setters do nothing).
+ * and tests (there they read `None` and valid setter calls do nothing).
  *
  * @since 0.1.0
  */
@@ -44,13 +44,18 @@ import { Cookies, Headers, HttpEffect, HttpServerRequest, HttpServerResponse } f
 const request: Effect.Effect<Option.Option<HttpServerRequest.HttpServerRequest>> =
   Effect.serviceOption(HttpServerRequest.HttpServerRequest);
 
+// Over WebSocket every call shares the upgrade request, whose response is long gone: registering
+// would only grow its pre-response handler chain for the lifetime of the connection.
+const isWebSocketUpgrade = (req: HttpServerRequest.HttpServerRequest): boolean =>
+  req.headers.upgrade?.toLowerCase() === 'websocket';
+
 const onResponse = (
   update: (
     response: HttpServerResponse.HttpServerResponse,
   ) => HttpServerResponse.HttpServerResponse,
 ): Effect.Effect<void> =>
   Effect.flatMap(request, (option) =>
-    Option.isNone(option)
+    Option.isNone(option) || isWebSocketUpgrade(option.value)
       ? Effect.void
       : Effect.sync(() =>
           HttpEffect.appendPreResponseHandlerUnsafe(option.value, (_, response) =>
@@ -59,13 +64,27 @@ const onResponse = (
         ),
   );
 
+// The characters Node's `http` and fetch `Headers` accept (RFC 9110 token / field value).
+const headerName = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const headerValue = /^[\t\x20-\x7e\x80-\xff]*$/;
+
+// Checked up front: an invalid header would otherwise break the whole HTTP response later.
+const checkHeader = (name: string, value: string): Effect.Effect<void> =>
+  headerName.test(name) && headerValue.test(value)
+    ? Effect.void
+    : Effect.die(
+        new TypeError(`HttpContext: invalid characters in the name or value of header "${name}"`),
+      );
+
 /**
  * Sets a response header, replacing any value set before.
  *
  * **Details**
  *
  * - Header names are case-insensitive (stored lowercased).
- * - A no-op when the call did not arrive over HTTP.
+ * - Dies (a defect) when the name or value has characters not allowed in an HTTP header (e.g.
+ *   CR/LF), even outside HTTP.
+ * - A valid call is a no-op when the call did not arrive over HTTP, or arrived over WebSocket.
  *
  * **Example** (Disabling caching)
  *
@@ -82,10 +101,14 @@ const onResponse = (
  * @since 0.1.0
  */
 const setHeader = (name: string, value: string): Effect.Effect<void> =>
-  onResponse(HttpServerResponse.setHeader(name, value));
+  Effect.andThen(checkHeader(name, value), onResponse(HttpServerResponse.setHeader(name, value)));
 
 /**
  * Appends a value to a response header, keeping the values set before (`a, b`).
+ *
+ * **Details**
+ *
+ * - Validated, and a no-op outside HTTP, like {@link setHeader}.
  *
  * **Example** (Adding to `vary`)
  *
@@ -102,19 +125,27 @@ const setHeader = (name: string, value: string): Effect.Effect<void> =>
  * @since 0.1.0
  */
 const appendHeader = (name: string, value: string): Effect.Effect<void> =>
-  onResponse((response) =>
-    HttpServerResponse.setHeader(
-      response,
-      name,
-      Option.match(Headers.get(response.headers, name), {
-        onNone: () => value,
-        onSome: (previous) => `${previous}, ${value}`,
-      }),
+  Effect.andThen(
+    checkHeader(name, value),
+    onResponse((response) =>
+      HttpServerResponse.setHeader(
+        response,
+        name,
+        Option.match(Headers.get(response.headers, name), {
+          onNone: () => value,
+          onSome: (previous) => `${previous}, ${value}`,
+        }),
+      ),
     ),
   );
 
 /**
  * Sets a response cookie (a `set-cookie` header).
+ *
+ * **Details**
+ *
+ * - Dies (a defect) on an invalid name, value or option, even outside HTTP.
+ * - A valid call is a no-op when the call did not arrive over HTTP, or arrived over WebSocket.
  *
  * **Example** (A login mutation setting a session cookie)
  *
@@ -162,23 +193,24 @@ const setCookie = (
  *
  * - None of them adds a requirement or an error: they are `Effect<…, never, never>`, so a
  *   handler using them still runs under every transport.
- * - Outside HTTP (`createCaller`, `localLink`, Electron, tests) `request` is `None` and the
- *   setters do nothing.
+ * - Outside HTTP (`createCaller`, `localLink`, Electron, tests) `request` is `None` and valid
+ *   setter calls do nothing. Invalid input (a header with CR/LF, a cookie name with a space) dies
+ *   everywhere: a defect, `RpcDefect` on the client.
  * - Changes apply to the response when it is written, in call order.
  *
  * **Gotchas**
  *
- * - The response is written as soon as the first response chunk exists: the `Exit` of a query or
- *   mutation, the first element of a subscription. Headers and cookies set after that (e.g. by a
- *   subscription after its first element) are silently dropped.
+ * - With a framed serialization (`ndjson`, the default) the response is written as soon as the
+ *   first response chunk exists: the `Exit` of a query or mutation, the first element of a
+ *   subscription. Headers and cookies set after that (e.g. by a subscription after its first
+ *   element) are silently dropped. With `serialization: 'json'` the whole response is collected
+ *   first, so they apply until the last call of the request ends.
  * - Several calls sent in one HTTP request share one response: a header set by one of them
- *   applies to all, and only if set before the first of them writes its response chunk.
- * - Over WebSocket, `request` is the upgrade request and the setters have no effect (the upgrade
+ *   applies to all, and (framed) only if set before the first of them writes its response chunk.
+ * - Over WebSocket, `request` is the upgrade request and the setters do nothing (the upgrade
  *   response was sent before any call).
  * - `appendHeader` joins values with `", "`; use `setCookie` for cookies, never
  *   `appendHeader('set-cookie', …)`.
- * - `setCookie` with an invalid name, value or option dies (a defect, `RpcDefect` on the client),
- *   with or without HTTP.
  *
  * **Example** (A login mutation that reads a header and sets a cookie)
  *
