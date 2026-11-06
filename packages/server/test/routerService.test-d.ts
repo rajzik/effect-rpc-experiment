@@ -310,6 +310,32 @@ describe('server adapters accept the router service class (types)', () => {
     Handlers.make(LegacyRouter, { ok: () => Effect.void, health: () => Effect.succeed('ok') });
   });
 
+  it('type queries on the instantiated Handlers.make compile', () => {
+    // `ReturnType<typeof Handlers.make>` (uninstantiated) hits TS2589 because of the overloads:
+    // instantiate it, or use `Handlers.Provides<R>` / `Handlers.Services<R, H>`.
+    type H = Handlers.From<typeof plainRouter>;
+    expectTypeOf<ReturnType<typeof Handlers.make<typeof plainRouter, H>>>().toEqualTypeOf<
+      Layer.Layer<
+        Handlers.Provides<typeof plainRouter>,
+        never,
+        Handlers.Services<typeof plainRouter, H>
+      >
+    >();
+    expectTypeOf<Parameters<typeof Handlers.make<typeof plainRouter, H>>[0]>().toEqualTypeOf<
+      typeof plainRouter
+    >();
+    type AppRouterOf = Router.Of<typeof AppRouter>;
+    expectTypeOf<
+      ReturnType<typeof Handlers.make<AppRouterOf, Handlers.From<AppRouterOf>>>
+    >().toEqualTypeOf<
+      Layer.Layer<
+        Handlers.Provides<AppRouterOf>,
+        never,
+        Handlers.Services<AppRouterOf, Handlers.From<AppRouterOf>>
+      >
+    >();
+  });
+
   it('generic code keeps its types', () => {
     expectTypeOf(forRouter(plainRouter, plainHandlers)).toEqualTypeOf<Caller<typeof plainRouter>>();
   });

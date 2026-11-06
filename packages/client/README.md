@@ -96,6 +96,7 @@ See [Links](#links) for `wsLink` / `localLink` and [Effect client](#effect-clien
 - Don't mutate headers on the client → `client.withHeaders({...})` returns a client sharing the connection.
 - Don't use Effect v3 imports (`@effect/rpc`, `@effect/platform`) → `effect/rpc`, `effect/http`.
 - Don't write `Client<typeof AppRouter>` for a router service (a type error) → `Client<Router.Of<typeof AppRouter>>`; `createClient` itself takes the class.
+- Don't write `ReturnType<typeof createClient>` (uninstantiated: TS2589 "excessively deep", because `createClient` is overloaded for router services) → `Client<R>` / `CreateClientOptions<R>`, or the instantiated form `ReturnType<typeof createClient<typeof appRouter>>` (for a service: `createClient<Router.Of<typeof AppRouter>>`).
 
 **Where to look**
 

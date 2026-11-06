@@ -282,6 +282,11 @@ const makeFromInput = (
  *   error. At runtime a missing handler throws (or fails the layer when `build` is an Effect).
  * - The returned layer does not include middleware implementations; merge them in:
  *   `Layer.mergeAll(HandlersLive, AuthLive)`.
+ * - `Handlers.make` is overloaded (routers and router services), so a type query on the
+ *   uninstantiated function such as `ReturnType<typeof Handlers.make>` fails with TS2589
+ *   ("Type instantiation is excessively deep"). Name the layer with `Handlers.Provides<R>` /
+ *   `Handlers.Services<R, H>` (or `Handlers.Requirements<R>`), or instantiate it:
+ *   `ReturnType<typeof Handlers.make<typeof appRouter, Handlers.From<typeof appRouter>>>`.
  *
  * **Example** (Implementing a router)
  *

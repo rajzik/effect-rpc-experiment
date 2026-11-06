@@ -59,6 +59,22 @@ describe('createClient with a router service (types)', () => {
     >();
   });
 
+  it('type queries on the instantiated createClient compile', () => {
+    // `ReturnType<typeof createClient>` (uninstantiated) hits TS2589 because of the overloads:
+    // instantiate it with a router type, or use `Client<R>` / `CreateClientOptions<R>`.
+    expectTypeOf<ReturnType<typeof createClient<typeof plainRouter>>>().toEqualTypeOf<
+      Client<typeof plainRouter>
+    >();
+    expectTypeOf<Parameters<typeof createClient<typeof plainRouter>>[1]>().toEqualTypeOf<
+      CreateClientOptions<typeof plainRouter>
+    >();
+    // For a router service, instantiate with its router type `Router.Of<typeof Svc>`.
+    type AppRouterOf = Router.Of<typeof AppRouter>;
+    expectTypeOf<ReturnType<typeof createClient<AppRouterOf>>>().toEqualTypeOf<
+      Client<AppRouterOf>
+    >();
+  });
+
   it('a link missing handlers is still a type error', () => {
     expectTypeOf(plainHandlersMissing).not.toExtend<typeof AppHandlers>();
     // @ts-expect-error -- the handlers of the service's procedures are required

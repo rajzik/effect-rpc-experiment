@@ -154,6 +154,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - Don't pass a router with `query({...})` definitions to `Handlers.fromService` / `fromProcedures` (compile error `procedure '<path>' has no handler ...`; throws if forced) → build them with `Procedure`, or implement the router with `Handlers.make`.
 - Don't write `Caller<typeof AppRouter>` for a router service → `Caller<Router.Of<typeof AppRouter>>` (functions take the class directly; type helpers take a router type).
 - Don't read services at the top of a router service's `make` → read them inside the handlers (`make` must be `Effect<Record, never, never>`).
+- Don't write `ReturnType<typeof Handlers.make>` (uninstantiated: TS2589 "excessively deep", because `Handlers.make` is overloaded for router services) → `Handlers.Provides<R>` / `Handlers.Services<R, H>` / `Handlers.Requirements<R>`, or the instantiated form `ReturnType<typeof Handlers.make<typeof appRouter, Handlers.From<typeof appRouter>>>`.
 - Don't call `RpcServer.layerHttp` directly without `protocol: "http"` and `disableFatalDefects: true` → use `layerHttp` from this package.
 
 **Where to look**

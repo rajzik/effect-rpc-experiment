@@ -677,6 +677,11 @@ const createClientFromInput = (
  *   `withHeaders`); nest such procedures under another key.
  * - Routers with `requiredForClient` middleware need the `middleware` option
  *   (`RpcMiddleware.layerClient(...)`); it is a type error to omit it.
+ * - `createClient` is overloaded (routers and router services), so a type query on the
+ *   uninstantiated function such as `ReturnType<typeof createClient>` fails with TS2589
+ *   ("Type instantiation is excessively deep"). Use `Client<R>` / `CreateClientOptions<R>`, or
+ *   the instantiated form `ReturnType<typeof createClient<typeof appRouter>>` (for a router
+ *   service: `createClient<Router.Of<typeof AppRouter>>`).
  *
  * **Example** (Promise and Effect calls over HTTP)
  *
