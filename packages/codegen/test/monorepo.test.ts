@@ -63,7 +63,7 @@ describe('schemas from other packages', () => {
     type Mod<K extends string> = Readonly<Record<K, new (...args: never) => unknown>>;
     const models = await load<Mod<'User'>>('node_modules/@fx/models/src/index.ts');
     const errors = await load<Mod<'UserNotFound'>>('node_modules/@fx/models/src/errors.ts');
-    const vendor = await load<Mod<'Money'>>('node_modules/vendor-lib/dist/index.js');
+    const vendor = await load<Mod<'Money'>>('node_modules/vendor-lib/lib/index.js');
     const server = await load<{ readonly AppRouter: Router.Any }>('router.gen.ts');
     const contract = await load<{ readonly AppRouter: Router.Any }>('router.client.gen.ts');
     const web = await toWebHandler(server.AppRouter, {
