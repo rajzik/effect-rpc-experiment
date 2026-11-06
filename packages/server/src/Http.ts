@@ -41,8 +41,8 @@ export type Serialization = 'json' | 'ndjson' | Layer.Layer<RpcSerialization.Rpc
  *
  * **When to use**
  *
- * Use to log or report failures centrally: every call that fails (typed failure or defect,
- * including failures of middleware such as auth) is reported once, with its procedure path.
+ * Use to log or report failures centrally: every call that fails while running (handler or
+ * middleware, e.g. auth; typed failure or defect) is reported once, with its procedure path.
  *
  * **Details**
  *
@@ -52,9 +52,13 @@ export type Serialization = 'json' | 'ndjson' | Layer.Layer<RpcSerialization.Rpc
  *
  * **Gotchas**
  *
+ * - Calls `RpcServer` rejects outside the handler and middleware are not reported: a payload
+ *   that fails to decode, an unknown procedure, a success value that fails to encode. They reach
+ *   the client as `RpcDefect`.
  * - The failure is sent once `onError` completes and the hook is not interrupted (not even by a
- *   client abort), so a slow hook delays the response; fork long work. Failures and defects of
- *   the hook itself are ignored and never change the response.
+ *   client abort), so a slow hook delays the response and a hanging hook also blocks `dispose()`
+ *   / server shutdown for that call; fork long work. Failures and defects of the hook itself are
+ *   ignored and never change the response.
  *
  * **Example** (Logging failed calls)
  *
@@ -110,9 +114,10 @@ export interface ServerOptions {
   /** Maximum number of requests handled concurrently. Defaults to `"unbounded"`. */
   readonly concurrency?: number | 'unbounded' | undefined;
   /**
-   * Called for every call that fails (typed failure or defect, middleware failures included),
-   * before the failure is sent; not for interruptions. Its own failures are ignored. See
-   * {@link OnErrorInfo}.
+   * Called for every call that fails while running (handler or middleware; typed failure or
+   * defect), before the failure is sent; not for interruptions, nor for calls rejected before or
+   * after running (invalid payload, unknown procedure, unencodable success). Its own failures are
+   * ignored. See {@link OnErrorInfo}.
    */
   readonly onError?: ((error: OnErrorInfo) => Effect.Effect<void>) | undefined;
 }

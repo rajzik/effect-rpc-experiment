@@ -1,8 +1,12 @@
 // `onError`: the server hook called for every failed call (tRPC's `onError` adapter option).
-import { Cause, Effect } from 'effect';
+import { Cause, Effect, Exit, Layer } from 'effect';
+import { HttpRouter, HttpServer } from 'effect/http';
+import { RpcClient, RpcSerialization } from 'effect/rpc';
+import { Socket } from 'effect/socket';
+import { NodeHttpServer } from '@effect/platform-node';
 import { Procedure, Router } from '@effect-trpc/core';
 import { describe, expect, it } from 'vite-plus/test';
-import { Handlers, toWebHandler } from '../src/index.js';
+import { Handlers, layerHttp, toWebHandler } from '../src/index.js';
 import type { OnErrorInfo } from '../src/index.js';
 import { runServer } from '../src/node.js';
 import { appRouter, makeServer, NotFound, Unauthorized } from './fixtures.js';
@@ -102,6 +106,17 @@ describe('onError over toWebHandler', () => {
     }
   });
 
+  it('is not called for calls rejected outside handler and middleware (client gets a Die)', async () => {
+    const { calls, onError } = recorder();
+    await using web = await toWebHandler(appRouter, { handlers: makeServer().layer, onError });
+    const die = { _tag: 'Failure', cause: [{ _tag: 'Die' }] };
+    // A payload that fails to decode, an unknown procedure, a success that fails to encode.
+    expect(exitFrame(await call(web, { tag: 'user.byId', payload: { id: 1 } }))).toMatchObject(die);
+    expect(exitFrame(await call(web, { tag: 'user.nope' }))).toMatchObject(die);
+    expect(exitFrame(await call(web, { tag: 'debug.badOutput' }))).toMatchObject(die);
+    expect(calls).toEqual([]);
+  });
+
   it('is not called for an interrupt-only cause', async () => {
     const router = Router.make({ stop: Procedure.mutation(() => Effect.interrupt) });
     const { calls, onError } = recorder();
@@ -144,5 +159,37 @@ describe('onError over runServer', () => {
     );
     expect(exitFrame(await readFrames(response))).toMatchObject({ _tag: 'Failure' });
     expect(calls.map((info) => info.path)).toEqual(['user.byId']);
+  });
+});
+
+describe('onError over WebSocket', () => {
+  it('a failing call reaches onError with its path', async () => {
+    const { calls, onError } = recorder();
+    const ServerLive = HttpRouter.serve(
+      layerHttp(appRouter, { handlers: makeServer().layer, protocol: 'websocket', onError }),
+      { disableLogger: true, disableListenLog: true },
+    ).pipe(Layer.provideMerge(NodeHttpServer.layerTest));
+    const ClientLive = Layer.unwrap(
+      Effect.gen(function* () {
+        const address = HttpServer.formatAddress((yield* HttpServer.HttpServer).address);
+        return RpcClient.layerProtocolSocket().pipe(
+          Layer.provide([
+            Socket.layerWebSocket(`${address.replace(/^http/, 'ws')}/rpc`).pipe(
+              Layer.provide(Socket.layerWebSocketConstructorGlobal),
+            ),
+            RpcSerialization.layerNdjson,
+          ]),
+        );
+      }),
+    ).pipe(Layer.provide(ServerLive));
+    const exit = await Effect.runPromiseExit(
+      Effect.gen(function* () {
+        const client = yield* RpcClient.make(appRouter.group);
+        return yield* client['user.byId']({ id: 'ghost' });
+      }).pipe(Effect.scoped, Effect.provide(ClientLive)),
+    );
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(calls.map((info) => info.path)).toEqual(['user.byId']);
+    expect(failures(calls[0]?.cause ?? Cause.empty)).toEqual([new NotFound({ id: 'ghost' })]);
   });
 });

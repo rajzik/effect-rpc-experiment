@@ -46,8 +46,8 @@ export interface RouteHandlerOptions<R extends Router.Any, LE = never> {
   /** Wire format, must match the client's `httpLink`. Defaults to `"ndjson"`. */
   readonly serialization?: Serialization | undefined;
   /**
-   * Called for every call that fails, before the failure is sent (see `OnErrorInfo` in
-   * `@effect-trpc/server`).
+   * Called for every call that fails while running (handler or middleware), before the failure
+   * is sent (see `OnErrorInfo` in `@effect-trpc/server`).
    */
   readonly onError?: ServerOptions['onError'];
 }
