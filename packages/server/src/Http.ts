@@ -301,7 +301,7 @@ const layerHttpFor = <
   }).pipe(Layer.provide([serializationLayer(options.serialization), hooks.layer]));
   const served =
     options.handlers === undefined ? server : server.pipe(Layer.provide(options.handlers));
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion -- removes `C` from the requirements: `context` provides it per call; and adds what `Router.Any` erased (`Handlers.Requirements<R>`)
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion -- removes `C` (provided per call by `context`) and adds what is erased: `Handlers.Requirements<R>` (`Router.Any`) and `CR` (`context` reads it from the call's context)
   return served as LayerHttpFor<R, LOut, LE, LR, C, CR>;
 };
 
