@@ -58,10 +58,10 @@ const release = (post: Post | undefined): void => {
   }
 };
 
+/** Ends the `send` of a call that was not interrupted; the call no longer counts as waiting. */
 const settle = (call: Call, exit: Exit.Exit<void, RpcClientError.RpcClientError>): void => {
-  if (call.state !== 'pending') return;
+  if (call.state === 'interrupted' || !Deferred.doneUnsafe(call.result, exit)) return;
   call.state = 'done';
-  Deferred.doneUnsafe(call.result, exit);
   release(call.post);
 };
 
@@ -119,12 +119,16 @@ const makeProtocol = (url: string, queries: ReadonlySet<string>, maxItems: numbe
             const call = 'requestId' in message ? byId.get(String(message.requestId)) : calls[0];
             if (call === undefined) return Effect.void;
             const write = writeResponse(call.clientId, message);
-            return message._tag === 'Exit'
-              ? Effect.andThen(
-                  write,
-                  Effect.sync(() => settle(call, Exit.void)),
-                )
-              : write;
+            if (message._tag !== 'Exit' || call.state !== 'pending') return write;
+            // `done` before RpcClient sees the Exit, as it then interrupts the call's `send` (not an
+            // abort); uninterruptible, so aborting the POST cannot drop the Exit.
+            call.state = 'done';
+            return Effect.uninterruptible(
+              Effect.andThen(
+                write,
+                Effect.sync(() => settle(call, Exit.void)),
+              ),
+            );
           };
           const response = yield* client.post('', { body });
           // NDJSON is decoded while it streams; JSON is one document.

@@ -48,9 +48,38 @@ const abortOf = (signal: AbortSignal | undefined): Promise<void> =>
     else signal.addEventListener('abort', () => resolve(), { once: true });
   });
 
+/** A top-level field of one NDJSON line. */
+const field = (line: string, key: string): unknown => {
+  const message: unknown = JSON.parse(line);
+  return typeof message === 'object' && message !== null ? Reflect.get(message, key) : undefined;
+};
+
+const lines = (text: string): ReadonlyArray<string> =>
+  text.split('\n').filter((line) => line !== '');
+
+/** A fetch response hook: drops the `Exit` frame of the call to `tag` from an NDJSON response. */
+const dropExitOf =
+  (tag: string) =>
+  async (request: Request, response: Response): Promise<Response> => {
+    const sent = lines(await request.text()).find((line) => field(line, 'tag') === tag);
+    const id = sent === undefined ? undefined : field(sent, 'id');
+    const kept = lines(await response.text()).filter(
+      (line) => field(line, '_tag') !== 'Exit' || field(line, 'requestId') !== id,
+    );
+    return new Response(kept.map((line) => `${line}\n`).join(''), {
+      status: response.status,
+      headers: response.headers,
+    });
+  };
+
 /** Serves `router` with `toWebHandler` and calls it through a fetch double that records signals. */
 const withClient = async (
-  options: { readonly format?: Format; readonly link?: Partial<HttpBatchLinkOptions> },
+  options: {
+    readonly format?: Format;
+    readonly link?: Partial<HttpBatchLinkOptions>;
+    /** Rewrites the server's response before the link sees it. */
+    readonly respond?: (request: Request, response: Response) => Promise<Response>;
+  },
   test: (ctx: {
     readonly client: ReturnType<typeof createClient<typeof router>>;
     /** The `signal` of every fetch, in call order: one entry per POST. */
@@ -84,10 +113,13 @@ const withClient = async (
     { disableLogger: true },
   );
   const signals: Array<AbortSignal> = [];
+  const { respond } = options;
   const fetch: typeof globalThis.fetch = (input, init) => {
     const request = new Request(input, init);
     signals.push(request.signal);
-    return web.handler(request);
+    return respond === undefined
+      ? web.handler(request)
+      : web.handler(request.clone()).then((response) => respond(request, response));
   };
   const client = createClient(router, {
     link: httpBatchLink({
@@ -215,6 +247,43 @@ describe('httpBatchLink limits, errors and abort', () => {
     expect(fetches).toBe(1);
     await client.dispose();
   });
+
+  it.each([
+    [
+      'throws',
+      () => {
+        throw new Error('no token');
+      },
+    ],
+    ['rejects', () => Promise.reject(new Error('no token'))],
+  ])(
+    'fails every call of the POST with RpcTransportError when headers() %s, without a fetch',
+    (_name, headers) =>
+      withClient({ link: { headers } }, async ({ client, signals }) => {
+        const errors = await Promise.all([
+          rejectionOf(client.item({ id: 1 })),
+          rejectionOf(client.item({ id: 2 })),
+          rejectionOf(client.header()),
+        ]);
+        for (const error of errors) expect(error).toBeInstanceOf(RpcTransportError);
+        expect(signals).toHaveLength(0);
+      }),
+  );
+
+  it('fails only the call whose Exit is missing from the response', () =>
+    withClient({ respond: dropExitOf('header') }, async ({ client, signals }) => {
+      const [first, missing, last] = await Promise.all([
+        client.item({ id: 1 }),
+        rejectionOf(client.header()),
+        client.item({ id: 2 }),
+      ]);
+      expect(signals).toHaveLength(1);
+      expect(missing).toBeInstanceOf(RpcTransportError);
+      expect(missing).toMatchObject({
+        message: 'RpcClientDefect: HTTP response ended before RPC request completed',
+      });
+      expect([first.label(), last.label()]).toEqual(['item 1', 'item 2']);
+    }));
 
   it('interrupts an aborted query and keeps the POST running for the others', () =>
     withClient({}, async ({ client, signals, open, hangInterrupted }) => {
