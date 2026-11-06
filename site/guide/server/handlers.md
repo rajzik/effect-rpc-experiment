@@ -4,6 +4,12 @@
 `router.group.toLayer(...)` from `effect/rpc` produces, so it works with every adapter and with
 `effect/rpc` directly.
 
+::: tip Router written as a service?
+A router whose procedures are built with `Procedure` already carries its handlers. Use
+`Handlers.fromService(AppRouter)` instead of `Handlers.make`:
+[Routers as services](../concepts/router-services).
+:::
+
 ## A record that mirrors the router
 
 <<< @/snippets/server/handlers.ts#service

@@ -49,6 +49,23 @@ The same call as an Effect: the error channel is exactly `PostNotFound | RpcTran
 `post.error` is typed as the procedure's errors plus the three infrastructure errors, so the
 `_tag` check narrows it to a `PostNotFound` instance.
 
+## Or write it as a service
+
+The router above declares the schemas in one module and the handlers in another. The same router
+can be written once, as an Effect service whose procedures carry their handlers. Server and client
+import the one class, and there is no `Handlers.make` or `type AppRouter = typeof appRouter`.
+
+<<< @/snippets/concepts/router-service-demo.ts#router [router.ts]
+
+`Handlers.fromService(AppRouter)` builds the layer from the procedures, and every adapter takes the
+class where it takes a router:
+
+<<< @/snippets/concepts/router-service-demo.ts#serve
+
+The client is `createClient(AppRouter, …)`, with the same types and the same decoded `Post`
+instances. See [Routers as services](./concepts/router-services) for the rules (`make` must not
+read services), nesting, middleware and the React helper types.
+
 ## Where next
 
 - How the errors are modeled, and when to use which: [the error model](./concepts/errors).

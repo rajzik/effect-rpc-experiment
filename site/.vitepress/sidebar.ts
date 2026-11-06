@@ -14,6 +14,7 @@ const guide: DefaultTheme.SidebarItem[] = [
     text: 'Core concepts',
     items: [
       { text: 'Routers and procedures', link: '/guide/concepts/routers' },
+      { text: 'Routers as services', link: '/guide/concepts/router-services' },
       { text: 'Schemas and serialization', link: '/guide/concepts/schemas' },
       { text: 'The error model', link: '/guide/concepts/errors' },
       { text: 'Type inference', link: '/guide/concepts/inference' },
