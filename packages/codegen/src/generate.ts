@@ -15,7 +15,8 @@
  *
  * A router service's `make` may be `Effect.succeed({...})`, `Effect.sync(() => ({...}))` or
  * `Effect.gen(function* () { ...; return {...} })` (it may read services); a schema must not
- * depend on a value read in `make`.
+ * depend on a value declared in `make`. A service whose `make` yields no procedure, router or
+ * router service is not a router and is skipped.
  *
  * @since 0.1.0
  */
@@ -219,32 +220,25 @@ const asRouterMake = (node: Expression): ObjectLiteralExpression | undefined => 
 };
 
 /**
- * The record literal of a `make` of `Effect.succeed({...})`, `Effect.sync(() => ({...}))` or
+ * The record expression of a `make` of `Effect.succeed({...})`, `Effect.sync(() => ({...}))` or
  * `Effect.gen(function* () { ...; return {...} })` (the generator's last top-level `return`).
  */
-const makeRecord = (make: Expression): ObjectLiteralExpression | undefined => {
+const makeRecord = (make: Expression): Expression | undefined => {
   const call = asMethodCall(unwrap(make));
   if (call === undefined || !isNamed(call.receiver, 'Effect')) return undefined;
   const [arg] = call.call.arguments;
   if (arg === undefined) return undefined;
-  if (call.name === 'succeed') {
-    const value = unwrap(arg);
-    return isObjectLiteralExpression(value) ? value : undefined;
-  }
-  if (call.name === 'sync' && isArrowFunction(arg)) {
-    const body = arg.body;
-    const value = body.kind === SyntaxKind.Block ? undefined : unwrap(body);
-    return value !== undefined && isObjectLiteralExpression(value) ? value : undefined;
-  }
+  if (call.name === 'succeed') return unwrap(arg);
+  if (call.name === 'sync' && isArrowFunction(arg))
+    return arg.body.kind === SyntaxKind.Block ? undefined : unwrap(arg.body);
   if (call.name === 'gen' && isFunctionExpression(arg) && arg.asteriskToken !== undefined) {
     const returned = arg.body.statements.findLast(isReturnStatement)?.expression;
-    const value = returned === undefined ? undefined : unwrap(returned);
-    return value !== undefined && isObjectLiteralExpression(value) ? value : undefined;
+    return returned === undefined ? undefined : unwrap(returned);
   }
   return undefined;
 };
 
-/** Whether a node is inside the `make` of a service class (a value read in `make`). */
+/** Whether a node is inside the `make` of a service class (a value declared in `make`). */
 const isInMake = (node: Node): boolean => {
   let inMake = false;
   for (let n = node.parent; !isSourceFile(n); n = n.parent) {
@@ -254,8 +248,8 @@ const isInMake = (node: Node): boolean => {
   return false;
 };
 
-/** The `make` record literal of `class X extends Context.Service<X>()('X', { make }) {}`. */
-const serviceRecord = (decl: ClassDeclaration): ObjectLiteralExpression | undefined => {
+/** The `make` of `class X extends Context.Service<X>()('X', { make }) {}`. */
+const serviceMake = (decl: ClassDeclaration): Expression | undefined => {
   for (const clause of decl.heritageClauses ?? []) {
     for (const type of clause.types) {
       const call = unwrap(type.expression);
@@ -264,9 +258,7 @@ const serviceRecord = (decl: ClassDeclaration): ObjectLiteralExpression | undefi
         const options = unwrap(arg);
         if (!isObjectLiteralExpression(options)) continue;
         for (const prop of options.properties) {
-          if (isPropertyAssignment(prop) && isNamed(prop.name, 'make')) {
-            return makeRecord(prop.initializer);
-          }
+          if (isPropertyAssignment(prop) && isNamed(prop.name, 'make')) return prop.initializer;
         }
       }
     }
@@ -854,6 +846,34 @@ const asRouter = (ctx: Ctx, node: Expression, errors: Array<string>): RouterNode
     : { kind: 'router', record: readRecord(ctx, literal, errors), middlewares };
 };
 
+const ENTRY_BRANDS = ['~@effect-trpc/core/ProcedureDef', '~@effect-trpc/core/Router'];
+
+/**
+ * Whether a service's `make` (an `Effect`) yields a router record: one of its entries, in a nested
+ * record too, is a procedure, a router or a router service. Other services are not routers.
+ */
+const yieldsRouter = (ctx: Ctx, make: Type | undefined, depth: number): boolean => {
+  const record =
+    make !== undefined && isReference(make) ? ctx.checker.getTypeArguments(make)[0] : undefined;
+  return record !== undefined && isRouterRecord(ctx, record, depth);
+};
+
+const isRouterRecord = (ctx: Ctx, record: Type, depth: number): boolean =>
+  depth < 8 &&
+  ctx.checker.getPropertiesOfType(record).some((prop) => {
+    const type = ctx.checker.getTypeOfSymbol(prop);
+    if (type === undefined) return false;
+    if (ENTRY_BRANDS.some((brand) => ctx.checker.getPropertyOfType(type, brand) !== undefined))
+      return true;
+    const make = ctx.checker.getPropertyOfType(type, 'make');
+    if (make !== undefined) return yieldsRouter(ctx, ctx.checker.getTypeOfSymbol(make), depth + 1);
+    return (
+      type.isObjectType() &&
+      (type.objectFlags & ObjectFlags.ObjectLiteral) !== 0 &&
+      isRouterRecord(ctx, type, depth + 1)
+    );
+  });
+
 /** The router a declaration defines (a router service class or a `Router.make` constant). */
 const routerOfDeclaration = (
   ctx: Ctx,
@@ -861,10 +881,16 @@ const routerOfDeclaration = (
   errors: Array<string>,
 ): RouterNode | undefined => {
   if (isClassDeclaration(decl)) {
-    const literal = serviceRecord(decl);
-    return literal === undefined
-      ? undefined
-      : { kind: 'router', record: readRecord(ctx, literal, errors), middlewares: [] };
+    const make = serviceMake(decl);
+    if (make === undefined || !yieldsRouter(ctx, ctx.checker.getTypeAtLocation(make), 0))
+      return undefined;
+    const record = makeRecord(make);
+    if (record !== undefined && isObjectLiteralExpression(record))
+      return { kind: 'router', record: readRecord(ctx, record, errors), middlewares: [] };
+    errors.push(
+      `${where(ctx, record ?? make)}: make must return an object literal for the generator to read it (Effect.succeed({...}), Effect.sync(() => ({...})) or Effect.gen ending in return {...})`,
+    );
+    return { kind: 'router', record: { kind: 'record', entries: [] }, middlewares: [] };
   }
   if (isVariableDeclaration(decl) && decl.initializer !== undefined)
     return asRouter(ctx, decl.initializer, errors);
@@ -952,7 +978,7 @@ const copyExpression = (gen: ModuleGen, expr: Node, copied: Map<string, string>)
     if (declSf.fileName === sf.fileName && decl.pos >= start && decl.end <= end) return;
     if (isInMake(decl))
       throw new Unmappable(
-        `${identifier.text} is read in make: schemas must not depend on values read in make (declare the schema at module level)`,
+        `${identifier.text} is declared in make: schemas must not depend on values declared in make (declare the schema at module level)`,
       );
     if (isImportSpecifier(decl) || isImportClause(decl) || isNamespaceImport(decl)) {
       let importDecl: Node = decl;

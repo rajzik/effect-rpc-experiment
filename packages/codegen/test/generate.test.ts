@@ -210,6 +210,12 @@ describe('router services whose make is Effect.gen', () => {
     );
   });
 
+  it('skips an ordinary Effect.gen service exported next to the routers', () => {
+    expect(out.errors).toEqual([]);
+    expect(readOut('router.gen.ts')).not.toContain('Cache');
+    expect(readOut('router.client.gen.ts')).not.toContain('Cache');
+  });
+
   it('inlines a nested effectful service into the client record', () => {
     expect(readOut('router.client.gen.ts')).toContain(
       [
@@ -340,7 +346,7 @@ describe('drift and errors', () => {
     }
   });
 
-  it('a schema built from a value read in make is an error at its location', () => {
+  it('a schema built from a value declared in make is an error at its location', () => {
     const bad = copyFixture('bad');
     try {
       const out = generate({
@@ -351,11 +357,32 @@ describe('drift and errors', () => {
       const line = (text: string): number => source.findIndex((l) => l.includes(text)) + 1;
       const errors = out.errors.join('\n');
       expect(errors).toContain(
-        `router.ts:${line('Procedure.input(cfg.schema)')}: cfg is read in make: schemas must not depend on values read in make (declare the schema at module level)`,
+        `router.ts:${line('Procedure.input(cfg.schema)')}: cfg is declared in make: schemas must not depend on values declared in make (declare the schema at module level)`,
+      );
+      // A plain local declared in make, not only a value read from a service.
+      expect(errors).toContain(
+        `router.ts:${line('Procedure.input(Key)')}: Key is declared in make`,
       );
       // The same in a nested service's make.
       expect(errors).toContain(
-        `router.ts:${line('Procedure.input(limits.schema)')}: limits is read in make`,
+        `router.ts:${line('Procedure.input(limits.schema)')}: limits is declared in make`,
+      );
+    } finally {
+      removeDir(bad);
+    }
+  });
+
+  it('a router make that does not return an object literal is an error at its location', () => {
+    const bad = copyFixture('bad');
+    try {
+      const out = generate({
+        project: path.join(bad, 'tsconfig.json'),
+        routers: [path.join(bad, 'loose.ts')],
+      });
+      const source = readFileSync(path.join(bad, 'loose.ts'), 'utf8').split('\n');
+      const line = source.findIndex((l) => l.includes('return routes;')) + 1;
+      expect(out.errors.join('\n')).toContain(
+        `loose.ts:${line}: make must return an object literal for the generator to read it`,
       );
     } finally {
       removeDir(bad);

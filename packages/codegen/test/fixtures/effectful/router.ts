@@ -23,3 +23,11 @@ export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
     };
   }),
 }) {}
+
+// An ordinary service next to the routers (its make returns no procedures): not a router.
+export class Cache extends Context.Service<Cache>()('Cache', {
+  make: Effect.gen(function* () {
+    const db = yield* Database;
+    return { count: db.count, label: { name: 'cache' } };
+  }),
+}) {}

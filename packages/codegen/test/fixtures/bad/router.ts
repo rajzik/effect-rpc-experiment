@@ -33,7 +33,7 @@ class AppConfig extends Context.Service<AppConfig, { readonly schema: typeof ByI
   'AppConfig',
 ) {}
 
-// Schemas built from values read in `make`: the client cannot have them.
+// Schemas built from values declared in `make`: the client cannot have them.
 class InnerRouter extends Context.Service<InnerRouter>()('InnerRouter', {
   make: Effect.gen(function* () {
     const limits = yield* AppConfig;
@@ -44,8 +44,10 @@ class InnerRouter extends Context.Service<InnerRouter>()('InnerRouter', {
 export class ConfigRouter extends Context.Service<ConfigRouter>()('ConfigRouter', {
   make: Effect.gen(function* () {
     const cfg = yield* AppConfig;
+    const Key = Schema.Struct({ key: Schema.String });
     return {
       byId: Procedure.input(cfg.schema).query(() => Effect.void),
+      byKey: Procedure.input(Key).query(() => Effect.void),
       inner: InnerRouter,
     };
   }),

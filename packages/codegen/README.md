@@ -173,8 +173,8 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
 - Passing a router service whose `make` reads services to `createClient` / `toWebHandler` /
   `createCaller` (compile error; a runtime error naming the fix if cast away): pass
   `router.client.gen.ts` there and serve the class from `router.gen.ts` with `Handlers.fromService`.
-- Using a value read in `make` (`const cfg = yield* AppConfig`) inside a schema: reported as
-  `<name> is read in make`; declare the schema at module level.
+- Using a value declared in `make` (`const cfg = yield* AppConfig`, or a local schema) inside a
+  schema: reported as `<name> is declared in make`; declare the schema at module level.
 - A recursive type that is not an exported interface / type alias: the hoisted declaration needs
   its name (`declare it as an exported interface or type`).
 - Building router records dynamically (spreads, function calls): the generator reads the router
@@ -212,10 +212,13 @@ A class its package does not export from any import path is reported
 - Routers are read statically: an exported router service class whose `make` is
   `Effect.succeed({...})` / `Effect.sync(() => ({...}))` / `Effect.gen(function* () { …; return {...} })`,
   or `Router.make({...})` (with `.middleware(...)`), with nested records, routers and router
-  services. For `Effect.gen` the object of the generator's last top-level `return` is read.
+  services. For `Effect.gen` the object of the generator's last top-level `return` is read; a
+  router `make` that returns anything else (`return routes`) is reported as `make must return an
+  object literal`. An exported service whose `make` yields no procedure, router or router service
+  (an ordinary service next to the routers) is skipped.
 - A schema expression (`.input` / `.output` / `.error` / middleware) that uses a value declared
   inside the `Effect.gen` generator (`const cfg = yield* AppConfig`) stops the generator with
-  `<name> is read in make: …` and its location: the client cannot have that value.
+  `<name> is declared in make: …` and its location: the client cannot have that value.
 - No code transform: the plugins only write the generated modules. The client stays
   handler-free because it imports the generated client module, which works with every bundler
   and without one.
