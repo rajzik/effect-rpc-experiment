@@ -67,6 +67,10 @@ const normalise = <R extends Router.Input>(input: R): readonly [R, Router.Any] =
   Router.from(input),
 ];
 
+// Pre-existing generic code over `Router.Shape`: `Router.make` must keep returning `Router<Rec>`.
+const makeGeneric = <const Rec extends Router.Shape>(record: Rec): Router<Rec> =>
+  Router.make(record);
+
 describe('router services (types)', () => {
   it('infers the router from make without as const', () => {
     expectTypeOf<Router.Paths<typeof AppRouter>>().toEqualTypeOf<
@@ -180,6 +184,12 @@ describe('router services (types)', () => {
   it('records without services keep their exact type', () => {
     const record = { health: query({ success: Schema.String }) };
     expectTypeOf(Router.make(record)).toEqualTypeOf<Router<typeof record>>();
+  });
+
+  it('generic code over Router.Shape keeps Router<Rec>', () => {
+    const record = { health: query({ success: Schema.String }), ns: { other: plain } };
+    expectTypeOf(makeGeneric(record)).toEqualTypeOf<Router<typeof record>>();
+    expectTypeOf(Router.make(record)).toEqualTypeOf(makeGeneric(record));
   });
 
   it('isService narrows to RouterService.Any', () => {

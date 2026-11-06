@@ -153,7 +153,7 @@ describe('Router.fromService', () => {
 
   it('fromService rejects a service that nests itself', () => {
     class Loop extends Context.Service<Loop>()('LoopRouter', {
-      make: Effect.suspend((): Effect.Effect<Router.Shape> =>
+      make: Effect.suspend((): Effect.Effect<Router.ServiceShape> =>
         Effect.succeed({ loop: { again: Loop } }),
       ),
     }) {}
@@ -163,7 +163,7 @@ describe('Router.fromService', () => {
   it('a failed make is not memoized', () => {
     let runs = 0;
     class Flaky extends Context.Service<Flaky>()('FlakyRouter', {
-      make: Effect.suspend((): Effect.Effect<Router.Shape> =>
+      make: Effect.suspend((): Effect.Effect<Router.ServiceShape> =>
         ++runs === 1
           ? Effect.die('first run fails')
           : Effect.succeed({ ping: query({ success: Schema.String }) }),

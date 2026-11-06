@@ -133,14 +133,24 @@ export interface Router<Rec> {
  */
 export declare namespace Router {
   /**
-   * A router record: procedure definitions, routers, router services or nested records, keyed by
-   * path segment. `Router.make` resolves router services to routers, so `router.record` never
-   * holds one.
+   * A router record: procedure definitions, routers or nested records, keyed by path segment.
+   * This is the type of `router.record` (router services are resolved there).
    *
    * @since 0.1.0
    */
   export type Shape = {
-    readonly [key: string]: ProcedureDef.Any | Any | RouterService.Any | Shape;
+    readonly [key: string]: ProcedureDef.Any | Any | Shape;
+  };
+
+  /**
+   * A router record whose entries may also be router services (see {@link RouterService}), at any
+   * depth: what `Router.make` and a router service's `make` accept. `Router.make` resolves the
+   * services to routers, so the stored record is a {@link Shape}.
+   *
+   * @since 0.1.0
+   */
+  export type ServiceShape = {
+    readonly [key: string]: ProcedureDef.Any | Any | RouterService.Any | ServiceShape;
   };
 
   /**
@@ -197,7 +207,7 @@ export declare namespace Router {
     ? RpcsOf<ServiceRecord<R>, ''>
     : R extends Any
       ? RpcsOf<R['record'], ''>
-      : R extends Shape
+      : R extends ServiceShape
         ? RpcsOf<Resolve<R>, ''>
         : never;
 
@@ -274,12 +284,12 @@ export declare namespace Router {
 export declare namespace RouterService {
   /**
    * Any router service: a `Context` service class whose static `make` is an
-   * `Effect<Router.Shape, never, never>` (no requirements, no failure).
+   * `Effect<Router.ServiceShape, never, never>` (no requirements, no failure).
    *
    * @since 0.1.0
    */
   export type Any = Context.Key<any, any> & {
-    readonly make: Effect.Effect<Router.Shape>;
+    readonly make: Effect.Effect<Router.ServiceShape>;
   };
 }
 
@@ -293,7 +303,9 @@ type ServiceRecord<S> = S extends { readonly make: Effect.Effect<infer Rec, infe
  * by the routers built from them. Records without services are returned unchanged.
  */
 type Resolve<Rec> = string extends keyof Rec
-  ? Rec
+  ? Rec extends Router.Shape
+    ? Rec
+    : Router.Shape
   : true extends HasService<Rec>
     ? { readonly [K in keyof Rec]: ResolveEntry<Rec[K]> }
     : Rec;
@@ -494,7 +506,7 @@ type RpcsOf<Rec, Prefix extends string> = {
 const isRouter = (u: unknown): u is Router.Any =>
   Predicate.hasProperty(u, TypeId) && u[TypeId] === TypeId;
 
-const isPlainRecord = (u: unknown): u is Router.Shape => {
+const isPlainRecord = (u: unknown): u is Router.ServiceShape => {
   if (typeof u !== 'object' || u === null || Array.isArray(u)) return false;
   const proto: unknown = Object.getPrototypeOf(u);
   return proto === Object.prototype || proto === null;
@@ -705,7 +717,7 @@ const validateKey = (key: string, path: ReadonlyArray<string>): void => {
 };
 
 const collect = (
-  record: Router.Shape,
+  record: Router.ServiceShape,
   prefix: ReadonlyArray<string>,
   procedures: Map<string, ProcedureInfo>,
 ): void => {
@@ -730,7 +742,7 @@ const collect = (
 };
 
 const applyMiddleware = (
-  record: Router.Shape,
+  record: Router.ServiceShape,
   middleware: RpcMiddleware.AnyService,
 ): Router.Shape => {
   const out: { [key: string]: ProcedureDef.Any | Router.Any | Router.Shape } = {};
@@ -751,9 +763,9 @@ const applyMiddleware = (
  * Replaces router services (at any depth of plain records) by the routers built from them. Returns
  * `record` itself when it holds no service, so routers made from ordinary records keep them as-is.
  */
-const resolveRecord = (record: Router.Shape): Router.Shape => {
+const resolveRecord = (record: Router.ServiceShape): Router.Shape => {
   let out:
-    | { [key: string]: ProcedureDef.Any | Router.Any | RouterService.Any | Router.Shape }
+    | { [key: string]: ProcedureDef.Any | Router.Any | RouterService.Any | Router.ServiceShape }
     | undefined;
   for (const key of Object.keys(record)) {
     const value: unknown = record[key];
@@ -768,11 +780,12 @@ const resolveRecord = (record: Router.Shape): Router.Shape => {
       out[key] = resolved as Router.Any | Router.Shape;
     }
   }
-  return out ?? record;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every service (at any depth of plain records) was replaced above, so what is left is a `Router.Shape`
+  return (out ?? record) as Router.Shape;
 };
 
 /** Compiles a record into a router (untyped core of `make`). */
-const build = (input: Router.Shape): Router<Router.Shape> => {
+const build = (input: Router.ServiceShape): Router<Router.Shape> => {
   const record = resolveRecord(input);
   const procedures = new Map<string, ProcedureInfo>();
   collect(record, [], procedures);
@@ -810,7 +823,9 @@ const build = (input: Router.Shape): Router<Router.Shape> => {
  * - The same definition may appear under several paths; nested routers are not mutated.
  * - A router service (see {@link RouterService}) may be an entry: it is resolved with
  *   {@link fromService}, and `router.record` (and its type) holds the resolved router there, so
- *   every type helper sees an ordinary nested router. A record without services is stored as-is.
+ *   every type helper sees an ordinary nested router. A record without services is stored as-is
+ *   and typed `Router<Rec>` (generic code over `Rec extends Router.Shape` keeps that type); a
+ *   record with services is a `Router.ServiceShape`.
  *
  * **Gotchas**
  *
@@ -851,9 +866,12 @@ const build = (input: Router.Shape): Router<Router.Shape> => {
  * @category constructors
  * @since 0.1.0
  */
-const make = <const Rec extends Router.Shape>(record: Rec): Router<Resolve<Rec>> =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `build` resolves the services in `record`, which is what `Resolve` describes
-  build(record) as unknown as Router<Resolve<Rec>>;
+const make: {
+  <const Rec extends Router.Shape>(record: Rec): Router<Rec>;
+  <const Rec extends Router.ServiceShape>(record: Rec): Router<Resolve<Rec>>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `build` stores a record without services as-is (first overload) and resolves the services of any other record (second overload, what `Resolve` describes)
+  build as unknown as typeof make;
 
 /**
  * Merges two routers into one (tRPC's `mergeRouters`).
