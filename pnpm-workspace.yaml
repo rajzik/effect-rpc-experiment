@@ -28,6 +28,9 @@ catalog:
   electron: ^44.5.1
   '@playwright/test': ^1.64.1
   vite-plus: 1.4.0
+  unplugin: ^3.4.0
+  rollup: ^4.67.5
+  esbuild: ^0.21.5
   '@effect/language-service': ^0.87.3
   '@effect/tsgo': 0.67.1
   vitepress: 1.6.4

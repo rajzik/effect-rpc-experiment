@@ -23,7 +23,17 @@ const pages = {
   'electron-renderer': ['electron', 'renderer'],
   'test-utils': ['test-utils', 'index'],
   codegen: ['codegen', 'index'],
+  'codegen-unplugin': ['codegen', 'unplugin'],
   'codegen-vite': ['codegen', 'vite'],
+  'codegen-rollup': ['codegen', 'rollup'],
+  'codegen-rolldown': ['codegen', 'rolldown'],
+  'codegen-webpack': ['codegen', 'webpack'],
+  'codegen-rspack': ['codegen', 'rspack'],
+  'codegen-rsbuild': ['codegen', 'rsbuild'],
+  'codegen-esbuild': ['codegen', 'esbuild'],
+  'codegen-farm': ['codegen', 'farm'],
+  'codegen-bun': ['codegen', 'bun'],
+  'codegen-loader': ['codegen', 'loader'],
 } as const;
 
 /** Exported names of a bundled declaration file: `export { … }` lists and `export declare …`. */

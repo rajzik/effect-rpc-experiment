@@ -2,7 +2,21 @@ import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
   pack: {
-    entry: ['src/index.ts', 'src/cli.ts', 'src/vite.ts'],
+    entry: [
+      'src/index.ts',
+      'src/cli.ts',
+      'src/unplugin.ts',
+      'src/vite.ts',
+      'src/rollup.ts',
+      'src/rolldown.ts',
+      'src/webpack.ts',
+      'src/rspack.ts',
+      'src/rsbuild.ts',
+      'src/esbuild.ts',
+      'src/farm.ts',
+      'src/bun.ts',
+      'src/loader.ts',
+    ],
     dts: true,
     format: ['esm'],
     sourcemap: true,

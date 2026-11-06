@@ -14,8 +14,22 @@ pnpm effect-trpc-codegen --watch src/router.ts    # next to the dev server
 pnpm effect-trpc-codegen --check src/router.ts    # in CI: fails when the output is stale
 ```
 
-`--project <tsconfig.json>` picks the TypeScript project (default `tsconfig.json`). In Vite-based
-apps (Vite, Vitest, TanStack Start, electron-vite) the plugin replaces `--watch`:
+`--project <tsconfig.json>` picks the TypeScript project (default `tsconfig.json`).
+
+## Bundler plugins
+
+The generator is an [unplugin](https://unplugin.unjs.io) too. Every entry takes the same options
+(`routers`, `project`, `root`), generates when a build starts and on every rebuild in watch mode,
+and fails the build on generator errors. In Vite dev errors are warnings, and every change
+regenerates.
+
+| Bundler                                                | Import                                                |
+| ------------------------------------------------------ | ----------------------------------------------------- |
+| Vite (Vitest, TanStack Start, electron-vite, Astro, …) | `@effect-trpc/codegen/vite`                           |
+| Rollup, Rolldown                                       | `@effect-trpc/codegen/rollup`, `/rolldown`            |
+| webpack (Next.js with `--webpack`), Rspack, Rsbuild    | `@effect-trpc/codegen/webpack`, `/rspack`, `/rsbuild` |
+| esbuild, Farm, Bun                                     | `@effect-trpc/codegen/esbuild`, `/farm`, `/bun`       |
+| Turbopack (Next.js default)                            | `@effect-trpc/codegen/loader`                         |
 
 ```ts
 // vite.config.ts
@@ -24,8 +38,29 @@ import { effectTrpcCodegen } from '@effect-trpc/codegen/vite';
 export default { plugins: [effectTrpcCodegen({ routers: ['src/router.ts'] })] };
 ```
 
-A build fails on generator errors; dev only warns, and regenerates on every change. Next.js
-(Turbopack or webpack) has no plugin: run `effect-trpc-codegen --watch` next to `next dev`.
+Turbopack runs webpack loaders, not plugins. Apply the loader to the router module:
+
+```ts
+// next.config.ts
+import type { NextConfig } from 'next';
+
+const config: NextConfig = {
+  turbopack: {
+    rules: {
+      '**/server/router.ts': {
+        loaders: [
+          { loader: '@effect-trpc/codegen/loader', options: { routers: ['src/server/router.ts'] } },
+        ],
+      },
+    },
+  },
+};
+
+export default config;
+```
+
+The loader runs when Turbopack compiles the router module, which needs the generated modules to
+exist already: commit them, or run `effect-trpc-codegen` once before the first build.
 
 ## What it writes
 

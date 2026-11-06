@@ -117,6 +117,11 @@ export interface GenerateResult {
   readonly procedures: ReadonlyArray<ProcedureReport>;
   /** Problems, each starting with `file:line:`. Modules with errors are not written. */
   readonly errors: ReadonlyArray<string>;
+  /**
+   * The project's own source files the run read (no `node_modules`, no generated modules): what a
+   * bundler plugin watches so that editing a model module regenerates too.
+   */
+  readonly inputs: ReadonlyArray<string>;
 }
 
 /**
@@ -1198,7 +1203,12 @@ export const createGenerator = (options: GenerateOptions): Generator => {
     first = false;
     const project = snapshot.getProject(tsconfig) ?? snapshot.getProjects()[0];
     if (project === undefined)
-      return { files: [], procedures: [], errors: [`${tsconfig}: no TypeScript project`] };
+      return {
+        files: [],
+        procedures: [],
+        errors: [`${tsconfig}: no TypeScript project`],
+        inputs: [],
+      };
     const ctx: Ctx = { checker: project.checker, program: project.program, project, cwd };
     const files: Array<GeneratedFile> = [];
     const procedures: Array<ProcedureReport> = [];
@@ -1229,7 +1239,15 @@ export const createGenerator = (options: GenerateOptions): Generator => {
         if (changed && options.write !== false) writeFileSync(target, content);
       }
     }
-    return { files, procedures, errors };
+    const inputs = project.program
+      .getSourceFileNames()
+      .filter(
+        (name) =>
+          !name.includes(`${path.sep}node_modules${path.sep}`) &&
+          !name.endsWith('.gen.ts') &&
+          !/\.d\.[cm]?ts$/.test(name),
+      );
+    return { files, procedures, errors, inputs };
   };
   return { run, close: () => api.close() };
 };

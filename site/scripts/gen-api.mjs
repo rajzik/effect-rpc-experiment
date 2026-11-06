@@ -134,6 +134,10 @@ function entryExports(entryFile) {
       out.push({ name: decl.name, file: entryFile, original: decl.name, star: false });
     }
   }
+  // `export default name;` (e.g. a webpack loader entry): documented as an alias of `name`.
+  for (const m of text.matchAll(/^export\s+default\s+([A-Za-z_$][\w$]*)\s*;/gm)) {
+    out.push({ name: 'default', file: entryFile, original: m[1], star: false });
+  }
   const seen = new Set();
   return out.filter((e) => (seen.has(e.name) ? false : (seen.add(e.name), true)));
 }

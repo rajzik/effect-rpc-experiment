@@ -43,14 +43,48 @@ const post = await client.byId({ id: 1 }); // Post (a real instance); fails with
 `DbError` (a `Data.TaggedError`, not a schema) is not part of the contract: it reaches the client
 as `RpcDefect`, and the client types say so.
 
-In Vite-based apps (Vite, Vitest, TanStack Start, electron-vite) the plugin does the same as
-`--watch`:
+## Bundlers
+
+The generator is also an [unplugin](https://unplugin.unjs.io), with one entry per bundler. It
+generates when a build starts (and on every rebuild in watch mode), fails the build on generator
+errors, and only warns in Vite dev, where every change regenerates:
+
+| Bundler                                                    | Entry                                                                  |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Vite (Vitest, TanStack Start, electron-vite, Astro, …)     | `@effect-trpc/codegen/vite`                                            |
+| Rollup / Rolldown                                          | `@effect-trpc/codegen/rollup`, `/rolldown`                             |
+| webpack (also Next.js with `--webpack`) / Rspack / Rsbuild | `@effect-trpc/codegen/webpack`, `/rspack`, `/rsbuild`                  |
+| esbuild / Farm / Bun                                       | `@effect-trpc/codegen/esbuild`, `/farm`, `/bun`                        |
+| Turbopack (Next.js default)                                | `@effect-trpc/codegen/loader` (a webpack loader)                       |
+| any other unplugin target                                  | `@effect-trpc/codegen/unplugin` (`unplugin`, `codegenUnpluginFactory`) |
 
 ```ts
+// vite.config.ts (every entry takes the same options)
 import { effectTrpcCodegen } from '@effect-trpc/codegen/vite';
 
 export default { plugins: [effectTrpcCodegen({ routers: ['src/router.ts'] })] };
 ```
+
+Turbopack runs webpack loaders but not plugins: apply the loader to the router module.
+
+```ts
+// next.config.ts
+const config: NextConfig = {
+  turbopack: {
+    rules: {
+      '**/server/router.ts': {
+        loaders: [
+          { loader: '@effect-trpc/codegen/loader', options: { routers: ['src/server/router.ts'] } },
+        ],
+      },
+    },
+  },
+};
+```
+
+The loader runs when the router module is compiled (the server imports `router.gen.ts`, which
+imports it), so commit the generated modules or run `effect-trpc-codegen` once before the first
+build.
 
 ## What maps to what
 
@@ -98,7 +132,8 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
 1. Write the router (a router service class or a `Router.make` constant, exported) with
    `Procedure` chains and no `.output` / `.error`; keep schemas, errors and middleware tags in a
    separate module (e.g. `models.ts`).
-2. `effect-trpc-codegen src/router.ts` (or the Vite plugin / `--watch`).
+2. `effect-trpc-codegen src/router.ts`, or the bundler plugin of your bundler
+   (`@effect-trpc/codegen/<bundler>`; Turbopack: `@effect-trpc/codegen/loader`).
 3. Server: `import { AppRouter } from './router.gen.js'`, serve with
    `Handlers.fromProcedures(AppRouter)` plus the middleware layers.
 4. Clients: `import { AppRouter } from './router.client.gen.js'` for `createClient`,
@@ -129,7 +164,8 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
   its name (`declare it as an exported interface or type`).
 - Building router records dynamically (spreads, function calls): the generator reads the router
   statically and reports `cannot read this router entry statically`.
-- Expecting webpack / Turbopack transforms: there are none; run `--watch` next to the dev server.
+- Registering the unplugin with Turbopack: Turbopack ignores plugins; use the `/loader` in
+  `turbopack.rules` instead.
 
 **Verify**
 
@@ -143,6 +179,7 @@ node scripts/verify-jsdoc.mjs codegen   # after `pnpm exec vp -C packages/codege
 - Routers are read statically: an exported router service class whose `make` is
   `Effect.succeed({...})` / `Effect.sync(() => ({...}))`, or `Router.make({...})` (with
   `.middleware(...)`), with nested records, routers and router services.
-- No bundler transform: the client stays handler-free because it imports the generated client
-  module, which works with every bundler (Turbopack included) and without one.
+- No code transform: the plugins only write the generated modules. The client stays
+  handler-free because it imports the generated client module, which works with every bundler
+  and without one.
 - Requires TypeScript 7 (`typescript/unstable/sync`): a peer dependency.
