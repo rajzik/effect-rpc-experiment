@@ -17,6 +17,10 @@ What differs from tRPC: there is **no transformer**. `Schema.Class` values (with
 everywhere: on the wire, in the dehydrated RSC payload and in server action results. Client
 components get real class instances, and errors are typed as `ClientError<E>`.
 
+Every helper that takes a `router` (and `useServerAction`'s `router` option) also takes a router
+written as an Effect service (`createRouteHandler(AppRouter, { handlers:
+Handlers.fromService(AppRouter) })`); the class is normalised with `Router.from`.
+
 ## For AI agents
 
 **Use this package when** you wire an `@effect-trpc/core` router into a **Next.js App Router**
@@ -69,6 +73,10 @@ that read the cache, and server actions that keep typed errors.
   singleton.
 - Relative client urls are resolved with `getBaseUrl()` because `httpLink` needs absolute urls,
   also during SSR.
+- `router` is a `Router.Input`: a `Router.make` router or a router service class. Types are
+  computed with `Router.Of<X>`, so both forms infer the same helpers. Type helpers
+  (`NextRpcClient<R>`, `ServerActionCaller<R>`, `InputAt<R, P>`, ...) take a router type:
+  `Router.Of<typeof AppRouter>` for a service.
 
 **Common mistakes**
 
@@ -86,6 +94,10 @@ that read the cache, and server actions that keep typed errors.
   `localhost:$PORT` fallback behind a proxy → pass an absolute `url`.
 - Don't set `keyPrefix` on only one of `createRscHelpers` / `createNextRpcClient` → set the same
   `keyPrefix` on both (or neither), or the query keys do not match and the client refetches.
+- Don't write `ServerActionCaller<typeof AppRouter>` for a router service →
+  `ServerActionCaller<Router.Of<typeof AppRouter>>` (functions take the class itself).
+- Don't pass `actions('post.create')` inline to `useServerAction` → bind it to a variable (or an
+  exported server action) first; an inline generic call is not inferred.
 - Don't give `unwrapActionResult` / `decodeActionResult` a different `path` than the action calls
   → the result is decoded with that path's schemas. (`useServerAction` rejects a path whose
   result type differs from the action's at compile time.)
@@ -97,6 +109,8 @@ that read the cache, and server actions that keep typed errors.
   `keyPrefix`, remote client): `test/rsc.test.tsx`.
 - Server actions (encoding, typed errors, defects, invalid input, headers, `dispose`):
   `test/serverActions.test.ts`; hook + provider + hydration in jsdom: `test/client.test.tsx`.
+- Router services (`typeof AppRouter`) in every helper: `test/routerService.test.tsx` /
+  `test/routerService.test-d.tsx`.
 - This README end to end: `test/readme.test.tsx`; types (`ClientError` narrowing, `NextRequest`
   assignability): `test/types.test-d.tsx`; tRPC parity: `test/PARITY.md`.
 - JSDoc conventions: `docs/jsdoc-style.md`. Everything is tested with Web `Request`s, jsdom and

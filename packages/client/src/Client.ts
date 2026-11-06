@@ -249,6 +249,8 @@ export interface ClientMethods<R extends Router.Any> {
  *
  * **Details**
  *
+ * - `R` is a router type. For a router service class write `Client<Router.Of<typeof AppRouter>>`
+ *   (`Router.Of` maps the class to the router built from it).
  * - The client is not thenable and its proxies are stable (`client.post.byId ===
  *   client.post.byId`), so it is safe to return from async functions and to use in React deps.
  * - Calling a path that is not a procedure throws an `Error` naming the known procedures.
@@ -602,6 +604,48 @@ const makeFacade = <R extends Router.Any>(
   }) as Client<R>;
 };
 
+/** `createClient` for a router (a router service is normalised by `createClient`). */
+const createClientFor = <R extends Router.Any>(
+  router: R,
+  options: CreateClientOptions<R>,
+): Client<R> => {
+  for (const key of Object.keys(router.record)) {
+    if (reservedClientKeys.has(key)) {
+      throw new Error(
+        `createClient: the router's top-level key "${key}" is reserved by the client (${[...reservedClientKeys].join(', ')}); nest it under another key`,
+      );
+    }
+  }
+  // `Link<Handlers>` is only a type-level check (done by `CreateClientOptions`).
+  const middleware: Layer.Layer<never, unknown> | undefined = options.middleware;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `RpcGroup.Any` erases the rpc union; any `Rpc.Any` group is accepted by links
+  const group = router.group as RpcGroup.RpcGroup<Rpc.Any>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erased to the untyped tag-keyed client; `makeFacade` restores types via `Client<R>`
+  const makeClient = options.link.makeClient(group) as unknown as Effect.Effect<
+    AnyRpcClient,
+    never,
+    Scope.Scope
+  >;
+  const clientLayer = Layer.effect(RpcClientService)(makeClient);
+  const runtime = ManagedRuntime.make(
+    middleware === undefined
+      ? clientLayer
+      : // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `middleware` option accepts any layer error; `orDie` turns it into a defect
+        clientLayer.pipe(Layer.provide(Layer.orDie(middleware))),
+  );
+  const shared: Shared = { router, runtime, disposed: false, disposing: undefined };
+  return makeFacade<R>(shared, options.headers === undefined ? [] : [options.headers]);
+};
+
+/** `createClient` for a router or a router service: normalises the input with `Router.from`. */
+const createClientFromInput = (
+  input: Router.Input,
+  options: CreateClientOptions<Router.Any>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return createClientFor(router, options);
+};
+
 /**
  * Creates a client for a router over a link.
  *
@@ -612,6 +656,9 @@ const makeFacade = <R extends Router.Any>(
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (see `RouterService` in
+ *   `@effect-trpc/core`); a service is turned into its router with `Router.from` (its `make`
+ *   runs once per process). The client's type is then `Client<Router.Of<typeof AppRouter>>`.
  * - The link is connected lazily on the first call (once, shared by every call and by
  *   `withHeaders` clients) and kept until `client.dispose()`.
  * - Results are decoded with the procedure's schemas: `Schema.Class` values are instances,
@@ -702,40 +749,38 @@ const makeFacade = <R extends Router.Any>(
  * const secret = await client.secret(); // rejects with Unauthorized when the server says so
  * ```
  *
+ * **Example** (A client of a router service)
+ *
+ * ```ts
+ * import { Context, Effect, Schema } from 'effect';
+ * import { Procedure, Router } from '@effect-trpc/core';
+ * import { createClient, httpLink, type Client } from '@effect-trpc/client';
+ *
+ * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+ *   make: Effect.succeed({
+ *     health: Procedure.output(Schema.Literal('ok')).query(() => Effect.succeed('ok' as const)),
+ *   }),
+ * }) {}
+ *
+ * // The class itself is accepted; annotate with `Router.Of<typeof AppRouter>`.
+ * const client: Client<Router.Of<typeof AppRouter>> = createClient(AppRouter, {
+ *   link: httpLink({ url: 'http://localhost:3000/rpc' }),
+ * });
+ * const health = await client.health(); // 'ok'
+ * ```
+ *
  * @see {@link httpLink}
  * @see {@link localLink}
  * @see {@link Client}
  * @category constructors
  * @since 0.1.0
  */
-export const createClient = <R extends Router.Any>(
-  router: R,
-  options: CreateClientOptions<R>,
-): Client<R> => {
-  for (const key of Object.keys(router.record)) {
-    if (reservedClientKeys.has(key)) {
-      throw new Error(
-        `createClient: the router's top-level key "${key}" is reserved by the client (${[...reservedClientKeys].join(', ')}); nest it under another key`,
-      );
-    }
-  }
-  // `Link<Handlers>` is only a type-level check (done by `CreateClientOptions`).
-  const middleware: Layer.Layer<never, unknown> | undefined = options.middleware;
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `RpcGroup.Any` erases the rpc union; any `Rpc.Any` group is accepted by links
-  const group = router.group as RpcGroup.RpcGroup<Rpc.Any>;
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erased to the untyped tag-keyed client; `makeFacade` restores types via `Client<R>`
-  const makeClient = options.link.makeClient(group) as unknown as Effect.Effect<
-    AnyRpcClient,
-    never,
-    Scope.Scope
-  >;
-  const clientLayer = Layer.effect(RpcClientService)(makeClient);
-  const runtime = ManagedRuntime.make(
-    middleware === undefined
-      ? clientLayer
-      : // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `middleware` option accepts any layer error; `orDie` turns it into a defect
-        clientLayer.pipe(Layer.provide(Layer.orDie(middleware))),
-  );
-  const shared: Shared = { router, runtime, disposed: false, disposing: undefined };
-  return makeFacade<R>(shared, options.headers === undefined ? [] : [options.headers]);
-};
+export const createClient: {
+  <R extends Router.Any>(router: R, options: CreateClientOptions<R>): Client<R>;
+  <X extends Router.Input>(
+    router: X,
+    options: CreateClientOptions<Router.Of<X>>,
+  ): Client<Router.Of<X>>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads take the options of `Router.from(input)` and return its client, which is what `createClientFor` builds (checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep)
+  createClientFromInput as unknown as typeof createClient;

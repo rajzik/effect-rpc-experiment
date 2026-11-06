@@ -16,6 +16,10 @@ all bound to the same handler layer:
 
 The result implements `Symbol.asyncDispose`, so `await using` cleans up even when a test throws.
 
+Every harness function takes a `Router.make` router or a router service class
+(`testServerAndClient(AppRouter, { handlers: Handlers.fromService(AppRouter) })`); a service is
+normalised with `Router.from`.
+
 ## For AI agents
 
 **Use this package when**
@@ -90,6 +94,7 @@ describe('appRouter', () => {
 - `ctx.client` rejects with `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; `ctx.effectClient` fails with `E | RpcTransportError` (server defects are defects).
 - Server, web handler and caller each build the handler layer separately: state created inside the layer is not shared between them.
 - Routers with `requiredForClient` middleware need the `middleware` option (client-side layers, also given to the caller).
+- `router` is a `Router.Input` (router or router service class); the result types use `Router.Of<X>`, so a service and the equivalent `Router.make` router give the same `ctx.client` / `ctx.caller` types. Annotate with `TestServerAndClient<Router.Of<typeof AppRouter>>`.
 
 **Common mistakes**
 
@@ -103,14 +108,15 @@ describe('appRouter', () => {
 
 **Where to look**
 
-| Behaviour                                                                    | Test                         |
-| ---------------------------------------------------------------------------- | ---------------------------- |
-| real server, ports, dispose, `fetch`, caller, `path`, `headers`, json/ndjson | `test/harness.test.ts`       |
-| `withTestServer`, `testWebHandler`, `testCaller`, `assertInstance`           | `test/harness.test.ts`       |
-| inferred client/caller types, rejected partial handler layers                | `test/harness.test-d.ts`     |
-| `effectIt.effect` driving the Effect client                                  | `test/effect-vitest.test.ts` |
-| this README's example                                                        | `test/readme.test.ts`        |
-| JSDoc conventions (every export has examples)                                | `docs/jsdoc-style.md`        |
+| Behaviour                                                                    | Test                             |
+| ---------------------------------------------------------------------------- | -------------------------------- |
+| real server, ports, dispose, `fetch`, caller, `path`, `headers`, json/ndjson | `test/harness.test.ts`           |
+| `withTestServer`, `testWebHandler`, `testCaller`, `assertInstance`           | `test/harness.test.ts`           |
+| inferred client/caller types, rejected partial handler layers                | `test/harness.test-d.ts`         |
+| router service classes (`typeof AppRouter`) in every harness function        | `test/routerService.test(-d).ts` |
+| `effectIt.effect` driving the Effect client                                  | `test/effect-vitest.test.ts`     |
+| this README's example                                                        | `test/readme.test.ts`            |
+| JSDoc conventions (every export has examples)                                | `docs/jsdoc-style.md`            |
 
 **Verify**
 

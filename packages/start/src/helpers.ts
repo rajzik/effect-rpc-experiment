@@ -12,7 +12,7 @@
  * @since 0.1.0
  */
 import type { Client } from '@effect-trpc/client';
-import type { Router } from '@effect-trpc/core';
+import { Router } from '@effect-trpc/core';
 import {
   createHydrationHelpers,
   createRpcContext,
@@ -96,6 +96,8 @@ export interface StartRouterHydrationOptions {
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - `dehydrate(queryClient)` encodes each rpc query's data (and error) with its procedure's
  *   schema (`createdAt` → ISO string); queries with other keys pass through unchanged.
  * - `hydrate(queryClient, state)` decodes it back to instances: methods work, `Date` fields are
@@ -146,7 +148,7 @@ export interface StartRouterHydrationOptions {
  * @since 0.1.0
  */
 export const createStartHydration = (
-  router: Router.Any,
+  router: Router.Input,
   options?: HydrationHelpersOptions,
 ): StartHydration => {
   const { dehydrate, hydrate } = createHydrationHelpers(router, options);
@@ -206,6 +208,52 @@ export interface StartHelpers<
   readonly hydration: StartHydration;
 }
 
+/** `createStartHelpers` for a router. */
+const createStartHelpersFor = <
+  R extends Router.Any,
+  TFeatureFlags extends FeatureFlags = DefaultFeatureFlags,
+>(
+  router: R,
+  options: StartHelpersOptions<R, TFeatureFlags>,
+): StartHelpers<R, TFeatureFlags> => {
+  const proxies = new WeakMap<QueryClient, RpcOptionsProxy<R, TFeatureFlags>>();
+  const rpc = (queryClient: QueryClient): RpcOptionsProxy<R, TFeatureFlags> => {
+    let proxy = proxies.get(queryClient);
+    if (proxy === undefined) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `KeyPrefixOptions<TFeatureFlags>` is a conditional type on a generic flag that no literal can satisfy; `StartHelpersOptions` already enforces it at the public API
+      proxy = createRpcOptionsProxy<R, TFeatureFlags>({
+        client: options.client,
+        queryClient,
+        ...(options.keyPrefix !== undefined && { keyPrefix: options.keyPrefix }),
+      } as unknown as Parameters<typeof createRpcOptionsProxy<R, TFeatureFlags>>[0]);
+      proxies.set(queryClient, proxy);
+    }
+    return proxy;
+  };
+  const { RpcProvider, useRpc, useRpcClient } = createRpcContext<R, TFeatureFlags>();
+  return {
+    rpc,
+    getRpc: rpc,
+    client: options.client,
+    RpcProvider,
+    useRpc,
+    useRpcClient,
+    hydration: createStartHydration(
+      router,
+      options.keyPrefix === undefined ? undefined : { keyPrefix: options.keyPrefix },
+    ),
+  };
+};
+
+/** `createStartHelpers` for a router or a router service: normalises the input with `Router.from`. */
+const createStartHelpersFromInput = (
+  input: Router.Input,
+  options: StartHelpersOptions<Router.Any, FeatureFlags>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return createStartHelpersFor(router, options);
+};
+
 /**
  * Creates everything a TanStack Start app needs to use a router with TanStack Query: the options
  * proxy for loaders (`rpc(queryClient)`), the React provider and hooks (`RpcProvider`, `useRpc`,
@@ -219,6 +267,8 @@ export interface StartHelpers<
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - `rpc(queryClient)` (alias `getRpc`) is the options proxy bound to that `QueryClient`,
  *   memoized per client. The same options work in loaders (server: in-process; client-side
  *   navigation: `httpLink`) and in components (`useRpc()`).
@@ -316,38 +366,15 @@ export interface StartHelpers<
  * @category constructors
  * @since 0.1.0
  */
-export const createStartHelpers = <
-  R extends Router.Any,
-  TFeatureFlags extends FeatureFlags = DefaultFeatureFlags,
->(
-  router: R,
-  options: StartHelpersOptions<R, TFeatureFlags>,
-): StartHelpers<R, TFeatureFlags> => {
-  const proxies = new WeakMap<QueryClient, RpcOptionsProxy<R, TFeatureFlags>>();
-  const rpc = (queryClient: QueryClient): RpcOptionsProxy<R, TFeatureFlags> => {
-    let proxy = proxies.get(queryClient);
-    if (proxy === undefined) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `KeyPrefixOptions<TFeatureFlags>` is a conditional type on a generic flag that no literal can satisfy; `StartHelpersOptions` already enforces it at the public API
-      proxy = createRpcOptionsProxy<R, TFeatureFlags>({
-        client: options.client,
-        queryClient,
-        ...(options.keyPrefix !== undefined && { keyPrefix: options.keyPrefix }),
-      } as unknown as Parameters<typeof createRpcOptionsProxy<R, TFeatureFlags>>[0]);
-      proxies.set(queryClient, proxy);
-    }
-    return proxy;
-  };
-  const { RpcProvider, useRpc, useRpcClient } = createRpcContext<R, TFeatureFlags>();
-  return {
-    rpc,
-    getRpc: rpc,
-    client: options.client,
-    RpcProvider,
-    useRpc,
-    useRpcClient,
-    hydration: createStartHydration(
-      router,
-      options.keyPrefix === undefined ? undefined : { keyPrefix: options.keyPrefix },
-    ),
-  };
-};
+export const createStartHelpers: {
+  <R extends Router.Any, TFeatureFlags extends FeatureFlags = DefaultFeatureFlags>(
+    router: R,
+    options: StartHelpersOptions<R, TFeatureFlags>,
+  ): StartHelpers<R, TFeatureFlags>;
+  <X extends Router.Input, TFeatureFlags extends FeatureFlags = DefaultFeatureFlags>(
+    router: X,
+    options: StartHelpersOptions<Router.Of<NoInfer<X>>, TFeatureFlags>,
+  ): StartHelpers<Router.Of<X>, TFeatureFlags>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  createStartHelpersFromInput as unknown as typeof createStartHelpers;

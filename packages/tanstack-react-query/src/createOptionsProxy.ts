@@ -425,6 +425,8 @@ const createRecursiveProxy = (
  *
  * **Details**
  *
+ * - The router comes from `client.$router`, so a client of a router service
+ *   (`createClient(AppRouter, ...)`) gives `RpcOptionsProxy<Router.Of<typeof AppRouter>>`.
  * - The router is read from the client (`client.$router`), so only the client is required.
  * - `queryOptions` passes TanStack's `AbortSignal` to the call: cancelling a query (or unmounting
  *   its last observer) interrupts the server handler.

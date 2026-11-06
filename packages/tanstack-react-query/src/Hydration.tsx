@@ -15,10 +15,11 @@ import {
   isClientInfrastructureError,
   RpcDefect,
   RpcInterrupted,
+  Router,
   RpcTransportError,
   causeToClientError,
 } from '@effect-trpc/core';
-import type { ProcedureInfo, Router } from '@effect-trpc/core';
+import type { ProcedureInfo } from '@effect-trpc/core';
 import {
   dehydrate as tanstackDehydrate,
   defaultShouldDehydrateQuery,
@@ -273,6 +274,8 @@ const ownership = (owner: Owner, queryKey: ReadonlyArray<unknown>): Ownership =>
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - Data of every query of the router is encoded with `Codecs.success(rpc)` (each page for
  *   infinite queries). Queries with other keys are dehydrated unchanged.
  * - Only queries with `options.keyPrefix` (default: none) belong to the router; effect-trpc
@@ -328,12 +331,12 @@ const ownership = (owner: Owner, queryKey: ReadonlyArray<unknown>): Ownership =>
  * @since 0.1.0
  */
 export const dehydrate = (
-  router: Router.Any,
+  router: Router.Input,
   queryClient: QueryClient,
   options: RpcDehydrateOptions = {},
 ): DehydratedState => {
   const { dehydrateErrors = true, keyPrefix, ...rest } = options;
-  const owner = ownerOf(router, keyPrefix);
+  const owner = ownerOf(Router.from(router), keyPrefix);
   const defaults = queryClient.getDefaultOptions().dehydrate;
   const shouldDehydrate =
     rest.shouldDehydrateQuery ?? defaults?.shouldDehydrateQuery ?? defaultShouldDehydrateQuery;
@@ -492,6 +495,8 @@ const withIdentityDeserializer = <O extends { defaultOptions?: object | undefine
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - `null` / `undefined` states are ignored.
  * - Only queries with `options.keyPrefix` (default: none) are decoded; encoded queries of another
  *   prefix are left for that router's helpers.
@@ -529,7 +534,7 @@ const withIdentityDeserializer = <O extends { defaultOptions?: object | undefine
  * @since 0.1.0
  */
 export const hydrate = (
-  router: Router.Any,
+  router: Router.Input,
   queryClient: QueryClient,
   state: DehydratedState | null | undefined,
   options: RpcHydrateOptions = {},
@@ -537,7 +542,7 @@ export const hydrate = (
   if (state === null || state === undefined || typeof state !== 'object') return;
   const { keyPrefix, ...tanstackOptions } = options;
   const decoded = decodeState(
-    ownerOf(router, keyPrefix),
+    ownerOf(Router.from(router), keyPrefix),
     state,
     deserializerOf(queryClient, tanstackOptions),
   );
@@ -586,6 +591,8 @@ const makeHydrationBoundary = (owner: Owner): React.FC<RpcHydrationBoundaryProps
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - `dehydrate(queryClient, options?)` and `hydrate(queryClient, state, options?)` are
  *   {@link dehydrate} / {@link hydrate} with the router (and `keyPrefix`) bound.
  * - `HydrationBoundary` has TanStack's props. It decodes a new `state` once (memoized on `state`)
@@ -658,9 +665,10 @@ const makeHydrationBoundary = (owner: Owner): React.FC<RpcHydrationBoundaryProps
  * @since 0.1.0
  */
 export const createHydrationHelpers = (
-  router: Router.Any,
+  input: Router.Input,
   options: HydrationHelpersOptions = {},
 ): HydrationHelpers => {
+  const router: Router.Any = Router.from(input);
   const { keyPrefix } = options;
   const bound = keyPrefix === undefined ? {} : { keyPrefix };
   return {

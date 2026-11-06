@@ -16,7 +16,7 @@ import type {
   MiddlewareOption,
   SerializationOption,
 } from '@effect-trpc/client';
-import type { Router } from '@effect-trpc/core';
+import { Router } from '@effect-trpc/core';
 import type { Handlers } from '@effect-trpc/server';
 import type { Layer } from 'effect';
 import { defaultStartPath } from './handler.js';
@@ -181,6 +181,27 @@ const middlewareOf = (options: object): object =>
     ? { middleware: options.middleware }
     : {};
 
+/** `createServerClient` for a router. */
+const createServerClientFor = <R extends Router.Any>(
+  router: R,
+  options: ServerClientOptions<R>,
+): Client<R> =>
+  createClient(router, {
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- passes the public `handlers` layer through unchanged: its construction error is `unknown` by design, matching `localLink`'s own option
+    link: localLink({ handlers: options.handlers }),
+    ...(options.headers !== undefined && { headers: options.headers }),
+    ...middlewareOf(options),
+  });
+
+/** `createServerClient` for a router or a router service: normalises the input with `Router.from`. */
+const createServerClientFromInput = (
+  input: Router.Input,
+  options: ServerClientOptions<Router.Any>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return createServerClientFor(router, options);
+};
+
 /**
  * Creates a client that calls the router's handlers in-process (`localLink`): for loaders,
  * server functions and SSR on the server.
@@ -193,6 +214,8 @@ const middlewareOf = (options: object): object =>
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - Values are passed by reference (no serialization), the router's middleware still runs.
  * - `headers` (a function is evaluated per call) are what handlers see as `ctx.headers`.
  * - Errors are `ClientError<E>` instances, as over HTTP.
@@ -231,16 +254,39 @@ const middlewareOf = (options: object): object =>
  * @category constructors
  * @since 0.1.0
  */
-export const createServerClient = <R extends Router.Any>(
+export const createServerClient: {
+  <R extends Router.Any>(router: R, options: ServerClientOptions<R>): Client<R>;
+  <X extends Router.Input>(
+    router: X,
+    options: ServerClientOptions<Router.Of<X>>,
+  ): Client<Router.Of<X>>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  createServerClientFromInput as unknown as typeof createServerClient;
+
+/** `createBrowserClient` for a router. */
+const createBrowserClientFor = <R extends Router.Any>(
   router: R,
-  options: ServerClientOptions<R>,
+  options: BrowserClientOptions<R> = {},
 ): Client<R> =>
   createClient(router, {
-    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- passes the public `handlers` layer through unchanged: its construction error is `unknown` by design, matching `localLink`'s own option
-    link: localLink({ handlers: options.handlers }),
-    ...(options.headers !== undefined && { headers: options.headers }),
+    link: httpLink({
+      url: getRpcUrl(options.url, { serverOrigin: options.serverOrigin }),
+      ...(options.headers !== undefined && { headers: options.headers }),
+      ...(options.serialization !== undefined && { serialization: options.serialization }),
+      ...(options.fetch !== undefined && { fetch: options.fetch }),
+    }),
     ...middlewareOf(options),
   });
+
+/** `createBrowserClient` for a router or a router service: normalises the input with `Router.from`. */
+const createBrowserClientFromInput = (
+  input: Router.Input,
+  options?: BrowserClientOptions<Router.Any>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return createBrowserClientFor(router, options);
+};
 
 /**
  * Creates a client over `httpLink` to the Start server route (default `/api/rpc`, resolved to an
@@ -254,6 +300,8 @@ export const createServerClient = <R extends Router.Any>(
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - Class instances and typed errors are decoded with the procedures' schemas; network failures
  *   become `RpcTransportError`.
  * - The url is resolved once, when the client is created.
@@ -291,19 +339,41 @@ export const createServerClient = <R extends Router.Any>(
  * @category constructors
  * @since 0.1.0
  */
-export const createBrowserClient = <R extends Router.Any>(
+export const createBrowserClient: {
+  <R extends Router.Any>(router: R, options?: BrowserClientOptions<R>): Client<R>;
+  <X extends Router.Input>(
+    router: X,
+    options?: BrowserClientOptions<Router.Of<X>>,
+  ): Client<Router.Of<X>>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  createBrowserClientFromInput as unknown as typeof createBrowserClient;
+
+/** `createIsomorphicClient` for a router. */
+const createIsomorphicClientFor = <R extends Router.Any>(
   router: R,
-  options: BrowserClientOptions<R> = {},
-): Client<R> =>
-  createClient(router, {
-    link: httpLink({
-      url: getRpcUrl(options.url, { serverOrigin: options.serverOrigin }),
-      ...(options.headers !== undefined && { headers: options.headers }),
-      ...(options.serialization !== undefined && { serialization: options.serialization }),
-      ...(options.fetch !== undefined && { fetch: options.fetch }),
-    }),
-    ...middlewareOf(options),
-  });
+  options: IsomorphicClientOptions<R>,
+): Client<R> => {
+  const isServer = options.isServer ?? typeof window === 'undefined';
+  const middleware = middlewareOf(options);
+  return isServer
+    ? createServerClient(router, {
+        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- passes the public `handlers` layer through unchanged: its construction error is `unknown` by design, matching `localLink`'s own option
+        handlers: options.server.handlers,
+        ...(options.server.headers !== undefined && { headers: options.server.headers }),
+        ...middleware,
+      })
+    : createBrowserClient(router, { ...options.client, ...middleware });
+};
+
+/** `createIsomorphicClient` for a router or a router service: normalises the input with `Router.from`. */
+const createIsomorphicClientFromInput = (
+  input: Router.Input,
+  options: IsomorphicClientOptions<Router.Any>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return createIsomorphicClientFor(router, options);
+};
 
 /**
  * Creates one client for code that runs on both sides (route loaders, components): in-process
@@ -318,6 +388,8 @@ export const createBrowserClient = <R extends Router.Any>(
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - `isServer` defaults to `typeof window === 'undefined'` and is evaluated once, when the client
  *   is created.
  * - `middleware` applies to both halves; `server.headers` only to the in-process half.
@@ -357,18 +429,12 @@ export const createBrowserClient = <R extends Router.Any>(
  * @category constructors
  * @since 0.1.0
  */
-export const createIsomorphicClient = <R extends Router.Any>(
-  router: R,
-  options: IsomorphicClientOptions<R>,
-): Client<R> => {
-  const isServer = options.isServer ?? typeof window === 'undefined';
-  const middleware = middlewareOf(options);
-  return isServer
-    ? createServerClient(router, {
-        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- passes the public `handlers` layer through unchanged: its construction error is `unknown` by design, matching `localLink`'s own option
-        handlers: options.server.handlers,
-        ...(options.server.headers !== undefined && { headers: options.server.headers }),
-        ...middleware,
-      })
-    : createBrowserClient(router, { ...options.client, ...middleware });
-};
+export const createIsomorphicClient: {
+  <R extends Router.Any>(router: R, options: IsomorphicClientOptions<R>): Client<R>;
+  <X extends Router.Input>(
+    router: X,
+    options: IsomorphicClientOptions<Router.Of<X>>,
+  ): Client<Router.Of<X>>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  createIsomorphicClientFromInput as unknown as typeof createIsomorphicClient;

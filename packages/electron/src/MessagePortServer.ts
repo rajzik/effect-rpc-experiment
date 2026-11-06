@@ -11,7 +11,7 @@
 import { Effect, Layer, Queue, Schema, Scope } from 'effect';
 import { RpcMessage, RpcSerialization, RpcServer } from 'effect/rpc';
 import type { Rpc, RpcGroup } from 'effect/rpc';
-import type { Router } from '@effect-trpc/core';
+import { Router } from '@effect-trpc/core';
 import type { Handlers } from '@effect-trpc/server';
 import { closePort, listen, post, readyFrame } from './internal/port.js';
 import type { AnyPort } from './types.js';
@@ -305,6 +305,42 @@ const make = (
   });
 };
 
+/** `serve` for a router. */
+const serveFor = <R extends Router.Any, LOut = never, LE = never, LR = never>(
+  router: R,
+  options: ServeOptions<LOut, LE, LR> = {},
+): Effect.Effect<
+  MessagePortServer,
+  LE,
+  Scope.Scope | LR | Exclude<Handlers.Requirements<R>, LOut>
+> =>
+  Effect.gen(function* () {
+    const server = yield* make(options);
+    const run = RpcServer.make(
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Router.Any` erases the group's rpcs on purpose; the return type restores them via `Handlers.Requirements<R>`
+      router.group as RpcGroup.RpcGroup<Rpc.Any>,
+      {
+        disableFatalDefects: true,
+        disableTracing: options.disableTracing,
+        spanPrefix: options.spanPrefix,
+        concurrency: options.concurrency,
+      },
+    ).pipe(Effect.provideService(RpcServer.Protocol, server.protocol));
+    const handlers =
+      options.handlers === undefined ? undefined : yield* Layer.build(options.handlers);
+    yield* Effect.forkScoped(handlers === undefined ? run : Effect.provide(run, handlers));
+    return server;
+  });
+
+/** `serve` for a router or a router service: normalises the input with `Router.from`. */
+const serveFromInput = (
+  input: Router.Input,
+  options?: ServeOptions<never, never, never>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return serveFor(router, options);
+};
+
 /**
  * Runs an rpc server for `router` over a {@link MessagePortServer} in the current scope and
  * returns it; call `attach(port)` for every connection. Handler defects fail only their call
@@ -318,6 +354,8 @@ const make = (
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - `handlers` is built once in the current scope. Services it does not provide stay
  *   requirements of the returned effect.
  * - `attach(port, { headers })` adds trusted headers to every request of that connection; they
@@ -363,31 +401,26 @@ const make = (
  * @see {@link make}
  * @since 0.1.0
  */
-const serve = <R extends Router.Any, LOut = never, LE = never, LR = never>(
-  router: R,
-  options: ServeOptions<LOut, LE, LR> = {},
-): Effect.Effect<
-  MessagePortServer,
-  LE,
-  Scope.Scope | LR | Exclude<Handlers.Requirements<R>, LOut>
-> =>
-  Effect.gen(function* () {
-    const server = yield* make(options);
-    const run = RpcServer.make(
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Router.Any` erases the group's rpcs on purpose; the return type restores them via `Handlers.Requirements<R>`
-      router.group as RpcGroup.RpcGroup<Rpc.Any>,
-      {
-        disableFatalDefects: true,
-        disableTracing: options.disableTracing,
-        spanPrefix: options.spanPrefix,
-        concurrency: options.concurrency,
-      },
-    ).pipe(Effect.provideService(RpcServer.Protocol, server.protocol));
-    const handlers =
-      options.handlers === undefined ? undefined : yield* Layer.build(options.handlers);
-    yield* Effect.forkScoped(handlers === undefined ? run : Effect.provide(run, handlers));
-    return server;
-  });
+const serve: {
+  <R extends Router.Any, LOut = never, LE = never, LR = never>(
+    router: R,
+    options?: ServeOptions<LOut, LE, LR>,
+  ): Effect.Effect<
+    MessagePortServer,
+    LE,
+    Scope.Scope | LR | Exclude<Handlers.Requirements<R>, LOut>
+  >;
+  <X extends Router.Input, LOut = never, LE = never, LR = never>(
+    router: X,
+    options?: ServeOptions<LOut, LE, LR>,
+  ): Effect.Effect<
+    MessagePortServer,
+    LE,
+    Scope.Scope | LR | Exclude<Handlers.Requirements<Router.Of<X>>, LOut>
+  >;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  serveFromInput as unknown as typeof serve;
 
 /**
  * A generic `effect/rpc` server transport over message ports.

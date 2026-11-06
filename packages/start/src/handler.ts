@@ -8,7 +8,7 @@
  *
  * @since 0.1.0
  */
-import type { Router } from '@effect-trpc/core';
+import { Router } from '@effect-trpc/core';
 import { toWebHandler } from '@effect-trpc/server';
 import type { WebHandler, WebHandlerOptions } from '@effect-trpc/server';
 
@@ -116,6 +116,75 @@ const rewrite = (request: Request, path: `/${string}`): Request | undefined => {
   return new Request(url, request);
 };
 
+/** `createStartHandler` for a router. */
+const createStartHandlerFor = <R extends Router.Any, LE = never>(
+  router: R,
+  options: StartHandlerOptions<R, LE>,
+): StartHandler => {
+  const path = normalizePath(options.path ?? defaultStartPath);
+  let web: Promise<WebHandler> | undefined;
+  let disposed: Promise<void> | undefined;
+
+  const build = (): Promise<WebHandler> => {
+    web ??= toWebHandler(router, {
+      handlers: options.handlers,
+      path,
+      serialization: options.serialization,
+      disableTracing: options.disableTracing,
+      spanPrefix: options.spanPrefix,
+      concurrency: options.concurrency,
+    }).catch((error: unknown) => {
+      web = undefined;
+      throw error;
+    });
+    return web;
+  };
+
+  const handle = async ({ request }: StartHandlerContext): Promise<Response> => {
+    if (disposed !== undefined) return new Response('Server disposed', { status: 503 });
+    if (request.method !== 'POST') {
+      return jsonResponse(
+        405,
+        {
+          _tag: 'MethodNotAllowed',
+          message: `effect-trpc only accepts POST requests (got ${request.method})`,
+        },
+        { allow: 'POST' },
+      );
+    }
+    const rewritten = rewrite(request, path);
+    if (rewritten === undefined) {
+      return jsonResponse(404, {
+        _tag: 'NotFound',
+        message: `No effect-trpc endpoint at ${new URL(request.url).pathname} (mounted on ${path})`,
+      });
+    }
+    const { handler } = await build();
+    return handler(rewritten);
+  };
+
+  const dispose = (): Promise<void> => {
+    disposed ??= (async () => {
+      const pending = web;
+      if (pending === undefined) return;
+      const built = await pending.catch(() => undefined);
+      await built?.dispose();
+    })();
+    return disposed;
+  };
+
+  return Object.assign(handle, { dispose, [Symbol.asyncDispose]: dispose });
+};
+
+/** `createStartHandler` for a router or a router service: normalises the input with `Router.from`. */
+const createStartHandlerFromInput = (
+  input: Router.Input,
+  options: StartHandlerOptions<Router.Any>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return createStartHandlerFor(router, options);
+};
+
 /**
  * Creates a TanStack Start server route handler for a router: mount it on a catch-all server
  * route (`src/routes/api/rpc.$.ts`).
@@ -128,6 +197,8 @@ const rewrite = (request: Request, path: `/${string}`): Request | undefined => {
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - The effect-trpc web handler (`toWebHandler`) is built lazily, once, on the first request
  *   (so importing the route module does not build the handler layer). A failed build rejects
  *   that request (Start answers `500`) and is retried on the next one.
@@ -195,61 +266,12 @@ const rewrite = (request: Request, path: `/${string}`): Request | undefined => {
  * @category adapters
  * @since 0.1.0
  */
-export const createStartHandler = <R extends Router.Any, LE = never>(
-  router: R,
-  options: StartHandlerOptions<R, LE>,
-): StartHandler => {
-  const path = normalizePath(options.path ?? defaultStartPath);
-  let web: Promise<WebHandler> | undefined;
-  let disposed: Promise<void> | undefined;
-
-  const build = (): Promise<WebHandler> => {
-    web ??= toWebHandler(router, {
-      handlers: options.handlers,
-      path,
-      serialization: options.serialization,
-      disableTracing: options.disableTracing,
-      spanPrefix: options.spanPrefix,
-      concurrency: options.concurrency,
-    }).catch((error: unknown) => {
-      web = undefined;
-      throw error;
-    });
-    return web;
-  };
-
-  const handle = async ({ request }: StartHandlerContext): Promise<Response> => {
-    if (disposed !== undefined) return new Response('Server disposed', { status: 503 });
-    if (request.method !== 'POST') {
-      return jsonResponse(
-        405,
-        {
-          _tag: 'MethodNotAllowed',
-          message: `effect-trpc only accepts POST requests (got ${request.method})`,
-        },
-        { allow: 'POST' },
-      );
-    }
-    const rewritten = rewrite(request, path);
-    if (rewritten === undefined) {
-      return jsonResponse(404, {
-        _tag: 'NotFound',
-        message: `No effect-trpc endpoint at ${new URL(request.url).pathname} (mounted on ${path})`,
-      });
-    }
-    const { handler } = await build();
-    return handler(rewritten);
-  };
-
-  const dispose = (): Promise<void> => {
-    disposed ??= (async () => {
-      const pending = web;
-      if (pending === undefined) return;
-      const built = await pending.catch(() => undefined);
-      await built?.dispose();
-    })();
-    return disposed;
-  };
-
-  return Object.assign(handle, { dispose, [Symbol.asyncDispose]: dispose });
-};
+export const createStartHandler: {
+  <R extends Router.Any, LE = never>(router: R, options: StartHandlerOptions<R, LE>): StartHandler;
+  <X extends Router.Input, LE = never>(
+    router: X,
+    options: StartHandlerOptions<Router.Of<X>, LE>,
+  ): StartHandler;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  createStartHandlerFromInput as unknown as typeof createStartHandler;

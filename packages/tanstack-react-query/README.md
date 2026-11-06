@@ -17,6 +17,10 @@ you use the normal TanStack hooks (`useQuery`, `useMutation`, `useInfiniteQuery`
   handler.
 - SSR hydration encodes values with the procedures' schemas, so class instances and typed errors
   come back as instances on the client.
+- A router written as an Effect service (`@effect-trpc/core`'s router services) works like a
+  router: `createRpcContext<typeof AppRouter>()`, `createHydrationHelpers(AppRouter)`,
+  `dehydrate(AppRouter, ...)` / `hydrate(AppRouter, ...)` take the class, and
+  `createRpcOptionsProxy` takes the client of `createClient(AppRouter, ...)`.
 
 ```sh
 pnpm add @effect-trpc/tanstack-react-query @effect-trpc/client @effect-trpc/core effect @tanstack/react-query react
@@ -128,6 +132,10 @@ export function PostTitle({ id }: { id: number }) {
 - SSR state for router queries must go through this package's `dehydrate` / `hydrate` /
   `HydrationBoundary`, bound to the same router on both sides, to keep class instances.
 - Calling a helper of the wrong kind (`queryOptions` on a mutation) throws at call time.
+- Every function taking a router (`createHydrationHelpers`, `dehydrate`, `hydrate`) and
+  `createRpcContext<R>()` accept a router service class too (normalised with `Router.from`).
+  Type helpers (`RpcOptionsProxy<R>`, `RpcProviderProps<R>`, ...) take a router type: write
+  `RpcOptionsProxy<Router.Of<typeof AppRouter>>` for a service.
 
 **Common mistakes**
 
@@ -147,6 +155,8 @@ export function PostTitle({ id }: { id: number }) {
   `queryFilter(input)` or `pathFilter()`.
 - Don't share one `QueryClient` between routers without prefixes. Use
   `createRpcContext<R, { keyPrefix: true }>()` and `keyPrefix="..."`.
+- Don't write `RpcOptionsProxy<typeof AppRouter>` for a router service. Use
+  `RpcOptionsProxy<Router.Of<typeof AppRouter>>` (`createRpcContext<typeof AppRouter>()` is fine).
 - Don't retry every error. Retry only `RpcTransportError`; typed errors and defects do not change
   on retry.
 - Don't send `trpc: { context }` per request. Use `rpc: { headers }`.
@@ -172,6 +182,7 @@ export function PostTitle({ id }: { id: number }) {
 | Provider, `useRpcClient`, proxy memoization             | `test/client.test.tsx`                                   |
 | Real HTTP transport                                     | `test/http.test.tsx`                                     |
 | Components against an abstract router                   | `test/polymorphism.test.tsx`                             |
+| Router services (`typeof AppRouter`) everywhere         | `test/routerService.test.tsx`, `.test-d.tsx`             |
 | tRPC test parity                                        | `test/PARITY.md`                                         |
 
 The JSDoc on every export follows [`docs/jsdoc-style.md`](../../docs/jsdoc-style.md) and carries

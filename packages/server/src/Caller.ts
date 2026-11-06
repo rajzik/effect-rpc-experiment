@@ -246,104 +246,8 @@ const rejectWithClientError = <A>(exit: Exit.Exit<A, unknown>): A => {
   throw causeToClientError(exit.cause);
 };
 
-/**
- * Creates an in-process caller for a router (tRPC's `createCaller`): calls go straight to the
- * handlers through `RpcTest.makeClient` (no HTTP, no serialization), but the router's middleware
- * still runs and per-call headers reach it.
- *
- * **When to use**
- *
- * Use in tests, scripts, server-side rendering and server-to-server calls inside one process.
- * Prefer `createClient(router, { link: localLink({ handlers }) })` from `@effect-trpc/client`
- * when the calling code should use the client API (`$effect`, `withHeaders`,
- * `RpcTransportError`), and {@link toWebHandler} / `layerHttp` to serve real HTTP clients.
- *
- * **Details**
- *
- * - The handler layer is built lazily on the first call and shared by all calls until
- *   `dispose()`. Layer construction failures surface as defects (`RpcDefect` for promises).
- * - Values are passed by reference: a `Schema.Class` result is the very instance the handler
- *   returned. Input is still decoded with the payload schema, so invalid input is a defect.
- * - `dispose()` interrupts in-flight calls and runs the layer's finalizers; later calls are
- *   interrupted (`RpcInterrupted` for promises) instead of hanging.
- *
- * **Gotchas**
- *
- * - Calling a path that is not a procedure of the router throws an `Error` synchronously.
- * - Throws if the router has a top-level key `$promise`, `$router` or `dispose` (the caller's
- *   own members); nest such procedures under another key.
- * - `handlers` must include the middleware implementations, not only `Handlers.make(...)`.
- *
- * **Example** (Calling procedures in-process with the Effect and Promise APIs)
- *
- * ```ts
- * import { Context, Effect, Layer, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { createCaller, Handlers, Middleware } from '@effect-trpc/server';
- *
- * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
- * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
- *   id: Schema.Number,
- * }) {}
- * class Unauthorized extends Schema.TaggedError<Unauthorized>()('Unauthorized', {}) {}
- *
- * class CurrentUser extends Context.Service<CurrentUser, { readonly name: string }>()(
- *   'CurrentUser',
- * ) {}
- * class Auth extends Middleware.make<Auth, { provides: CurrentUser }>()('Auth', {
- *   error: Unauthorized,
- * }) {}
- *
- * const appRouter = Router.make({
- *   post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
- *   me: query({ success: Schema.String }).middleware(Auth),
- * });
- *
- * const AuthLive = Layer.succeed(Auth)(
- *   Auth.of((effect, { headers }) => {
- *     const name = headers['x-user'];
- *     return name === undefined
- *       ? Effect.fail(new Unauthorized())
- *       : Effect.provideService(effect, CurrentUser, { name });
- *   }),
- * );
- * const HandlersLive = Handlers.make(appRouter, {
- *   post: {
- *     byId: ({ id }) =>
- *       id === 1 ? Effect.succeed(new Post({ id, title: 'Hello' })) : Effect.fail(new PostNotFound({ id })),
- *   },
- *   me: () =>
- *     Effect.gen(function* () {
- *       const user = yield* CurrentUser; // provided by the Auth middleware
- *       return user.name;
- *     }),
- * });
- *
- * // The middleware implementation travels with the handlers.
- * const caller = createCaller(appRouter, { handlers: Layer.mergeAll(HandlersLive, AuthLive) });
- *
- * // Promise API: rejects with ClientError<PostNotFound | ...>.
- * const post = await caller.$promise.post.byId({ id: 1 });
- * const me = await caller.$promise.me(undefined, { headers: { 'x-user': 'ada' } });
- *
- * // Effect API: typed errors, no requirements.
- * const title = caller.post
- *   .byId({ id: 2 })
- *   .pipe(
- *     Effect.map((p) => p.title),
- *     Effect.catchTag('PostNotFound', () => Effect.succeed('missing')),
- *   );
- * await Effect.runPromise(title);
- *
- * await caller.dispose();
- * ```
- *
- * @see {@link Caller}
- * @see {@link Handlers}
- * @category constructors
- * @since 0.1.0
- */
-export const createCaller = <R extends Router.Any, LE = never>(
+/** `createCaller` for a router. */
+const createCallerFor = <R extends Router.Any, LE = never>(
   router: R,
   options: CallerOptions<R, LE>,
 ): Caller<R> => {
@@ -498,6 +402,124 @@ export const createCaller = <R extends Router.Any, LE = never>(
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the proxy implements every path of the router record (`$promise`, `$router`, `dispose` handled above), which is exactly the shape `Caller<R>` describes
   return root as Caller<R>;
 };
+
+/** `createCaller` for a router or a router service: normalises the input with `Router.from`. */
+const createCallerFromInput = (
+  input: Router.Input,
+  options: CallerOptions<Router.Any, never>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return createCallerFor(router, options);
+};
+
+/**
+ * Creates an in-process caller for a router (tRPC's `createCaller`): calls go straight to the
+ * handlers through `RpcTest.makeClient` (no HTTP, no serialization), but the router's middleware
+ * still runs and per-call headers reach it.
+ *
+ * **When to use**
+ *
+ * Use in tests, scripts, server-side rendering and server-to-server calls inside one process.
+ * Prefer `createClient(router, { link: localLink({ handlers }) })` from `@effect-trpc/client`
+ * when the calling code should use the client API (`$effect`, `withHeaders`,
+ * `RpcTransportError`), and {@link toWebHandler} / `layerHttp` to serve real HTTP clients.
+ *
+ * **Details**
+ *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
+ * - The handler layer is built lazily on the first call and shared by all calls until
+ *   `dispose()`. Layer construction failures surface as defects (`RpcDefect` for promises).
+ * - Values are passed by reference: a `Schema.Class` result is the very instance the handler
+ *   returned. Input is still decoded with the payload schema, so invalid input is a defect.
+ * - `dispose()` interrupts in-flight calls and runs the layer's finalizers; later calls are
+ *   interrupted (`RpcInterrupted` for promises) instead of hanging.
+ *
+ * **Gotchas**
+ *
+ * - Calling a path that is not a procedure of the router throws an `Error` synchronously.
+ * - Throws if the router has a top-level key `$promise`, `$router` or `dispose` (the caller's
+ *   own members); nest such procedures under another key.
+ * - `handlers` must include the middleware implementations, not only `Handlers.make(...)`.
+ *
+ * **Example** (Calling procedures in-process with the Effect and Promise APIs)
+ *
+ * ```ts
+ * import { Context, Effect, Layer, Schema } from 'effect';
+ * import { query, Router } from '@effect-trpc/core';
+ * import { createCaller, Handlers, Middleware } from '@effect-trpc/server';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+ *   id: Schema.Number,
+ * }) {}
+ * class Unauthorized extends Schema.TaggedError<Unauthorized>()('Unauthorized', {}) {}
+ *
+ * class CurrentUser extends Context.Service<CurrentUser, { readonly name: string }>()(
+ *   'CurrentUser',
+ * ) {}
+ * class Auth extends Middleware.make<Auth, { provides: CurrentUser }>()('Auth', {
+ *   error: Unauthorized,
+ * }) {}
+ *
+ * const appRouter = Router.make({
+ *   post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
+ *   me: query({ success: Schema.String }).middleware(Auth),
+ * });
+ *
+ * const AuthLive = Layer.succeed(Auth)(
+ *   Auth.of((effect, { headers }) => {
+ *     const name = headers['x-user'];
+ *     return name === undefined
+ *       ? Effect.fail(new Unauthorized())
+ *       : Effect.provideService(effect, CurrentUser, { name });
+ *   }),
+ * );
+ * const HandlersLive = Handlers.make(appRouter, {
+ *   post: {
+ *     byId: ({ id }) =>
+ *       id === 1 ? Effect.succeed(new Post({ id, title: 'Hello' })) : Effect.fail(new PostNotFound({ id })),
+ *   },
+ *   me: () =>
+ *     Effect.gen(function* () {
+ *       const user = yield* CurrentUser; // provided by the Auth middleware
+ *       return user.name;
+ *     }),
+ * });
+ *
+ * // The middleware implementation travels with the handlers.
+ * const caller = createCaller(appRouter, { handlers: Layer.mergeAll(HandlersLive, AuthLive) });
+ *
+ * // Promise API: rejects with ClientError<PostNotFound | ...>.
+ * const post = await caller.$promise.post.byId({ id: 1 });
+ * const me = await caller.$promise.me(undefined, { headers: { 'x-user': 'ada' } });
+ *
+ * // Effect API: typed errors, no requirements.
+ * const title = caller.post
+ *   .byId({ id: 2 })
+ *   .pipe(
+ *     Effect.map((p) => p.title),
+ *     Effect.catchTag('PostNotFound', () => Effect.succeed('missing')),
+ *   );
+ * await Effect.runPromise(title);
+ *
+ * await caller.dispose();
+ * ```
+ *
+ * @see {@link Caller}
+ * @see {@link Handlers}
+ * @category constructors
+ * @since 0.1.0
+ */
+export const createCaller: {
+  <R extends Router.Any, LE = never>(router: R, options: CallerOptions<R, LE>): Caller<R>;
+  <X extends Router.Input, LE = never>(
+    router: X,
+    options: CallerOptions<Router.Of<X>, LE>,
+  ): Caller<Router.Of<X>>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  createCallerFromInput as unknown as typeof createCaller;
 
 const abortEffect = (signal: AbortSignal): Effect.Effect<void> =>
   Effect.callback<void>((resume) => {

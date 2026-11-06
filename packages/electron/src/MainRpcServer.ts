@@ -11,7 +11,7 @@
  */
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import type { Scope } from 'effect';
-import type { Router } from '@effect-trpc/core';
+import { Router } from '@effect-trpc/core';
 import type { Handlers } from '@effect-trpc/server';
 import { MessagePortServer } from './MessagePortServer.js';
 import type { ServeOptions } from './MessagePortServer.js';
@@ -117,6 +117,45 @@ type MainRequirements<R extends Router.Any, LOut, LR> =
   | LR
   | Exclude<Handlers.Requirements<R>, LOut>;
 
+/** `make` for a router. */
+const makeFor = <R extends Router.Any, LOut = never, LE = never, LR = never>(
+  router: R,
+  options: MainRpcServerOptions<LOut, LE, LR>,
+): Effect.Effect<void, LE, Scope.Scope | MainRequirements<R, LOut, LR>> =>
+  Effect.gen(function* () {
+    const channel = options.channel ?? defaultChannel;
+    const { ipcMain, authorize } = options;
+    const server = yield* MessagePortServer.serve(router, options);
+    const context = yield* Effect.context();
+    const runFork = Effect.runForkWith(context);
+    const listener: IpcMainListener = (event) => {
+      const ports = event.ports;
+      const port = ports[0];
+      if (port === undefined) return;
+      if (ports.length !== 1 || (authorize !== undefined && !authorize(event))) {
+        for (const rejected of ports) rejected.close();
+        return;
+      }
+      const senderId = event.sender?.id;
+      runFork(
+        server.attach(port, {
+          headers: { [senderIdHeader]: senderId === undefined ? undefined : String(senderId) },
+        }),
+      );
+    };
+    ipcMain.on(channel, listener);
+    yield* Effect.addFinalizer(() => Effect.sync(() => ipcMain.removeListener(channel, listener)));
+  });
+
+/** `make` for a router or a router service: normalises the input with `Router.from`. */
+const makeFromInput = (
+  input: Router.Input,
+  options: MainRpcServerOptions<never, never, never>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return makeFor(router, options);
+};
+
 /**
  * Serves `router` to renderers in the current scope: every `MessagePort` posted on `channel`
  * (by `installPreloadBridge`) becomes one connection. Stops listening and closes all
@@ -129,6 +168,8 @@ type MainRequirements<R extends Router.Any, LOut, LR> =
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - Each accepted port gets the trusted `x-effect-trpc-sender-id` header (`event.sender.id`).
  * - Handler services not provided by `options.handlers` stay requirements of the effect.
  * - A defect in a handler fails only that call (`RpcDefect` in the renderer).
@@ -158,34 +199,34 @@ type MainRequirements<R extends Router.Any, LOut, LR> =
  * @see {@link run}
  * @since 0.1.0
  */
-const make = <R extends Router.Any, LOut = never, LE = never, LR = never>(
+const make: {
+  <R extends Router.Any, LOut = never, LE = never, LR = never>(
+    router: R,
+    options: MainRpcServerOptions<LOut, LE, LR>,
+  ): Effect.Effect<void, LE, Scope.Scope | MainRequirements<R, LOut, LR>>;
+  <X extends Router.Input, LOut = never, LE = never, LR = never>(
+    router: X,
+    options: MainRpcServerOptions<LOut, LE, LR>,
+  ): Effect.Effect<void, LE, Scope.Scope | MainRequirements<Router.Of<X>, LOut, LR>>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  makeFromInput as unknown as typeof make;
+
+/** `layer` for a router. */
+const layerFor = <R extends Router.Any, LOut = never, LE = never, LR = never>(
   router: R,
   options: MainRpcServerOptions<LOut, LE, LR>,
-): Effect.Effect<void, LE, Scope.Scope | MainRequirements<R, LOut, LR>> =>
-  Effect.gen(function* () {
-    const channel = options.channel ?? defaultChannel;
-    const { ipcMain, authorize } = options;
-    const server = yield* MessagePortServer.serve(router, options);
-    const context = yield* Effect.context();
-    const runFork = Effect.runForkWith(context);
-    const listener: IpcMainListener = (event) => {
-      const ports = event.ports;
-      const port = ports[0];
-      if (port === undefined) return;
-      if (ports.length !== 1 || (authorize !== undefined && !authorize(event))) {
-        for (const rejected of ports) rejected.close();
-        return;
-      }
-      const senderId = event.sender?.id;
-      runFork(
-        server.attach(port, {
-          headers: { [senderIdHeader]: senderId === undefined ? undefined : String(senderId) },
-        }),
-      );
-    };
-    ipcMain.on(channel, listener);
-    yield* Effect.addFinalizer(() => Effect.sync(() => ipcMain.removeListener(channel, listener)));
-  });
+): Layer.Layer<never, LE, MainRequirements<R, LOut, LR>> =>
+  Layer.effectDiscard(make(router, options));
+
+/** `layer` for a router or a router service: normalises the input with `Router.from`. */
+const layerFromInput = (
+  input: Router.Input,
+  options: MainRpcServerOptions<never, never, never>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return layerFor(router, options);
+};
 
 /**
  * {@link make} as a layer, for composing into an Effect application.
@@ -197,6 +238,8 @@ const make = <R extends Router.Any, LOut = never, LE = never, LR = never>(
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - `handlers` is optional: services the router's handlers need and the layer does not provide
  *   stay requirements of the returned layer, to be provided with `Layer.provide`.
  *
@@ -226,11 +269,44 @@ const make = <R extends Router.Any, LOut = never, LE = never, LR = never>(
  * @see {@link make}
  * @since 0.1.0
  */
-const layer = <R extends Router.Any, LOut = never, LE = never, LR = never>(
+const layer: {
+  <R extends Router.Any, LOut = never, LE = never, LR = never>(
+    router: R,
+    options: MainRpcServerOptions<LOut, LE, LR>,
+  ): Layer.Layer<never, LE, MainRequirements<R, LOut, LR>>;
+  <X extends Router.Input, LOut = never, LE = never, LR = never>(
+    router: X,
+    options: MainRpcServerOptions<LOut, LE, LR>,
+  ): Layer.Layer<never, LE, MainRequirements<Router.Of<X>, LOut, LR>>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  layerFromInput as unknown as typeof layer;
+
+/** `run` for a router. */
+const runFor = async <R extends Router.Any, LE = never>(
   router: R,
-  options: MainRpcServerOptions<LOut, LE, LR>,
-): Layer.Layer<never, LE, MainRequirements<R, LOut, LR>> =>
-  Layer.effectDiscard(make(router, options));
+  options: MainRpcServerRunOptions<R, LE>,
+): Promise<RunningMainRpcServer> => {
+  const runtime = ManagedRuntime.make(layer(router, options));
+  try {
+    await runtime.context();
+  } catch (error) {
+    await runtime.dispose();
+    throw error;
+  }
+  let disposed: Promise<void> | undefined;
+  const dispose = (): Promise<void> => (disposed ??= runtime.dispose());
+  return { dispose, [Symbol.asyncDispose]: dispose };
+};
+
+/** `run` for a router or a router service: normalises the input with `Router.from`. */
+const runFromInput = (
+  input: Router.Input,
+  options: MainRpcServerRunOptions<Router.Any, never>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return runFor(router, options);
+};
 
 /**
  * Starts the main-process server with a self-contained runtime (no Effect application needed).
@@ -244,6 +320,8 @@ const layer = <R extends Router.Any, LOut = never, LE = never, LR = never>(
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - `handlers` must provide every requirement of the router (a type error otherwise).
  * - `dispose()` removes the `ipcMain` listener, closes every connection (pending renderer calls
  *   reject with `RpcTransportError`, in-flight handlers are interrupted) and releases the
@@ -320,21 +398,18 @@ const layer = <R extends Router.Any, LOut = never, LE = never, LR = never>(
  * @see {@link RunningMainRpcServer}
  * @since 0.1.0
  */
-const run = async <R extends Router.Any, LE = never>(
-  router: R,
-  options: MainRpcServerRunOptions<R, LE>,
-): Promise<RunningMainRpcServer> => {
-  const runtime = ManagedRuntime.make(layer(router, options));
-  try {
-    await runtime.context();
-  } catch (error) {
-    await runtime.dispose();
-    throw error;
-  }
-  let disposed: Promise<void> | undefined;
-  const dispose = (): Promise<void> => (disposed ??= runtime.dispose());
-  return { dispose, [Symbol.asyncDispose]: dispose };
-};
+const run: {
+  <R extends Router.Any, LE = never>(
+    router: R,
+    options: MainRpcServerRunOptions<R, LE>,
+  ): Promise<RunningMainRpcServer>;
+  <X extends Router.Input, LE = never>(
+    router: X,
+    options: MainRpcServerRunOptions<Router.Of<X>, LE>,
+  ): Promise<RunningMainRpcServer>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  runFromInput as unknown as typeof run;
 
 /**
  * Reads the sender id (the renderer's `webContents.id`) from the headers a handler receives.

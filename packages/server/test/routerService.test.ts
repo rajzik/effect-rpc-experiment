@@ -1,9 +1,11 @@
 import { Context, Effect, Exit, Layer, Schema, Stream } from 'effect';
-import { FetchHttpClient } from 'effect/http';
+import { FetchHttpClient, HttpRouter, HttpServer } from 'effect/http';
 import { RpcClient, RpcSerialization } from 'effect/rpc';
+import { NodeHttpServer } from '@effect/platform-node';
 import { Procedure, query, Router } from '@effect-trpc/core';
 import { describe, expect, it } from 'vite-plus/test';
-import { createCaller, Handlers, toWebHandler } from '../src/index.js';
+import { createCaller, Handlers, layerHttp, toWebHandler } from '../src/index.js';
+import { runServer } from '../src/node.js';
 import { AuthLive, Trace, TraceLive, Unauthorized } from './fixtures.js';
 import {
   AppRouter,
@@ -169,5 +171,103 @@ describe('Handlers.fromProcedures', () => {
     expect(() => Handlers.fromProcedures(forced)).toThrow(
       'Handlers.fromProcedures: the router has procedures without a handler: "nested.old" (defined with query/mutation/subscription({...})). Build them with Procedure (e.g. Procedure.input(...).query(handler)), or implement the router with Handlers.make',
     );
+  });
+});
+
+/** Calls the service router over HTTP with an effect/rpc client (instances + typed errors). */
+const callOverHttp = (url: string, fetch?: typeof globalThis.fetch) =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const client = yield* RpcClient.make(appRouter.group);
+      const post = yield* client['post.byId']({ id: 1 });
+      const missing = yield* Effect.flip(client['post.byId']({ id: 7 }));
+      const titles = yield* Stream.runCollect(client['post.titles']());
+      return { post, missing, titles };
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        RpcClient.layerProtocolHttp({ url }).pipe(
+          Layer.provide([
+            fetch === undefined
+              ? FetchHttpClient.layer
+              : FetchHttpClient.layer.pipe(
+                  Layer.provide(Layer.succeed(FetchHttpClient.Fetch)(fetch)),
+                ),
+            RpcSerialization.layerNdjson,
+          ]),
+        ),
+      ),
+    ),
+  );
+
+/** What the HTTP calls decoded to: instances (with methods and Dates) and the typed error. */
+const decoded = (result: Awaited<ReturnType<typeof callOverHttp>>) => ({
+  post: result.post instanceof Post,
+  headline: result.post.headline(),
+  createdAt: result.post.createdAt.toISOString(),
+  missing: result.missing instanceof PostNotFound,
+  titles: result.titles,
+});
+const expected = {
+  post: true,
+  headline: '#1 Hello',
+  createdAt: postCreatedAt.toISOString(),
+  missing: true,
+  titles: ['first', 'second'],
+};
+
+describe('server adapters accept the router service class', () => {
+  it('createCaller', async () => {
+    await using caller = createCaller(AppRouter, { handlers: ServerLive });
+    expect(caller.$router).toBe(appRouter);
+    const post = await caller.$promise.post.byId({ id: 1 });
+    expect(post).toBeInstanceOf(Post);
+    expect(post.headline()).toBe('#1 Hello');
+    expect(await caller.$promise.post.byId({ id: 7 }).catch((e: unknown) => e)).toBeInstanceOf(
+      PostNotFound,
+    );
+    const missing = await Effect.runPromise(Effect.flip(caller.post.byId({ id: 7 })));
+    expect(missing).toBeInstanceOf(PostNotFound);
+  });
+
+  it('toWebHandler', async () => {
+    await using web = await toWebHandler(AppRouter, { handlers: ServerLive });
+    expect(
+      decoded(
+        await callOverHttp('http://localhost/rpc', (input, init) =>
+          web.handler(new Request(input, init)),
+        ),
+      ),
+    ).toEqual(expected);
+  });
+
+  it('layerHttp', async () => {
+    const app = HttpRouter.serve(layerHttp(AppRouter, { handlers: ServerLive }), {
+      disableLogger: true,
+      disableListenLog: true,
+    });
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const address = HttpServer.formatAddress((yield* HttpServer.HttpServer).address);
+        return yield* Effect.promise(() => callOverHttp(`${address}/rpc`));
+      }).pipe(Effect.provide(app.pipe(Layer.provideMerge(NodeHttpServer.layerTest)))),
+    );
+    expect(decoded(result)).toEqual(expected);
+  });
+
+  it('runServer', async () => {
+    await using server = await runServer(AppRouter, { handlers: ServerLive, port: 0 });
+    expect(decoded(await callOverHttp(server.url))).toEqual(expected);
+  });
+
+  it('Handlers.make implements a service of plain definitions', async () => {
+    const handlers = Handlers.make(LegacyRouter, {
+      ok: () => Effect.void,
+      user: { byId: () => Effect.succeed('ada') },
+      health: () => Effect.succeed('ok' as const),
+    });
+    await using caller = createCaller(LegacyRouter, { handlers });
+    expect(await caller.$promise.user.byId()).toBe('ada');
+    expect(await caller.$promise.health()).toBe('ok');
   });
 });

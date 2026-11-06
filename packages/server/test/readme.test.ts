@@ -169,7 +169,7 @@ describe('README: routers as services', () => {
     const ServiceServerLive = Layer.mergeAll(ServiceHandlersLive, AuthLive).pipe(
       Layer.provide(DatabaseLive),
     );
-    await using caller = createCaller(Router.from(AppRouter), { handlers: ServiceServerLive });
+    await using caller = createCaller(AppRouter, { handlers: ServiceServerLive });
     expect(await caller.$promise.post.byId({ id: 1 })).toBeInstanceOf(Post);
     expect(await caller.$promise.me(undefined, { headers: { 'x-user': 'ada' } })).toBe('ada');
   });

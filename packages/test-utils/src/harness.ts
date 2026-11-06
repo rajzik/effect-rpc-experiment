@@ -10,7 +10,7 @@
  * @since 0.1.0
  */
 import type { Layer } from 'effect';
-import type { Router } from '@effect-trpc/core';
+import { Router } from '@effect-trpc/core';
 import type { Client } from '@effect-trpc/client';
 import { createCaller, toWebHandler } from '@effect-trpc/server';
 import type { Caller, WebHandler } from '@effect-trpc/server';
@@ -233,6 +233,62 @@ export interface TestWebHandler<R extends Router.Any> {
   readonly [Symbol.asyncDispose]: () => Promise<void>;
 }
 
+/** `testServerAndClient` for a router. */
+const testServerAndClientFor = async <R extends Router.Any, LE = never>(
+  router: R,
+  options: TestServerOptions<R, LE>,
+): Promise<TestServerAndClient<R>> => {
+  const path = options.path ?? DEFAULT_PATH;
+  const serverOptions = {
+    handlers: options.handlers,
+    path,
+    ...(options.serialization === undefined ? {} : { serialization: options.serialization }),
+  };
+  const [server, web] = await Promise.allSettled([
+    runServer(router, { ...serverOptions, port: 0 }),
+    toWebHandler(router, serverOptions),
+  ]);
+  if (server.status === 'rejected' || web.status === 'rejected') {
+    // Release whichever half started, then report the first failure.
+    await Promise.allSettled([
+      server.status === 'fulfilled' ? server.value.dispose() : undefined,
+      web.status === 'fulfilled' ? web.value.dispose() : undefined,
+    ]);
+    if (server.status === 'rejected') throw server.reason;
+    if (web.status === 'rejected') throw web.reason;
+  }
+  const { url, port } = server.value;
+  const client = makeHttpClient(router, url, options);
+  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `handlers` / `middleware` options accept any layer error
+  const caller = createCaller(router, { handlers: callerLayer(options) });
+  const handler = web.value.handler;
+  const dispose = onceDispose([
+    client.dispose,
+    caller.dispose,
+    web.value.dispose,
+    server.value.dispose,
+  ]);
+  return {
+    url,
+    port,
+    client,
+    effectClient: client.$effect,
+    fetch: (input, init) => handler(toRequest(url, input, init)),
+    caller,
+    dispose,
+    [Symbol.asyncDispose]: dispose,
+  };
+};
+
+/** `testServerAndClient` for a router or a router service: normalises the input with `Router.from`. */
+const testServerAndClientFromInput = (
+  input: Router.Input,
+  options: TestServerOptions<Router.Any>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return testServerAndClientFor(router, options);
+};
+
 /**
  * Starts the router on a real Node HTTP server (ephemeral port) and returns a Promise client, its
  * Effect API, a fetch web handler and an in-process caller, all bound to the same handlers.
@@ -245,6 +301,8 @@ export interface TestWebHandler<R extends Router.Any> {
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - `url` is absolute (`http://localhost:<port>/rpc`); `client` uses `httpLink({ url })`.
  * - `client` rejects with `ClientError<E>`: the declared `Schema.TaggedError` instance, or
  *   `RpcDefect` / `RpcTransportError` / `RpcInterrupted`.
@@ -302,50 +360,41 @@ export interface TestWebHandler<R extends Router.Any> {
  * @category testing
  * @since 0.1.0
  */
-export const testServerAndClient = async <R extends Router.Any, LE = never>(
+export const testServerAndClient: {
+  <R extends Router.Any, LE = never>(
+    router: R,
+    options: TestServerOptions<R, LE>,
+  ): Promise<TestServerAndClient<R>>;
+  <X extends Router.Input, LE = never>(
+    router: X,
+    options: TestServerOptions<Router.Of<X>, LE>,
+  ): Promise<TestServerAndClient<Router.Of<X>>>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  testServerAndClientFromInput as unknown as typeof testServerAndClient;
+
+/** `withTestServer` for a router. */
+const withTestServerFor = async <R extends Router.Any, A, LE = never>(
   router: R,
   options: TestServerOptions<R, LE>,
-): Promise<TestServerAndClient<R>> => {
-  const path = options.path ?? DEFAULT_PATH;
-  const serverOptions = {
-    handlers: options.handlers,
-    path,
-    ...(options.serialization === undefined ? {} : { serialization: options.serialization }),
-  };
-  const [server, web] = await Promise.allSettled([
-    runServer(router, { ...serverOptions, port: 0 }),
-    toWebHandler(router, serverOptions),
-  ]);
-  if (server.status === 'rejected' || web.status === 'rejected') {
-    // Release whichever half started, then report the first failure.
-    await Promise.allSettled([
-      server.status === 'fulfilled' ? server.value.dispose() : undefined,
-      web.status === 'fulfilled' ? web.value.dispose() : undefined,
-    ]);
-    if (server.status === 'rejected') throw server.reason;
-    if (web.status === 'rejected') throw web.reason;
+  use: (ctx: TestServerAndClient<R>) => Promise<A>,
+): Promise<A> => {
+  const ctx = await testServerAndClient(router, options);
+  try {
+    return await use(ctx);
+  } finally {
+    await ctx.dispose();
   }
-  const { url, port } = server.value;
-  const client = makeHttpClient(router, url, options);
-  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `handlers` / `middleware` options accept any layer error
-  const caller = createCaller(router, { handlers: callerLayer(options) });
-  const handler = web.value.handler;
-  const dispose = onceDispose([
-    client.dispose,
-    caller.dispose,
-    web.value.dispose,
-    server.value.dispose,
-  ]);
-  return {
-    url,
-    port,
-    client,
-    effectClient: client.$effect,
-    fetch: (input, init) => handler(toRequest(url, input, init)),
-    caller,
-    dispose,
-    [Symbol.asyncDispose]: dispose,
-  };
+};
+
+/** `withTestServer` for a router or a router service: normalises the input with `Router.from`. */
+const withTestServerFromInput = (
+  input: Router.Input,
+  options: TestServerOptions<Router.Any>,
+  use: (ctx: TestServerAndClient<Router.Any>) => Promise<unknown>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return withTestServerFor(router, options, use);
 };
 
 /**
@@ -357,6 +406,11 @@ export const testServerAndClient = async <R extends Router.Any, LE = never>(
  * Use when `await using` is not available (older runtimes or transpilers) or a callback scope
  * reads better. Returns whatever `use` returns; a rejection from `use` is rethrown after
  * disposal.
+ *
+ * **Details**
+ *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  *
  * **Example** (Scoped server for one assertion)
  *
@@ -396,17 +450,53 @@ export const testServerAndClient = async <R extends Router.Any, LE = never>(
  * @category testing
  * @since 0.1.0
  */
-export const withTestServer = async <R extends Router.Any, A, LE = never>(
+export const withTestServer: {
+  <R extends Router.Any, A, LE = never>(
+    router: R,
+    options: TestServerOptions<R, LE>,
+    use: (ctx: TestServerAndClient<R>) => Promise<A>,
+  ): Promise<A>;
+  <X extends Router.Input, A, LE = never>(
+    router: X,
+    options: TestServerOptions<Router.Of<X>, LE>,
+    use: (ctx: TestServerAndClient<Router.Of<X>>) => Promise<A>,
+  ): Promise<A>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  withTestServerFromInput as unknown as typeof withTestServer;
+
+/** `testWebHandler` for a router. */
+const testWebHandlerFor = async <R extends Router.Any, LE = never>(
   router: R,
-  options: TestServerOptions<R, LE>,
-  use: (ctx: TestServerAndClient<R>) => Promise<A>,
-): Promise<A> => {
-  const ctx = await testServerAndClient(router, options);
-  try {
-    return await use(ctx);
-  } finally {
-    await ctx.dispose();
-  }
+  options: TestWebHandlerOptions<R, LE>,
+): Promise<TestWebHandler<R>> => {
+  const path = options.path ?? DEFAULT_PATH;
+  const web = await toWebHandler(router, {
+    handlers: options.handlers,
+    path,
+    ...(options.serialization === undefined ? {} : { serialization: options.serialization }),
+  });
+  const url = `http://localhost${path}`;
+  const fetch: TestFetch = (input, init) => web.handler(toRequest(url, input, init));
+  const client = makeHttpClient(router, url, options, fetch);
+  const dispose = onceDispose([client.dispose, web.dispose]);
+  return {
+    handler: web.handler,
+    fetch,
+    url,
+    client,
+    dispose,
+    [Symbol.asyncDispose]: dispose,
+  };
+};
+
+/** `testWebHandler` for a router or a router service: normalises the input with `Router.from`. */
+const testWebHandlerFromInput = (
+  input: Router.Input,
+  options: TestWebHandlerOptions<Router.Any>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return testWebHandlerFor(router, options);
 };
 
 /**
@@ -420,6 +510,8 @@ export const withTestServer = async <R extends Router.Any, A, LE = never>(
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - `url` is the virtual `http://localhost<path>` (default `http://localhost/rpc`).
  * - `handler` is the raw `Request` → `Response` function; `fetch` resolves relative urls
  *   against `url` before calling it.
@@ -460,28 +552,32 @@ export const withTestServer = async <R extends Router.Any, A, LE = never>(
  * @category testing
  * @since 0.1.0
  */
-export const testWebHandler = async <R extends Router.Any, LE = never>(
+export const testWebHandler: {
+  <R extends Router.Any, LE = never>(
+    router: R,
+    options: TestWebHandlerOptions<R, LE>,
+  ): Promise<TestWebHandler<R>>;
+  <X extends Router.Input, LE = never>(
+    router: X,
+    options: TestWebHandlerOptions<Router.Of<X>, LE>,
+  ): Promise<TestWebHandler<Router.Of<X>>>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  testWebHandlerFromInput as unknown as typeof testWebHandler;
+
+/** `testCaller` for a router. */
+const testCallerFor = <R extends Router.Any, LE = never>(
   router: R,
-  options: TestWebHandlerOptions<R, LE>,
-): Promise<TestWebHandler<R>> => {
-  const path = options.path ?? DEFAULT_PATH;
-  const web = await toWebHandler(router, {
-    handlers: options.handlers,
-    path,
-    ...(options.serialization === undefined ? {} : { serialization: options.serialization }),
-  });
-  const url = `http://localhost${path}`;
-  const fetch: TestFetch = (input, init) => web.handler(toRequest(url, input, init));
-  const client = makeHttpClient(router, url, options, fetch);
-  const dispose = onceDispose([client.dispose, web.dispose]);
-  return {
-    handler: web.handler,
-    fetch,
-    url,
-    client,
-    dispose,
-    [Symbol.asyncDispose]: dispose,
-  };
+  handlers: Layer.Layer<Caller.Requirements<R>, LE>,
+): Caller<R> => createCaller(router, { handlers });
+
+/** `testCaller` for a router or a router service: normalises the input with `Router.from`. */
+const testCallerFromInput = (
+  input: Router.Input,
+  handlers: Layer.Layer<Caller.Requirements<Router.Any>>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return testCallerFor(router, handlers);
 };
 
 /**
@@ -495,6 +591,8 @@ export const testWebHandler = async <R extends Router.Any, LE = never>(
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - Effect calls fail with the procedure's typed error; `$promise` calls reject with
  *   `ClientError<E>` (defects become `RpcDefect`).
  *
@@ -534,7 +632,15 @@ export const testWebHandler = async <R extends Router.Any, LE = never>(
  * @category testing
  * @since 0.1.0
  */
-export const testCaller = <R extends Router.Any, LE = never>(
-  router: R,
-  handlers: Layer.Layer<Caller.Requirements<R>, LE>,
-): Caller<R> => createCaller(router, { handlers });
+export const testCaller: {
+  <R extends Router.Any, LE = never>(
+    router: R,
+    handlers: Layer.Layer<Caller.Requirements<R>, LE>,
+  ): Caller<R>;
+  <X extends Router.Input, LE = never>(
+    router: X,
+    handlers: Layer.Layer<Caller.Requirements<Router.Of<X>>, LE>,
+  ): Caller<Router.Of<X>>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  testCallerFromInput as unknown as typeof testCaller;

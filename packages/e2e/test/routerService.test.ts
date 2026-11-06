@@ -4,7 +4,8 @@
 import { Context, Effect, Layer, Schema, Stream } from 'effect';
 import { afterAll, beforeAll, describe, expect, expectTypeOf, it } from 'vite-plus/test';
 import type { ClientError } from '@effect-trpc/core';
-import { Procedure, Router } from '@effect-trpc/core';
+import { Procedure } from '@effect-trpc/core';
+import type { Router } from '@effect-trpc/core';
 import { createClient, httpLink } from '@effect-trpc/client';
 import type { Client } from '@effect-trpc/client';
 import { Handlers, toWebHandler } from '@effect-trpc/server';
@@ -61,17 +62,18 @@ class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
   }),
 }) {}
 
-// Adapters take a router: `Router.from` turns the service into one (memoized `make`).
-const appRouter = Router.from(AppRouter);
+// Adapters take the class itself (normalised with `Router.from`, memoized `make`); type
+// helpers take the router type `Router.Of<typeof AppRouter>`.
+type AppRouterOf = Router.Of<typeof AppRouter>;
 
 describe('router service: Handlers.fromService → toWebHandler → httpLink', () => {
   let web: WebHandler;
-  let client: Client<typeof appRouter>;
+  let client: Client<AppRouterOf>;
   beforeAll(async () => {
-    web = await toWebHandler(appRouter, {
+    web = await toWebHandler(AppRouter, {
       handlers: Handlers.fromService(AppRouter).pipe(Layer.provide(DatabaseLive)),
     });
-    client = createClient(appRouter, {
+    client = createClient(AppRouter, {
       link: httpLink({
         url: 'http://localhost/rpc',
         fetch: (input, init) => web.handler(new Request(input, init)),
@@ -94,7 +96,7 @@ describe('router service: Handlers.fromService → toWebHandler → httpLink', (
   it('rejects with the typed error instance', async () => {
     const error = await client.post.byId({ id: 7 }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(PostNotFound);
-    expectTypeOf<Client.Error<typeof appRouter.record.post.byId>>().toEqualTypeOf<
+    expectTypeOf<Client.Error<AppRouterOf['record']['post']['byId']>>().toEqualTypeOf<
       ClientError<PostNotFound>
     >();
   });

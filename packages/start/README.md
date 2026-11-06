@@ -14,6 +14,11 @@ routers. It follows the layout of TanStack Start's `with-trpc` example:
 `@tanstack/react-start` is only imported as types, so this package has no Start runtime
 dependency.
 
+Every function that takes a `router` also takes a router written as an Effect service
+(`createStartHandler(AppRouter, { handlers: Handlers.fromService(AppRouter) })`,
+`createIsomorphicClient(AppRouter, ...)`, `createStartHelpers(AppRouter, { client })`); the class
+is normalised with `Router.from`.
+
 ## For AI agents
 
 **Use this package when** you wire an `@effect-trpc/core` router into a **TanStack Start** app:
@@ -64,6 +69,10 @@ hydration that keeps `Schema.Class` / `TaggedError` instances.
   `queryClient` props (and `keyPrefix` with the `{ keyPrefix: true }` flag).
 - Relative browser-client urls are resolved with `getBaseUrl()`: `serverOrigin` → `PUBLIC_URL` /
   `URL` → `https://$VERCEL_URL` → `http://localhost:$PORT` on the server.
+- `router` is a `Router.Input` (a `Router.make` router or a router service class); types use
+  `Router.Of<X>`, so both forms infer the same clients and helpers. Type helpers
+  (`StartHelpers<R>`, `ServerClientOptions<R>`, ...) take a router type:
+  `Router.Of<typeof AppRouter>` for a service.
 
 **Common mistakes**
 
@@ -79,6 +88,8 @@ hydration that keeps `Schema.Class` / `TaggedError` instances.
   pass `serverOrigin`, or pass an absolute `url`.
 - Don't mount the handler on a path other than `path` → pass `path` (include the router
   `basepath`).
+- Don't write `StartHelpers<typeof AppRouter>` for a router service →
+  `StartHelpers<Router.Of<typeof AppRouter>>` (functions take the class itself).
 - Don't combine `hydration.routerOptions` and `@tanstack/react-router-ssr-query` for the same rpc
   data → one serializer per query (the combination is not tested).
 
@@ -90,6 +101,8 @@ hydration that keeps `Schema.Class` / `TaggedError` instances.
   `test/client.test.ts`.
 - Helpers (loader `ensureQueryData`, typed errors, dehydrate/hydrate, infinite queries,
   `keyPrefix`): `test/helpers.test.ts`.
+- Router services (`typeof AppRouter`) in every function: `test/routerService.test.ts` /
+  `test/routerService.test-d.ts`.
 - This README wired with real `@tanstack/react-router` objects (`router.load()` → `dehydrate` →
   `hydrate`): `test/app.tsx`, `test/readme.test.ts`; types: `test/start.test-d.tsx`; tRPC parity:
   `test/PARITY.md`.

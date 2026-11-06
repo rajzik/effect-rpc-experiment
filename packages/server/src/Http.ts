@@ -15,7 +15,7 @@ import type { Context } from 'effect';
 import { HttpRouter } from 'effect/http';
 import { RpcSerialization, RpcServer } from 'effect/rpc';
 import type { Rpc, RpcGroup } from 'effect/rpc';
-import type { Router } from '@effect-trpc/core';
+import { Router } from '@effect-trpc/core';
 import type { Handlers } from './Handlers.js';
 
 /**
@@ -148,6 +148,34 @@ export const serializationLayer = (
   return value;
 };
 
+/** `layerHttp` for a router. */
+const layerHttpFor = <R extends Router.Any, LOut = never, LE = never, LR = never>(
+  router: R,
+  options: LayerHttpOptions<LOut, LE, LR> = {},
+): Layer.Layer<never, LE, HttpRouter.HttpRouter | LR | Exclude<Handlers.Requirements<R>, LOut>> => {
+  const protocol = options.protocol ?? 'http';
+  const server = RpcServer.layerHttp({
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Router.Any` erases the group's rpcs on purpose; the return type below restores them via `Handlers.Requirements<R>`
+    group: router.group as RpcGroup.RpcGroup<Rpc.Any>,
+    path: options.path ?? defaultPath,
+    protocol,
+    disableFatalDefects: true,
+    disableTracing: options.disableTracing,
+    spanPrefix: options.spanPrefix,
+    concurrency: options.concurrency,
+  }).pipe(Layer.provide(serializationLayer(options.serialization)));
+  return options.handlers === undefined ? server : server.pipe(Layer.provide(options.handlers));
+};
+
+/** `layerHttp` for a router or a router service: normalises the input with `Router.from`. */
+const layerHttpFromInput = (
+  input: Router.Input,
+  options?: LayerHttpOptions<never, never, never>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return layerHttpFor(router, options);
+};
+
 /**
  * Serves a router on an Effect `HttpRouter` route, for composing into an existing Effect HTTP
  * application (`HttpRouter.serve`, `HttpRouter.toWebHandler`, ...).
@@ -160,6 +188,8 @@ export const serializationLayer = (
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - A thin wrapper over `RpcServer.layerHttp` that defaults to `protocol: "http"` and always
  *   sets `disableFatalDefects: true`, so a defect in one handler fails only that call instead of
  *   the whole connection.
@@ -194,23 +224,22 @@ export const serializationLayer = (
  * @category adapters
  * @since 0.1.0
  */
-export const layerHttp = <R extends Router.Any, LOut = never, LE = never, LR = never>(
-  router: R,
-  options: LayerHttpOptions<LOut, LE, LR> = {},
-): Layer.Layer<never, LE, HttpRouter.HttpRouter | LR | Exclude<Handlers.Requirements<R>, LOut>> => {
-  const protocol = options.protocol ?? 'http';
-  const server = RpcServer.layerHttp({
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Router.Any` erases the group's rpcs on purpose; the return type below restores them via `Handlers.Requirements<R>`
-    group: router.group as RpcGroup.RpcGroup<Rpc.Any>,
-    path: options.path ?? defaultPath,
-    protocol,
-    disableFatalDefects: true,
-    disableTracing: options.disableTracing,
-    spanPrefix: options.spanPrefix,
-    concurrency: options.concurrency,
-  }).pipe(Layer.provide(serializationLayer(options.serialization)));
-  return options.handlers === undefined ? server : server.pipe(Layer.provide(options.handlers));
-};
+export const layerHttp: {
+  <R extends Router.Any, LOut = never, LE = never, LR = never>(
+    router: R,
+    options?: LayerHttpOptions<LOut, LE, LR>,
+  ): Layer.Layer<never, LE, HttpRouter.HttpRouter | LR | Exclude<Handlers.Requirements<R>, LOut>>;
+  <X extends Router.Input, LOut = never, LE = never, LR = never>(
+    router: X,
+    options?: LayerHttpOptions<LOut, LE, LR>,
+  ): Layer.Layer<
+    never,
+    LE,
+    HttpRouter.HttpRouter | LR | Exclude<Handlers.Requirements<Router.Of<X>>, LOut>
+  >;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  layerHttpFromInput as unknown as typeof layerHttp;
 
 /**
  * Alias of {@link layerHttp}.
@@ -234,6 +263,54 @@ export const layerHttp = <R extends Router.Any, LOut = never, LE = never, LR = n
  */
 export const toHttpLayer = layerHttp;
 
+/** `toWebHandler` for a router. */
+const toWebHandlerFor = async <R extends Router.Any, LE = never>(
+  router: R,
+  options: WebHandlerOptions<R, LE>,
+): Promise<WebHandler> => {
+  const runtime = ManagedRuntime.make(options.handlers);
+  let context: Context.Context<Handlers.Requirements<R>>;
+  try {
+    context = await runtime.context();
+  } catch (error) {
+    await runtime.dispose();
+    throw error;
+  }
+  const app = layerHttp(router, {
+    path: options.path,
+    serialization: options.serialization,
+    disableTracing: options.disableTracing,
+    spanPrefix: options.spanPrefix,
+    concurrency: options.concurrency,
+    protocol: 'http',
+    handlers: Layer.succeedContext(context),
+  }) as Layer.Layer<never, never, HttpRouter.HttpRouter>;
+  const web = HttpRouter.toWebHandler(app, { disableLogger: true });
+  let disposed: Promise<void> | undefined;
+  const dispose = (): Promise<void> => {
+    disposed ??= web.dispose().finally(() => runtime.dispose());
+    return disposed;
+  };
+  return {
+    // After dispose() the underlying handler would wait forever: answer 503 instead.
+    handler: (request) =>
+      disposed === undefined
+        ? web.handler(request)
+        : Promise.resolve(new Response('Server disposed', { status: 503 })),
+    dispose,
+    [Symbol.asyncDispose]: dispose,
+  };
+};
+
+/** `toWebHandler` for a router or a router service: normalises the input with `Router.from`. */
+const toWebHandlerFromInput = (
+  input: Router.Input,
+  options: WebHandlerOptions<Router.Any, never>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return toWebHandlerFor(router, options);
+};
+
 /**
  * Builds a fetch handler (`(request: Request) => Promise<Response>`) serving a router over HTTP,
  * for any fetch runtime: Next.js route handlers, TanStack Start server routes, Bun, Deno,
@@ -247,6 +324,8 @@ export const toHttpLayer = layerHttp;
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - The handler layer is built eagerly, so the returned promise rejects with the layer's error
  *   when it fails to build, and the layer is shared by all requests until `dispose()`.
  * - The endpoint always uses `protocol: "http"` and `disableFatalDefects: true`: typed failures
@@ -288,40 +367,15 @@ export const toHttpLayer = layerHttp;
  * @category adapters
  * @since 0.1.0
  */
-export const toWebHandler = async <R extends Router.Any, LE = never>(
-  router: R,
-  options: WebHandlerOptions<R, LE>,
-): Promise<WebHandler> => {
-  const runtime = ManagedRuntime.make(options.handlers);
-  let context: Context.Context<Handlers.Requirements<R>>;
-  try {
-    context = await runtime.context();
-  } catch (error) {
-    await runtime.dispose();
-    throw error;
-  }
-  const app = layerHttp(router, {
-    path: options.path,
-    serialization: options.serialization,
-    disableTracing: options.disableTracing,
-    spanPrefix: options.spanPrefix,
-    concurrency: options.concurrency,
-    protocol: 'http',
-    handlers: Layer.succeedContext(context),
-  }) as Layer.Layer<never, never, HttpRouter.HttpRouter>;
-  const web = HttpRouter.toWebHandler(app, { disableLogger: true });
-  let disposed: Promise<void> | undefined;
-  const dispose = (): Promise<void> => {
-    disposed ??= web.dispose().finally(() => runtime.dispose());
-    return disposed;
-  };
-  return {
-    // After dispose() the underlying handler would wait forever: answer 503 instead.
-    handler: (request) =>
-      disposed === undefined
-        ? web.handler(request)
-        : Promise.resolve(new Response('Server disposed', { status: 503 })),
-    dispose,
-    [Symbol.asyncDispose]: dispose,
-  };
-};
+export const toWebHandler: {
+  <R extends Router.Any, LE = never>(
+    router: R,
+    options: WebHandlerOptions<R, LE>,
+  ): Promise<WebHandler>;
+  <X extends Router.Input, LE = never>(
+    router: X,
+    options: WebHandlerOptions<Router.Of<X>, LE>,
+  ): Promise<WebHandler>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  toWebHandlerFromInput as unknown as typeof toWebHandler;

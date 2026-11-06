@@ -9,7 +9,7 @@
  *
  * @since 0.1.0
  */
-import { RpcTransportError, type ClientError, type Router } from '@effect-trpc/core';
+import { Router, RpcTransportError, type ClientError } from '@effect-trpc/core';
 import { Exit } from 'effect';
 import * as React from 'react';
 import { decodeActionResultInternal, type EncodedActionResult } from './serverActions.js';
@@ -96,6 +96,66 @@ type Outcome<A, E> =
 
 const idle: State<never, never> = { status: 'idle', data: undefined, error: null };
 
+/** `useServerAction` for a router. */
+const useServerActionFor = <
+  Args extends ReadonlyArray<unknown>,
+  A,
+  E,
+  R extends Router.Any,
+  const P extends ActionPath<R>,
+>(
+  action: (...args: Args) => PromiseLike<EncodedActionResult<A, E>>,
+  options: UseServerActionOptions<R, P> & CheckActionPath<R, P, A, E>,
+): UseServerActionResult<Args, A, E> => {
+  const [state, setState] = React.useState<State<A, E>>(idle);
+  const latest = React.useRef(0);
+  const { router, path } = options;
+
+  const run = React.useCallback(
+    async (...args: Args): Promise<Exit.Exit<A, ClientError<E>>> => {
+      const id = ++latest.current;
+      setState((previous) => ({ ...previous, status: 'pending' }));
+      let outcome: Outcome<A, E>;
+      try {
+        const encoded = await action(...args);
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- decoded by the codecs of the procedure at `path`, and `CheckActionPath` ties `A` / `E` to that procedure's types
+        outcome = decodeActionResultInternal(router, path, encoded) as Outcome<A, E>;
+      } catch (cause) {
+        outcome = {
+          ok: false,
+          error: new RpcTransportError({
+            message: cause instanceof Error ? cause.message : 'The server action request failed',
+            cause,
+          }),
+        };
+      }
+      if (id === latest.current) {
+        setState(
+          outcome.ok
+            ? { status: 'success', data: outcome.value, error: null }
+            : { status: 'error', data: undefined, error: outcome.error },
+        );
+      }
+      return outcome.ok ? Exit.succeed(outcome.value) : Exit.fail(outcome.error);
+    },
+    [action, router, path],
+  );
+
+  const reset = React.useCallback(() => {
+    latest.current++;
+    setState(idle);
+  }, []);
+
+  return { ...state, run, reset, isPending: state.status === 'pending' };
+};
+
+/** `useServerAction` for a router or a router service: normalises `options.router` with `Router.from`. */
+const useServerActionFromInput = (
+  action: (...args: ReadonlyArray<unknown>) => PromiseLike<EncodedActionResult<unknown, unknown>>,
+  options: { readonly router: Router.Input; readonly path: ActionPath<Router.Any> },
+): unknown =>
+  useServerActionFor(action, { router: Router.from(options.router), path: options.path });
+
 /**
  * Calls a server action created with `createServerActionCaller` from a client component and
  * decodes its result to class instances, with the procedure's error union typed.
@@ -109,6 +169,8 @@ const idle: State<never, never> = { status: 'idle', data: undefined, error: null
  *
  * **Details**
  *
+ * - `options.router` is a `Router.make` router or a router service class (`Router.Input`),
+ *   normalised with `Router.from`; types use `Router.Of<X>`.
  * - `run(...args)` never rejects: it resolves with the decoded `Exit<A, ClientError<E>>` and
  *   also updates `status`, `data` and `error`.
  * - `error` is `ClientError<E> | null`, so `error._tag` narrows to the procedure's errors or to
@@ -170,54 +232,21 @@ const idle: State<never, never> = { status: 'idle', data: undefined, error: null
  * @category hooks
  * @since 0.1.0
  */
-export const useServerAction = <
-  Args extends ReadonlyArray<unknown>,
-  A,
-  E,
-  R extends Router.Any,
-  const P extends ActionPath<R>,
->(
-  action: (...args: Args) => PromiseLike<EncodedActionResult<A, E>>,
-  options: UseServerActionOptions<R, P> & CheckActionPath<R, P, A, E>,
-): UseServerActionResult<Args, A, E> => {
-  const [state, setState] = React.useState<State<A, E>>(idle);
-  const latest = React.useRef(0);
-  const { router, path } = options;
-
-  const run = React.useCallback(
-    async (...args: Args): Promise<Exit.Exit<A, ClientError<E>>> => {
-      const id = ++latest.current;
-      setState((previous) => ({ ...previous, status: 'pending' }));
-      let outcome: Outcome<A, E>;
-      try {
-        const encoded = await action(...args);
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- decoded by the codecs of the procedure at `path`, and `CheckActionPath` ties `A` / `E` to that procedure's types
-        outcome = decodeActionResultInternal(router, path, encoded) as Outcome<A, E>;
-      } catch (cause) {
-        outcome = {
-          ok: false,
-          error: new RpcTransportError({
-            message: cause instanceof Error ? cause.message : 'The server action request failed',
-            cause,
-          }),
-        };
-      }
-      if (id === latest.current) {
-        setState(
-          outcome.ok
-            ? { status: 'success', data: outcome.value, error: null }
-            : { status: 'error', data: undefined, error: outcome.error },
-        );
-      }
-      return outcome.ok ? Exit.succeed(outcome.value) : Exit.fail(outcome.error);
-    },
-    [action, router, path],
-  );
-
-  const reset = React.useCallback(() => {
-    latest.current++;
-    setState(idle);
-  }, []);
-
-  return { ...state, run, reset, isPending: state.status === 'pending' };
-};
+export const useServerAction: {
+  <Args extends ReadonlyArray<unknown>, A, E, R extends Router.Any, const P extends ActionPath<R>>(
+    action: (...args: Args) => PromiseLike<EncodedActionResult<A, E>>,
+    options: UseServerActionOptions<R, P> & CheckActionPath<R, P, A, E>,
+  ): UseServerActionResult<Args, A, E>;
+  <
+    Args extends ReadonlyArray<unknown>,
+    A,
+    E,
+    X extends Router.Input,
+    const P extends ActionPath<Router.Of<X>>,
+  >(
+    action: (...args: Args) => PromiseLike<EncodedActionResult<A, E>>,
+    options: { readonly router: X; readonly path: P } & CheckActionPath<Router.Of<X>, P, A, E>,
+  ): UseServerActionResult<Args, A, E>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise `options.router` with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  useServerActionFromInput as unknown as typeof useServerAction;

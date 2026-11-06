@@ -8,7 +8,7 @@
  *
  * @since 0.1.0
  */
-import type { Router } from '@effect-trpc/core';
+import { Router } from '@effect-trpc/core';
 import { toWebHandler } from '@effect-trpc/server';
 import type { Handlers, Serialization, WebHandler } from '@effect-trpc/server';
 import type { Layer } from 'effect';
@@ -116,6 +116,84 @@ const methodNotAllowed: NextRouteHandlerFn = (request) =>
     ),
   );
 
+/** `createRouteHandler` for a router. */
+const createRouteHandlerFor = <R extends Router.Any, LE = never>(
+  router: R,
+  options: RouteHandlerOptions<R, LE>,
+): RouteHandler => {
+  const path = trimMountPath(options.path ?? defaultPath);
+  const prefixes =
+    options.basePath === undefined || options.basePath === '/'
+      ? [path]
+      : [`${trimTrailingSlash(options.basePath)}${path === '/' ? '' : path}`, path];
+
+  let server: Promise<WebHandler> | undefined;
+  let disposed: Promise<void> | undefined;
+
+  const getServer = (): Promise<WebHandler> => {
+    server ??= toWebHandler(router, {
+      handlers: options.handlers,
+      path,
+      serialization: options.serialization,
+    }).catch((error: unknown) => {
+      // Let the next request retry instead of caching the failure forever.
+      server = undefined;
+      throw error;
+    });
+    return server;
+  };
+
+  const toEndpoint = async (request: Request): Promise<Request | Response> => {
+    const url = new URL(request.url);
+    const pathname = trimTrailingSlash(url.pathname);
+    if (pathname === path) return request;
+    if (!prefixes.some((prefix) => isAtOrBelow(pathname, prefix))) {
+      return json(404, {
+        _tag: 'NotFound',
+        message: `No effect-trpc endpoint at ${url.pathname} (expected ${prefixes.join(' or ')})`,
+      });
+    }
+    url.pathname = path;
+    return new Request(url, {
+      method: request.method,
+      headers: request.headers,
+      body: await request.arrayBuffer(),
+      signal: request.signal,
+    });
+  };
+
+  const POST: NextRouteHandlerFn = async (request) => {
+    const endpoint = await toEndpoint(request);
+    if (endpoint instanceof Response) return endpoint;
+    // Checked after the await (not before): `dispose()` may have run while the body was read, and
+    // `getServer()` must never start a server that `dispose()` has already missed.
+    if (disposed !== undefined) return json(503, { _tag: 'Disposed', message: 'Server disposed' });
+    const web = await getServer();
+    return web.handler(endpoint);
+  };
+
+  const dispose = (): Promise<void> => {
+    disposed ??= (async () => {
+      const pending = server;
+      if (pending === undefined) return;
+      const web = await pending.catch(() => undefined);
+      await web?.dispose();
+    })();
+    return disposed;
+  };
+
+  return { GET: methodNotAllowed, POST, dispose, [Symbol.asyncDispose]: dispose };
+};
+
+/** `createRouteHandler` for a router or a router service: normalises the input with `Router.from`. */
+const createRouteHandlerFromInput = (
+  input: Router.Input,
+  options: RouteHandlerOptions<Router.Any>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return createRouteHandlerFor(router, options);
+};
+
 /**
  * Creates the `GET` / `POST` exports of a Next.js App Router route handler serving a router
  * (tRPC's `fetchRequestHandler` in `app/api/trpc/[trpc]/route.ts`).
@@ -128,6 +206,8 @@ const methodNotAllowed: NextRouteHandlerFn = (request) =>
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - The server (`toWebHandler`) is built lazily on the first request and shared by every later
  *   request. When building fails, that request rejects (Next answers `500`) and the next request
  *   tries again.
@@ -209,70 +289,12 @@ const methodNotAllowed: NextRouteHandlerFn = (request) =>
  * @category adapters
  * @since 0.1.0
  */
-export const createRouteHandler = <R extends Router.Any, LE = never>(
-  router: R,
-  options: RouteHandlerOptions<R, LE>,
-): RouteHandler => {
-  const path = trimMountPath(options.path ?? defaultPath);
-  const prefixes =
-    options.basePath === undefined || options.basePath === '/'
-      ? [path]
-      : [`${trimTrailingSlash(options.basePath)}${path === '/' ? '' : path}`, path];
-
-  let server: Promise<WebHandler> | undefined;
-  let disposed: Promise<void> | undefined;
-
-  const getServer = (): Promise<WebHandler> => {
-    server ??= toWebHandler(router, {
-      handlers: options.handlers,
-      path,
-      serialization: options.serialization,
-    }).catch((error: unknown) => {
-      // Let the next request retry instead of caching the failure forever.
-      server = undefined;
-      throw error;
-    });
-    return server;
-  };
-
-  const toEndpoint = async (request: Request): Promise<Request | Response> => {
-    const url = new URL(request.url);
-    const pathname = trimTrailingSlash(url.pathname);
-    if (pathname === path) return request;
-    if (!prefixes.some((prefix) => isAtOrBelow(pathname, prefix))) {
-      return json(404, {
-        _tag: 'NotFound',
-        message: `No effect-trpc endpoint at ${url.pathname} (expected ${prefixes.join(' or ')})`,
-      });
-    }
-    url.pathname = path;
-    return new Request(url, {
-      method: request.method,
-      headers: request.headers,
-      body: await request.arrayBuffer(),
-      signal: request.signal,
-    });
-  };
-
-  const POST: NextRouteHandlerFn = async (request) => {
-    const endpoint = await toEndpoint(request);
-    if (endpoint instanceof Response) return endpoint;
-    // Checked after the await (not before): `dispose()` may have run while the body was read, and
-    // `getServer()` must never start a server that `dispose()` has already missed.
-    if (disposed !== undefined) return json(503, { _tag: 'Disposed', message: 'Server disposed' });
-    const web = await getServer();
-    return web.handler(endpoint);
-  };
-
-  const dispose = (): Promise<void> => {
-    disposed ??= (async () => {
-      const pending = server;
-      if (pending === undefined) return;
-      const web = await pending.catch(() => undefined);
-      await web?.dispose();
-    })();
-    return disposed;
-  };
-
-  return { GET: methodNotAllowed, POST, dispose, [Symbol.asyncDispose]: dispose };
-};
+export const createRouteHandler: {
+  <R extends Router.Any, LE = never>(router: R, options: RouteHandlerOptions<R, LE>): RouteHandler;
+  <X extends Router.Input, LE = never>(
+    router: X,
+    options: RouteHandlerOptions<Router.Of<X>, LE>,
+  ): RouteHandler;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  createRouteHandlerFromInput as unknown as typeof createRouteHandler;

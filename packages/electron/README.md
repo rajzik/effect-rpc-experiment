@@ -12,6 +12,10 @@ HTTP.
 - **preload**: `installPreloadBridge({ ipcRenderer })` (no Effect, sandbox friendly)
 - **renderer**: `createClient(router, { link: rendererLink() })`
 
+`router` can also be a router written as an Effect service (`MainRpcServer.run(AppRouter, {
+handlers: Handlers.fromService(AppRouter), ipcMain })`): `MainRpcServer.run` / `.layer` /
+`.make` and `MessagePortServer.serve` normalise it with `Router.from`.
+
 The package never imports `electron` at runtime. It only uses structural types (`IpcMainLike`,
 `IpcRendererLike`, `PortLike`, `PortMainLike`, `WindowLike`) that Electron's real objects
 satisfy. So it loads in a sandboxed renderer and in plain Node, where tests drive it with Node
@@ -64,6 +68,8 @@ from `src/types.ts`.
   (`MainRpcServer.run`), `ipcRenderer` (`installPreloadBridge`).
 - `channel` defaults to `"effect-trpc"` and must be identical on all three sides.
 - One `MessagePort` connection per client; a handler defect fails only its call.
+- `MainRpcServer.*` and `MessagePortServer.serve` take a `Router.Input` (router or router service
+  class); requirement types are computed with `Router.Of<X>`, as for the equivalent router.
 - `x-effect-trpc-sender-id` is set by the main process; renderer values are replaced.
 - `rendererLink` fails calls after `connectTimeout` (default `10 seconds`) without an
   acknowledgement; `messagePortLink` has no timeout unless you pass one.
@@ -101,6 +107,8 @@ from `src/types.ts`.
   EventEmitter ports, trusted headers, port factory vs single-use port, malformed and hostile
   frames, binary serialization, closing the server scope.
 - `test/preload.test.ts`: which window messages the bridge forwards.
+- `test/routerService.test(-d).ts`: router service classes with `MainRpcServer` and
+  `MessagePortServer`.
 - `test/electron.test-d.ts`: real Electron / DOM / Node objects satisfy the structural types;
   type-level guarantees of `MainRpcServer` and the links.
 - `test/fakes.ts`: `FakeIpcMain`, `FakeWindow`, `FakePortMain`, `makeIpcRenderer`.

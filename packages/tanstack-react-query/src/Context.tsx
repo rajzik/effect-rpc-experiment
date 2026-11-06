@@ -67,6 +67,55 @@ export interface CreateRpcContextResult<
   readonly useRpcClient: () => Client<R>;
 }
 
+/** `createRpcContext` for a router type (both overloads: a router service maps to `Router.Of<X>`). */
+const createRpcContextFor = <
+  R extends Router.Any,
+  TFeatureFlags extends FeatureFlags = DefaultFeatureFlags,
+>(): CreateRpcContextResult<R, TFeatureFlags> => {
+  const ClientContext = React.createContext<Client<R> | null>(null);
+  const ProxyContext = React.createContext<RpcOptionsProxy<R, TFeatureFlags> | null>(null);
+
+  const RpcProvider: React.FC<RpcProviderProps<R, TFeatureFlags>> = (props) => {
+    const { client, queryClient } = props;
+    const keyPrefix = props.keyPrefix;
+    const value = React.useMemo(
+      () =>
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `RpcProviderProps` already requires `keyPrefix` exactly when `TFeatureFlags` does; only the generic flag check is erased
+        createRpcOptionsProxy<R, FeatureFlags>({
+          client,
+          queryClient,
+          ...(keyPrefix !== undefined && { keyPrefix }),
+        } as Parameters<typeof createRpcOptionsProxy<R, FeatureFlags>>[0]) as RpcOptionsProxy<
+          R,
+          TFeatureFlags
+        >,
+      [client, queryClient, keyPrefix],
+    );
+    return (
+      <ClientContext.Provider value={client}>
+        <ProxyContext.Provider value={value}>{props.children}</ProxyContext.Provider>
+      </ClientContext.Provider>
+    );
+  };
+  RpcProvider.displayName = 'RpcProvider';
+
+  const useRpc = (): RpcOptionsProxy<R, TFeatureFlags> => {
+    const proxy = React.useContext(ProxyContext);
+    if (proxy === null) throw new Error('useRpc() can only be used inside of an <RpcProvider>');
+    return proxy;
+  };
+
+  const useRpcClient = (): Client<R> => {
+    const client = React.useContext(ClientContext);
+    if (client === null) {
+      throw new Error('useRpcClient() can only be used inside of an <RpcProvider>');
+    }
+    return client;
+  };
+
+  return { RpcProvider, useRpc, useRpcClient };
+};
+
 /**
  * Creates a typed `RpcProvider` plus the `useRpc` / `useRpcClient` hooks for one router (tRPC's
  * `createTRPCContext`).
@@ -80,6 +129,8 @@ export interface CreateRpcContextResult<
  *
  * **Details**
  *
+ * - `R` is a router type or a router service class: `createRpcContext<typeof AppRouter>()` is
+ *   `createRpcContext<Router.Of<typeof AppRouter>>()`.
  * - The router type is the only type argument you must pass; the runtime router comes from the
  *   `client` given to `RpcProvider`.
  * - `useRpc()` returns an {@link RpcOptionsProxy}: `rpc.post.byId.queryOptions(...)`,
@@ -186,50 +237,13 @@ export interface CreateRpcContextResult<
  * @category constructors
  * @since 0.1.0
  */
-export const createRpcContext = <
-  R extends Router.Any,
-  TFeatureFlags extends FeatureFlags = DefaultFeatureFlags,
->(): CreateRpcContextResult<R, TFeatureFlags> => {
-  const ClientContext = React.createContext<Client<R> | null>(null);
-  const ProxyContext = React.createContext<RpcOptionsProxy<R, TFeatureFlags> | null>(null);
-
-  const RpcProvider: React.FC<RpcProviderProps<R, TFeatureFlags>> = (props) => {
-    const { client, queryClient } = props;
-    const keyPrefix = props.keyPrefix;
-    const value = React.useMemo(
-      () =>
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `RpcProviderProps` already requires `keyPrefix` exactly when `TFeatureFlags` does; only the generic flag check is erased
-        createRpcOptionsProxy<R, FeatureFlags>({
-          client,
-          queryClient,
-          ...(keyPrefix !== undefined && { keyPrefix }),
-        } as Parameters<typeof createRpcOptionsProxy<R, FeatureFlags>>[0]) as RpcOptionsProxy<
-          R,
-          TFeatureFlags
-        >,
-      [client, queryClient, keyPrefix],
-    );
-    return (
-      <ClientContext.Provider value={client}>
-        <ProxyContext.Provider value={value}>{props.children}</ProxyContext.Provider>
-      </ClientContext.Provider>
-    );
-  };
-  RpcProvider.displayName = 'RpcProvider';
-
-  const useRpc = (): RpcOptionsProxy<R, TFeatureFlags> => {
-    const proxy = React.useContext(ProxyContext);
-    if (proxy === null) throw new Error('useRpc() can only be used inside of an <RpcProvider>');
-    return proxy;
-  };
-
-  const useRpcClient = (): Client<R> => {
-    const client = React.useContext(ClientContext);
-    if (client === null) {
-      throw new Error('useRpcClient() can only be used inside of an <RpcProvider>');
-    }
-    return client;
-  };
-
-  return { RpcProvider, useRpc, useRpcClient };
-};
+export const createRpcContext: {
+  <
+    R extends Router.Any,
+    TFeatureFlags extends FeatureFlags = DefaultFeatureFlags,
+  >(): CreateRpcContextResult<R, TFeatureFlags>;
+  <
+    X extends Router.Input,
+    TFeatureFlags extends FeatureFlags = DefaultFeatureFlags,
+  >(): CreateRpcContextResult<Router.Of<X>, TFeatureFlags>;
+} = createRpcContextFor;

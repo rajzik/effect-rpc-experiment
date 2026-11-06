@@ -19,6 +19,9 @@ pieces:
 - **`Middleware`** — `effect/rpc`'s `RpcMiddleware` plus `Middleware.make` for auth/context.
 - **`@effect-trpc/server/node`** — `serve` (a Layer) and `runServer` (a Promise) on Node's `http`.
 
+Every function that takes a `router` also takes a router service class (`toWebHandler(AppRouter,
+...)`); it is normalised with `Router.from` once at the call.
+
 Every HTTP endpoint uses `protocol: "http"` and `disableFatalDefects: true`: typed failures and
 defects are encoded into that call's `Exit` and later calls keep working. `Schema.Class` results
 and `Schema.TaggedError` failures are encoded with their schemas, so clients receive real
@@ -118,7 +121,8 @@ export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
 // Layer<Rpc.Handler<'post.byId'> | AppRouter, never, Database>: requirements inferred.
 const ServiceHandlersLive = Handlers.fromService(AppRouter);
 declare const DatabaseLive: Layer.Layer<Database>;
-await toWebHandler(Router.from(AppRouter), {
+// Every adapter takes the class itself (normalised with `Router.from`).
+await toWebHandler(AppRouter, {
   handlers: ServiceHandlersLive.pipe(Layer.provide(DatabaseLive)),
 });
 ```
@@ -133,6 +137,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - Default serialization is `"ndjson"` for both protocols (the same default as `httpLink` / `wsLink`); if you override it, clients must use the same one.
 - The server layer must provide `Handlers.Requirements<R>`: every handler plus every middleware implementation (`Layer.mergeAll(HandlersLive, AuthLive)`).
 - Promise caller rejections are `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; Effect caller calls fail with exactly `E`.
+- Every function taking a `router` takes a `Router.Input` (a router or a router service class) and calls `Router.from` once; types are computed with `Router.Of<X>`, so a service and the equivalent `Router.make` router infer the same caller / handler types. Type helpers (`Caller<R>`, `Handlers.Requirements<R>`, ...) take a router type: `Router.Of<typeof AppRouter>`.
 - `toWebHandler` / `runServer` build the handler layer eagerly (the promise rejects on failure); `createCaller` builds it on the first call.
 - `$promise`, `$router` and `dispose` are reserved top-level keys on a caller: `createCaller` throws for a router that uses them.
 - `Handlers.fromService` / `Handlers.fromProcedures` produce the same handler layer as `Handlers.make` (same tags) from the procedures' `handler`s; their requirements are the handlers' services minus `Scope` and middleware-provided services. `fromService` also provides the service (`yield* AppRouter` is `Router.from(AppRouter).record`) and evaluates `make` once per class (memoized `Router.fromService`).
@@ -147,6 +152,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - Don't import `serve` / `runServer` from `@effect-trpc/server` → import from `@effect-trpc/server/node`.
 - Don't forget `dispose()` on `toWebHandler`, `createCaller` and `runServer` results in tests → use `try/finally` or `await using`.
 - Don't pass a router with `query({...})` definitions to `Handlers.fromService` / `fromProcedures` (compile error `procedure '<path>' has no handler ...`; throws if forced) → build them with `Procedure`, or implement the router with `Handlers.make`.
+- Don't write `Caller<typeof AppRouter>` for a router service → `Caller<Router.Of<typeof AppRouter>>` (functions take the class directly; type helpers take a router type).
 - Don't read services at the top of a router service's `make` → read them inside the handlers (`make` must be `Effect<Record, never, never>`).
 - Don't call `RpcServer.layerHttp` directly without `protocol: "http"` and `disableFatalDefects: true` → use `layerHttp` from this package.
 
@@ -318,14 +324,16 @@ there is no handler record to write:
   functions reject it at compile time (TypeScript reports a missing property named
   `procedure '<path>' has no handler ...`) and throw, naming every such path, if forced with a
   cast. Implement routers that mix both styles with `Handlers.make`.
-- Adapters take a router: pass `Router.from(AppRouter)` to `toWebHandler`, `createCaller`,
-  `layerHttp` and `runServer`.
+- Adapters take the class too: `toWebHandler`, `layerHttp`, `createCaller`, `serve` /
+  `runServer` and `Handlers.make` / `flat` / `of` accept `AppRouter` directly (normalised with
+  `Router.from`). Type helpers that take a router type take `Router.Of<typeof AppRouter>`
+  (`Caller<Router.Of<typeof AppRouter>>`, `Handlers.Requirements<Router.Of<typeof AppRouter>>`).
 
 ```ts
 const ServerLive = Layer.mergeAll(Handlers.fromService(AppRouter), AuthLive).pipe(
   Layer.provide(DatabaseLive),
 );
-const caller = createCaller(Router.from(AppRouter), { handlers: ServerLive });
+const caller = createCaller(AppRouter, { handlers: ServerLive });
 ```
 
 ## Middleware and auth context

@@ -1,10 +1,14 @@
 import { Context, Effect, Layer, Schema, Stream } from 'effect';
+import type { HttpRouter, HttpServerError } from 'effect/http';
 import type { Rpc } from 'effect/rpc';
-import { Procedure, query, Router } from '@effect-trpc/core';
+import { Procedure, query, Router, subscription } from '@effect-trpc/core';
 import type { RouterService } from '@effect-trpc/core';
 import { describe, expectTypeOf, it } from 'vite-plus/test';
-import { createCaller, Handlers, toWebHandler } from '../src/index.js';
-import { Auth, AuthLive, CurrentUser, Trace } from './fixtures.js';
+import { createCaller, Handlers, layerHttp, toHttpLayer, toWebHandler } from '../src/index.js';
+import type { Caller, WebHandler } from '../src/index.js';
+import { runServer, serve } from '../src/node.js';
+import type { RunningServer } from '../src/node.js';
+import { Auth, AuthLive, CurrentUser, Trace, Unauthorized } from './fixtures.js';
 import {
   AppRouter,
   Database,
@@ -15,6 +19,19 @@ import {
 } from './service-fixtures.js';
 
 class Clock extends Context.Service<Clock, { readonly ticks: Stream.Stream<number> }>()('Clock') {}
+
+/** `AppRouter` written with plain definitions: what `typeof AppRouter` must infer like. */
+const plainRouter = Router.make({
+  health: query({ success: Schema.Literal('ok') }),
+  post: {
+    byId: query({ payload: { id: Schema.Finite }, success: Post, error: PostNotFound }),
+    titles: subscription({ success: Schema.String }),
+  },
+  me: query({ success: Schema.String }).middleware(Auth),
+  whoami: query({ success: Schema.String }).middleware(Auth),
+});
+declare const plainHandlers: Layer.Layer<Caller.Requirements<typeof plainRouter>>;
+void Unauthorized;
 
 type AppProvides =
   | Rpc.Handler<'health'>
@@ -90,7 +107,7 @@ describe('Handlers.fromService types', () => {
     }) {}
     expectTypeOf(NeedsDb).not.toExtend<RouterService.Any>();
     // @ts-expect-error - make must be Effect<Record, never, never>
-    Handlers.fromService(NeedsDb);
+    Handlers.fromService(NeedsDb); // oxlint-disable-line effecttsgo/missing-effect-context -- the service is passed on purpose to prove the compile error
   });
 
   it('the layer serves the service router through createCaller and toWebHandler', () => {
@@ -185,5 +202,89 @@ describe('Handlers.fromProcedures types', () => {
     Handlers.fromProcedures(legacy);
     // @ts-expect-error - a nested legacy service is rejected too
     Handlers.fromProcedures(Router.make({ legacy: LegacyRouter }));
+  });
+});
+
+/** Generic code over `Router.Any` keeps `Caller<R>` (the first overload). */
+const forRouter = <R extends Router.Any>(
+  router: R,
+  handlers: Layer.Layer<Caller.Requirements<R>>,
+): Caller<R> => createCaller(router, { handlers });
+
+describe('server adapters accept the router service class (types)', () => {
+  const live = Layer.mergeAll(Handlers.fromService(AppRouter), AuthLive()).pipe(
+    Layer.provide(DatabaseLive),
+  );
+  type AppRouterOf = Router.Of<typeof AppRouter>;
+
+  it('createCaller infers the caller of Router.Of<typeof Svc>, like the Router.make equivalent', () => {
+    const caller = createCaller(AppRouter, { handlers: live });
+    expectTypeOf(caller).toEqualTypeOf<Caller<AppRouterOf>>();
+    expectTypeOf(caller.$router).toEqualTypeOf<AppRouterOf>();
+    const plainCaller = createCaller(plainRouter, { handlers: plainHandlers });
+    expectTypeOf(caller.post.byId).toEqualTypeOf<typeof plainCaller.post.byId>();
+    expectTypeOf(caller.$promise.post.byId).toEqualTypeOf<typeof plainCaller.$promise.post.byId>();
+    expectTypeOf(caller.post.titles).toEqualTypeOf<typeof plainCaller.post.titles>();
+    expectTypeOf(caller.me).toEqualTypeOf<typeof plainCaller.me>();
+    expectTypeOf(caller.post.byId).returns.toEqualTypeOf<Effect.Effect<Post, PostNotFound>>();
+  });
+
+  it('the handler layer is still checked against the service router', () => {
+    expectTypeOf(live).toExtend<Layer.Layer<Caller.Requirements<AppRouterOf>>>();
+    createCaller(AppRouter, {
+      // @ts-expect-error - the Auth middleware implementation is missing
+      handlers: Handlers.fromService(AppRouter).pipe(Layer.provide(DatabaseLive)),
+    });
+    void toWebHandler(AppRouter, {
+      // @ts-expect-error - the Auth middleware implementation is missing
+      handlers: Handlers.fromService(AppRouter).pipe(Layer.provide(DatabaseLive)),
+    });
+  });
+
+  it('toWebHandler, layerHttp, serve and runServer accept typeof Svc', () => {
+    expectTypeOf(toWebHandler(AppRouter, { handlers: live })).toEqualTypeOf<Promise<WebHandler>>();
+    expectTypeOf(layerHttp(AppRouter, { handlers: live })).toEqualTypeOf<
+      Layer.Layer<never, never, HttpRouter.HttpRouter>
+    >();
+    expectTypeOf(layerHttp(AppRouter)).toEqualTypeOf(layerHttp(plainRouter));
+    expectTypeOf(toHttpLayer(AppRouter, { handlers: live })).toEqualTypeOf<
+      Layer.Layer<never, never, HttpRouter.HttpRouter>
+    >();
+    expectTypeOf(serve(AppRouter, { handlers: live, port: 0 })).toEqualTypeOf<
+      Layer.Layer<never, HttpServerError.ServeError>
+    >();
+    expectTypeOf(runServer(AppRouter, { handlers: live, port: 0 })).toEqualTypeOf<
+      Promise<RunningServer>
+    >();
+  });
+
+  it('Handlers.make, flat and of type handlers from the service router', () => {
+    const layer = Handlers.make(LegacyRouter, {
+      ok: () => Effect.void,
+      user: { byId: () => Effect.succeed('ada') },
+      health: () => Effect.succeed('ok' as const),
+    });
+    expectTypeOf(layer).toEqualTypeOf<
+      Layer.Layer<Handlers.Provides<Router.Of<typeof LegacyRouter>>>
+    >();
+    expectTypeOf(
+      Handlers.flat(LegacyRouter, {
+        ok: () => Effect.void,
+        'user.byId': () => Effect.succeed('ada'),
+        health: () => Effect.succeed('ok' as const),
+      }),
+    ).toEqualTypeOf(layer);
+    const handlers = Handlers.of(LegacyRouter, {
+      ok: () => Effect.void,
+      user: { byId: () => Effect.succeed('ada') },
+      health: () => Effect.succeed('ok' as const),
+    });
+    expectTypeOf(handlers.user.byId).returns.toEqualTypeOf<Effect.Effect<string>>();
+    // @ts-expect-error - a missing handler is still a type error
+    Handlers.make(LegacyRouter, { ok: () => Effect.void, health: () => Effect.succeed('ok') });
+  });
+
+  it('generic code keeps its types', () => {
+    expectTypeOf(forRouter(plainRouter, plainHandlers)).toEqualTypeOf<Caller<typeof plainRouter>>();
   });
 });

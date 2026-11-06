@@ -11,8 +11,7 @@
  */
 import { createClient, localLink } from '@effect-trpc/client';
 import type { Client, HeadersOption } from '@effect-trpc/client';
-import type { Router } from '@effect-trpc/core';
-import { RpcTransportError } from '@effect-trpc/core';
+import { Router, RpcTransportError } from '@effect-trpc/core';
 import type { Caller } from '@effect-trpc/server';
 import {
   createHydrationHelpers,
@@ -449,15 +448,118 @@ export function createRscHelpers<
   R extends Router.Any,
   const P extends string | undefined = undefined,
 >(router: R, source: RscClientSource<R>, options?: RscHelpersOptions<P>): RscHelpers<R, P>;
-/** Implementation of the `createRscHelpers` overloads. @internal */
+/**
+ * Creates the RSC helpers of a router service class with an in-process caller: the
+ * `{ handlers }` overload for a router written as an Effect service.
+ *
+ * **When to use**
+ *
+ * Use when the router is a router service (`Context.Service` whose `make` returns `Procedure`
+ * procedures): pass the class itself, and `Handlers.fromService(AppRouter)` as the handlers.
+ *
+ * **Details**
+ *
+ * - The class is normalised with `Router.from` (its `make` runs once per process); every type
+ *   is computed from `Router.Of<typeof AppRouter>`, exactly as for the equivalent router.
+ *
+ * **Example** (RSC helpers of a router service)
+ *
+ * ```tsx
+ * import { Procedure } from '@effect-trpc/core';
+ * import { createRscHelpers } from '@effect-trpc/next';
+ * import { Handlers } from '@effect-trpc/server';
+ * import { Context, Effect, Schema } from 'effect';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+ *   make: Effect.succeed({
+ *     post: {
+ *       byId: Procedure.input({ id: Schema.Number })
+ *         .output(Post)
+ *         .query(({ id }) => Effect.succeed(new Post({ id, title: 'Hello' }))),
+ *     },
+ *   }),
+ * }) {}
+ *
+ * export const { rpc, prefetch, HydrateClient, caller } = createRscHelpers(AppRouter, {
+ *   handlers: Handlers.fromService(AppRouter),
+ * });
+ * const post = await caller.post.byId({ id: 1 }); // a Post instance
+ * ```
+ *
+ * @see {@link RscHandlersSource}
+ * @category constructors
+ * @since 0.1.0
+ */
 export function createRscHelpers<
-  R extends Router.Any,
+  X extends Router.Input,
   const P extends string | undefined = undefined,
 >(
+  router: X,
+  source: RscHandlersSource<Router.Of<NoInfer<X>>>,
+  options?: RscHelpersOptions<P>,
+): RscHelpersWithCaller<Router.Of<X>, P>;
+/**
+ * Creates the RSC helpers of a router service class over an existing client: the `{ client }`
+ * overload for a router written as an Effect service.
+ *
+ * **When to use**
+ *
+ * Use when the server components call a remote router service over HTTP: pass the class and a
+ * client created with `createClient(AppRouter, { link })`.
+ *
+ * **Details**
+ *
+ * - The class is normalised with `Router.from`; types are computed from
+ *   `Router.Of<typeof AppRouter>`. There is no `caller`.
+ *
+ * **Example** (RSC helpers of a router service over HTTP)
+ *
+ * ```tsx
+ * import { createClient, httpLink } from '@effect-trpc/client';
+ * import { Procedure } from '@effect-trpc/core';
+ * import { createRscHelpers } from '@effect-trpc/next';
+ * import { Context, Effect, Schema } from 'effect';
+ *
+ * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+ *   make: Effect.succeed({
+ *     health: Procedure.output(Schema.Literal('ok')).query(() => Effect.succeed('ok' as const)),
+ *   }),
+ * }) {}
+ *
+ * const client = createClient(AppRouter, { link: httpLink({ url: 'https://api.example.com/rpc' }) });
+ * export const { rpc, prefetch, HydrateClient } = createRscHelpers(AppRouter, { client });
+ * prefetch(rpc.health.queryOptions());
+ * ```
+ *
+ * @see {@link RscClientSource}
+ * @category constructors
+ * @since 0.1.0
+ */
+export function createRscHelpers<
+  X extends Router.Input,
+  const P extends string | undefined = undefined,
+>(
+  router: X,
+  source: RscClientSource<Router.Of<NoInfer<X>>>,
+  options?: RscHelpersOptions<P>,
+): RscHelpers<Router.Of<X>, P>;
+/** Implementation of the `createRscHelpers` overloads: normalises the router with `Router.from`. @internal */
+export function createRscHelpers(
+  input: Router.Input,
+  source: RscHandlersSource<Router.Any> | RscClientSource<Router.Any>,
+  options?: RscHelpersOptions<string | undefined>,
+): unknown {
+  const router: Router.Any = Router.from(input);
+  return createRscHelpersFor(router, source, options);
+}
+
+/** `createRscHelpers` for a router. */
+const createRscHelpersFor = <R extends Router.Any, const P extends string | undefined = undefined>(
   router: R,
   source: RscHandlersSource<R> | RscClientSource<R>,
   options: RscHelpersOptions<P> = {},
-): RscHelpers<R, P> | RscHelpersWithCaller<R, P> {
+): RscHelpers<R, P> | RscHelpersWithCaller<R, P> => {
   // `React.cache` exists since React 19; without it every call creates a new query client.
   const cache: CacheFn = options.cache ?? reactCache ?? ((fn) => () => fn());
   const getQueryClient = cache(options.makeQueryClient ?? (() => makeQueryClient()));
@@ -518,4 +620,4 @@ export function createRscHelpers<
     dehydrate: dehydrateRequest,
   };
   return caller === undefined ? helpers : { ...helpers, caller };
-}
+};

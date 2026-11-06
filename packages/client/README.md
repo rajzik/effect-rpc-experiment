@@ -11,6 +11,9 @@ subscriptions as `AsyncIterable` / `Stream`. Each call goes through a **link** (
   and aborts are separate typed errors (`RpcDefect`, `RpcTransportError`, `RpcInterrupted`), so
   they never show up looking like your domain errors.
 - Aborting a call interrupts the handler on the server.
+- `createClient` takes a `Router.make` router or a router written as an Effect service
+  (`createClient(AppRouter, { link })`); annotate a service client as
+  `Client<Router.Of<typeof AppRouter>>`.
 
 ## For AI agents
 
@@ -80,6 +83,7 @@ See [Links](#links) for `wsLink` / `localLink` and [Effect client](#effect-clien
 - A router may not use `$effect`, `$router`, `dispose` or `withHeaders` as top-level keys (`createClient` throws).
 - Routers with `requiredForClient` middleware require the `middleware` option (`RpcMiddleware.layerClient(...)`); it is a type error to omit it.
 - The link connects lazily on the first call; after `dispose()` calls fail with `RpcTransportError`.
+- `createClient(router, ...)` takes a `Router.Input` (router or router service class, normalised with `Router.from`); a service client is `Client<Router.Of<typeof AppRouter>>` and has the same call types as the equivalent `Router.make` router. `$router` is the normalised router.
 
 **Common mistakes**
 
@@ -91,10 +95,11 @@ See [Links](#links) for `wsLink` / `localLink` and [Effect client](#effect-clien
 - Don't create a client per call → create one per app (or per request on the server) and `dispose()` it.
 - Don't mutate headers on the client → `client.withHeaders({...})` returns a client sharing the connection.
 - Don't use Effect v3 imports (`@effect/rpc`, `@effect/platform`) → `effect/rpc`, `effect/http`.
+- Don't write `Client<typeof AppRouter>` for a router service (a type error) → `Client<Router.Of<typeof AppRouter>>`; `createClient` itself takes the class.
 
 **Where to look**
 
-- `test/readme.test.ts` (this README's examples), `test/httpLink.test.ts` (instances, typed errors, defects, streams, headers, non-2xx → `RpcTransportError`, absolute URLs), `test/wsLink.test.ts`, `test/localLink.test.ts` (Effect client, headers merge, proxy, lazy link, dispose), `test/abort.test.ts` (abort, interruption, subscription cleanup), `test/middleware.test.ts` (`requiredForClient`), `test/client.test-d.ts` (call, error and option types), `test/PARITY.md`.
+- `test/readme.test.ts` (this README's examples), `test/httpLink.test.ts` (instances, typed errors, defects, streams, headers, non-2xx → `RpcTransportError`, absolute URLs), `test/wsLink.test.ts`, `test/localLink.test.ts` (Effect client, headers merge, proxy, lazy link, dispose), `test/abort.test.ts` (abort, interruption, subscription cleanup), `test/middleware.test.ts` (`requiredForClient`), `test/routerService.test(-d).ts` (router service classes), `test/client.test-d.ts` (call, error and option types), `test/PARITY.md`.
 - JSDoc on every export (`src/*.ts`) follows `docs/jsdoc-style.md`.
 
 **Verify**
@@ -247,7 +252,8 @@ If a router uses middleware declared with `requiredForClient: true`, `createClie
 
 ## API
 
-- `createClient(router, { link, headers?, middleware? })` returns `Client<R>`. A client has the
+- `createClient(router, { link, headers?, middleware? })` returns `Client<R>` (for a router
+  service class, `Client<Router.Of<typeof AppRouter>>`). A client has the
   procedures plus `$effect`, `$router`, `withHeaders(headers)`, `dispose()` and
   `[Symbol.asyncDispose]`. A router may not use these names as top-level keys. The client
   connects lazily on the first call. Calling an unknown path throws an `Error`.

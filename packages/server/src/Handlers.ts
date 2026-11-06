@@ -234,6 +234,25 @@ const toLayer = <A, E, R>(router: Router.Any, handlers: unknown): Layer.Layer<A,
   return group.toLayer(handlers);
 };
 
+/** `make` for a router. */
+const makeFor = <R extends Router.Any, H extends Handlers.From<R>, EX = never, RX = never>(
+  router: R,
+  build: H | Effect.Effect<H, EX, RX>,
+): Layer.Layer<Handlers.Provides<R>, EX, Exclude<RX, Scope.Scope> | Handlers.Services<R, H>> =>
+  toLayer<Handlers.Provides<R>, EX, Exclude<RX, Scope.Scope> | Handlers.Services<R, H>>(
+    router,
+    flattenBuild(router, build),
+  );
+
+/** `make` for a router or a router service: normalises the input with `Router.from`. */
+const makeFromInput = (
+  input: Router.Input,
+  build: Handlers.From<Router.Any> | Effect.Effect<Handlers.From<Router.Any>>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return makeFor(router, build);
+};
+
 /**
  * Implements every procedure of a router from a nested handler record mirroring the router
  * record, returning the handler layer (`Layer<Rpc.ToHandler<...>>`) consumed by `RpcServer`,
@@ -247,6 +266,8 @@ const toLayer = <A, E, R>(router: Router.Any, handlers: unknown): Layer.Layer<A,
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - Each handler receives the decoded payload and the `effect/rpc` handler context
  *   `{ client, requestId, headers, rpc }`. `headers` are the HTTP request headers merged with
  *   the rpc message headers (per-call `headers` for a caller).
@@ -290,14 +311,46 @@ const toLayer = <A, E, R>(router: Router.Any, handlers: unknown): Layer.Layer<A,
  * });
  * ```
  */
-const make = <R extends Router.Any, H extends Handlers.From<R>, EX = never, RX = never>(
+const make: {
+  <R extends Router.Any, H extends Handlers.From<R>, EX = never, RX = never>(
+    router: R,
+    build: H | Effect.Effect<H, EX, RX>,
+  ): Layer.Layer<Handlers.Provides<R>, EX, Exclude<RX, Scope.Scope> | Handlers.Services<R, H>>;
+  <X extends Router.Input, H extends Handlers.From<Router.Of<X>>, EX = never, RX = never>(
+    router: X,
+    build: H | Effect.Effect<H, EX, RX>,
+  ): Layer.Layer<
+    Handlers.Provides<Router.Of<X>>,
+    EX,
+    Exclude<RX, Scope.Scope> | Handlers.Services<Router.Of<X>, H>
+  >;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  makeFromInput as unknown as typeof make;
+
+/** `flat` for a router. */
+const flatFor = <R extends Router.Any, H extends Handlers.Flat<R>, EX = never, RX = never>(
   router: R,
   build: H | Effect.Effect<H, EX, RX>,
-): Layer.Layer<Handlers.Provides<R>, EX, Exclude<RX, Scope.Scope> | Handlers.Services<R, H>> =>
-  toLayer<Handlers.Provides<R>, EX, Exclude<RX, Scope.Scope> | Handlers.Services<R, H>>(
-    router,
-    flattenBuild(router, build),
-  );
+): Layer.Layer<
+  Handlers.Provides<R>,
+  EX,
+  Exclude<RX, Scope.Scope> | RpcGroup.HandlersServices<Router.Rpcs<R>, H>
+> =>
+  toLayer<
+    Handlers.Provides<R>,
+    EX,
+    Exclude<RX, Scope.Scope> | RpcGroup.HandlersServices<Router.Rpcs<R>, H>
+  >(router, build);
+
+/** `flat` for a router or a router service: normalises the input with `Router.from`. */
+const flatFromInput = (
+  input: Router.Input,
+  build: FlatHandlers | Effect.Effect<FlatHandlers>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return flatFor(router, build);
+};
 
 /**
  * Implements every procedure of a router from a tag-keyed handler record
@@ -307,6 +360,11 @@ const make = <R extends Router.Any, H extends Handlers.From<R>, EX = never, RX =
  *
  * Use when handlers are keyed by procedure tag (the dot-joined router path), e.g. when porting
  * code written against `effect/rpc` directly. Prefer `Handlers.make` for new code.
+ *
+ * **Details**
+ *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  *
  * **Example** (Tag-keyed handlers)
  *
@@ -324,19 +382,26 @@ const make = <R extends Router.Any, H extends Handlers.From<R>, EX = never, RX =
  * });
  * ```
  */
-const flat = <R extends Router.Any, H extends Handlers.Flat<R>, EX = never, RX = never>(
-  router: R,
-  build: H | Effect.Effect<H, EX, RX>,
-): Layer.Layer<
-  Handlers.Provides<R>,
-  EX,
-  Exclude<RX, Scope.Scope> | RpcGroup.HandlersServices<Router.Rpcs<R>, H>
-> =>
-  toLayer<
+const flat: {
+  <R extends Router.Any, H extends Handlers.Flat<R>, EX = never, RX = never>(
+    router: R,
+    build: H | Effect.Effect<H, EX, RX>,
+  ): Layer.Layer<
     Handlers.Provides<R>,
     EX,
     Exclude<RX, Scope.Scope> | RpcGroup.HandlersServices<Router.Rpcs<R>, H>
-  >(router, build);
+  >;
+  <X extends Router.Input, H extends Handlers.Flat<Router.Of<X>>, EX = never, RX = never>(
+    router: X,
+    build: H | Effect.Effect<H, EX, RX>,
+  ): Layer.Layer<
+    Handlers.Provides<Router.Of<X>>,
+    EX,
+    Exclude<RX, Scope.Scope> | RpcGroup.HandlersServices<Router.Rpcs<Router.Of<X>>, H>
+  >;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  flatFromInput as unknown as typeof flat;
 
 /** The definition at `path` of a resolved router record (nested routers and plain records). */
 const procedureAt = (router: Router.Any, path: ReadonlyArray<string>): unknown => {
@@ -515,6 +580,12 @@ const fromService = <S extends RouterService.Any>(
   return Layer.merge(handlers, Layer.succeed(key)(router.record));
 };
 
+/** `of` for a router or a router service: validates the input with `Router.from`. */
+const ofFromInput = <H>(input: Router.Input, handlers: H): H => {
+  Router.from(input);
+  return handlers;
+};
+
 /**
  * Identity helper that type-checks (and contextually types) a nested handler record against a
  * router, e.g. to define handlers in a separate module or inside `Effect.gen`.
@@ -523,6 +594,11 @@ const fromService = <S extends RouterService.Any>(
  *
  * Use inside the `Effect` passed to `Handlers.make`, where TypeScript cannot otherwise infer
  * the payload types of the returned record.
+ *
+ * **Details**
+ *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  *
  * **Example** (Building handlers from a service)
  *
@@ -547,8 +623,10 @@ const fromService = <S extends RouterService.Any>(
  * );
  * ```
  */
-const of = <R extends Router.Any, H extends Handlers.From<R>>(_router: R, handlers: H): H =>
-  handlers;
+const of: {
+  <R extends Router.Any, H extends Handlers.From<R>>(router: R, handlers: H): H;
+  <X extends Router.Input, H extends Handlers.From<Router.Of<X>>>(router: X, handlers: H): H;
+} = ofFromInput;
 
 /**
  * Handler constructors for a core `Router`: `make` (nested record), `flat` (tag-keyed record),

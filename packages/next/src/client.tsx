@@ -12,7 +12,7 @@
  */
 import { createClient, httpLink } from '@effect-trpc/client';
 import type { Client, HeadersOption, SerializationOption } from '@effect-trpc/client';
-import type { Router } from '@effect-trpc/core';
+import { Router } from '@effect-trpc/core';
 import { createHydrationHelpers, createRpcContext } from '@effect-trpc/tanstack-react-query';
 import type {
   FeatureFlags,
@@ -150,6 +150,87 @@ export interface NextRpcClient<R extends Router.Any, P extends string | undefine
   readonly createClient: () => Client<R>;
 }
 
+/** `createNextRpcClient` for a router. */
+const createNextRpcClientFor = <
+  R extends Router.Any,
+  const P extends string | undefined = undefined,
+>(
+  router: R,
+  options: NextRpcClientOptions<P> = {},
+): NextRpcClient<R, P> => {
+  // The flags only shape the proxy's types; at runtime the context provider accepts an optional
+  // `keyPrefix` (it only forwards a defined one), so widen its props to that.
+  const context = createRpcContext<R, FeatureFlags>();
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- widening the provider's props only: an optional `keyPrefix` is what it handles at runtime (see above)
+  const ContextProvider = context.RpcProvider as unknown as React.FC<{
+    readonly client: Client<R>;
+    readonly queryClient: QueryClient;
+    readonly keyPrefix?: string;
+    readonly children?: React.ReactNode;
+  }>;
+  const { HydrationBoundary } = createHydrationHelpers(
+    router,
+    options.keyPrefix === undefined ? undefined : { keyPrefix: options.keyPrefix },
+  );
+  const make = options.makeQueryClient ?? (() => makeQueryClient());
+  let browserQueryClient: QueryClient | undefined;
+
+  const getQueryClient = (): QueryClient => {
+    if (isServer()) return make();
+    browserQueryClient ??= make();
+    return browserQueryClient;
+  };
+
+  const newClient = (): Client<R> =>
+    createClient(router, {
+      link: httpLink({
+        url: new URL(options.url ?? '/api/rpc', getBaseUrl()),
+        ...(options.serialization !== undefined && { serialization: options.serialization }),
+        ...(options.fetch !== undefined && { fetch: options.fetch }),
+      }),
+      ...(options.headers !== undefined && { headers: options.headers }),
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `middleware` option accepts any layer error, as `createClient`'s own option does
+      ...(options.middleware !== undefined && { middleware: options.middleware }),
+    });
+
+  const RpcProvider: React.FC<NextRpcProviderProps> = (props) => {
+    const [ownQueryClient] = React.useState(() => props.queryClient ?? getQueryClient());
+    const queryClient = props.queryClient ?? ownQueryClient;
+    const [client] = React.useState(newClient);
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ContextProvider
+          client={client}
+          queryClient={queryClient}
+          {...(options.keyPrefix !== undefined && { keyPrefix: options.keyPrefix })}
+        >
+          {props.children}
+        </ContextProvider>
+      </QueryClientProvider>
+    );
+  };
+  RpcProvider.displayName = 'NextRpcProvider';
+
+  return {
+    RpcProvider,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the context was created with the widened `FeatureFlags`; `PrefixFlags<P>` is the flag set `options.keyPrefix` actually selects
+    useRpc: context.useRpc as () => RpcOptionsProxy<R, PrefixFlags<P>>,
+    useRpcClient: context.useRpcClient,
+    HydrationBoundary,
+    getQueryClient,
+    createClient: newClient,
+  };
+};
+
+/** `createNextRpcClient` for a router or a router service: normalises the input with `Router.from`. */
+const createNextRpcClientFromInput = (
+  input: Router.Input,
+  options?: NextRpcClientOptions<string | undefined>,
+): unknown => {
+  const router: Router.Any = Router.from(input);
+  return createNextRpcClientFor(router, options);
+};
+
 /**
  * Creates the client half of an App Router integration (tRPC's `trpc/client.tsx`): a provider,
  * the `useRpc` / `useRpcClient` hooks and the router's Schema-aware `HydrationBoundary`.
@@ -162,6 +243,8 @@ export interface NextRpcClient<R extends Router.Any, P extends string | undefine
  *
  * **Details**
  *
+ * - `router` is a `Router.make` router or a router service class (`Router.Input`); a service is
+ *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - `RpcProvider` renders `QueryClientProvider` plus the effect-trpc context. It takes the query
  *   client from its `queryClient` prop, else from `getQueryClient()`, and creates one
  *   `httpLink` client per provider instance (it does not dispose it on unmount).
@@ -251,73 +334,15 @@ export interface NextRpcClient<R extends Router.Any, P extends string | undefine
  * @category constructors
  * @since 0.1.0
  */
-export const createNextRpcClient = <
-  R extends Router.Any,
-  const P extends string | undefined = undefined,
->(
-  router: R,
-  options: NextRpcClientOptions<P> = {},
-): NextRpcClient<R, P> => {
-  // The flags only shape the proxy's types; at runtime the context provider accepts an optional
-  // `keyPrefix` (it only forwards a defined one), so widen its props to that.
-  const context = createRpcContext<R, FeatureFlags>();
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- widening the provider's props only: an optional `keyPrefix` is what it handles at runtime (see above)
-  const ContextProvider = context.RpcProvider as unknown as React.FC<{
-    readonly client: Client<R>;
-    readonly queryClient: QueryClient;
-    readonly keyPrefix?: string;
-    readonly children?: React.ReactNode;
-  }>;
-  const { HydrationBoundary } = createHydrationHelpers(
-    router,
-    options.keyPrefix === undefined ? undefined : { keyPrefix: options.keyPrefix },
-  );
-  const make = options.makeQueryClient ?? (() => makeQueryClient());
-  let browserQueryClient: QueryClient | undefined;
-
-  const getQueryClient = (): QueryClient => {
-    if (isServer()) return make();
-    browserQueryClient ??= make();
-    return browserQueryClient;
-  };
-
-  const newClient = (): Client<R> =>
-    createClient(router, {
-      link: httpLink({
-        url: new URL(options.url ?? '/api/rpc', getBaseUrl()),
-        ...(options.serialization !== undefined && { serialization: options.serialization }),
-        ...(options.fetch !== undefined && { fetch: options.fetch }),
-      }),
-      ...(options.headers !== undefined && { headers: options.headers }),
-      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `middleware` option accepts any layer error, as `createClient`'s own option does
-      ...(options.middleware !== undefined && { middleware: options.middleware }),
-    });
-
-  const RpcProvider: React.FC<NextRpcProviderProps> = (props) => {
-    const [ownQueryClient] = React.useState(() => props.queryClient ?? getQueryClient());
-    const queryClient = props.queryClient ?? ownQueryClient;
-    const [client] = React.useState(newClient);
-    return (
-      <QueryClientProvider client={queryClient}>
-        <ContextProvider
-          client={client}
-          queryClient={queryClient}
-          {...(options.keyPrefix !== undefined && { keyPrefix: options.keyPrefix })}
-        >
-          {props.children}
-        </ContextProvider>
-      </QueryClientProvider>
-    );
-  };
-  RpcProvider.displayName = 'NextRpcProvider';
-
-  return {
-    RpcProvider,
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the context was created with the widened `FeatureFlags`; `PrefixFlags<P>` is the flag set `options.keyPrefix` actually selects
-    useRpc: context.useRpc as () => RpcOptionsProxy<R, PrefixFlags<P>>,
-    useRpcClient: context.useRpcClient,
-    HydrationBoundary,
-    getQueryClient,
-    createClient: newClient,
-  };
-};
+export const createNextRpcClient: {
+  <R extends Router.Any, const P extends string | undefined = undefined>(
+    router: R,
+    options?: NextRpcClientOptions<P>,
+  ): NextRpcClient<R, P>;
+  <X extends Router.Input, const P extends string | undefined = undefined>(
+    router: X,
+    options?: NextRpcClientOptions<P>,
+  ): NextRpcClient<Router.Of<X>, P>;
+} =
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
+  createNextRpcClientFromInput as unknown as typeof createNextRpcClient;
