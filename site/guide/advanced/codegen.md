@@ -114,9 +114,14 @@ Errors that a procedure's middleware declares are not repeated.
   class its package does not export is reported: export it, or import it in the router module.
 - A plain class, a function, `any` or a type parameter has no schema. The generator reports the
   procedure's location: add `.output(schema)` there.
-- The router is read statically: an exported router service class (`make: Effect.succeed({...})`)
-  or `Router.make({...})` constant, with nested records, routers and router services. Records
-  built with spreads or function calls are reported.
+- The router is read statically: an exported router service class (`make: Effect.succeed({...})`
+  or `Effect.gen(function* () { …; return {...} })`) or `Router.make({...})` constant, with nested
+  records, routers and router services. Records built with spreads or function calls are reported.
+- A `make` that reads services (`const cfg = yield* AppConfig`) works: the class is served with
+  `Handlers.fromService`, and every client or adapter that needs the router synchronously takes
+  `router.client.gen.ts` as its contract (a router service that reads services cannot be passed to
+  `createClient`, `toWebHandler` and the like). A schema that uses a value read in `make` is
+  reported (`<name> is read in make`): declare the schema at module level.
 - Serving `router.ts` instead of `router.gen.ts` fails loudly: an inferred procedure that returns a
   value dies with a defect naming the fix.
 

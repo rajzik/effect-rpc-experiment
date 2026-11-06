@@ -20,27 +20,51 @@ with every adapter and can be mixed.
 - Services are read inside the handler with `yield*`. Their types become requirements of the
   implementation, inferred: nothing is declared by hand.
 
-Wire format, tags and every client are the same as for the equivalent `query({...})` router. The
-class works as the router everywhere: `createClient(AppRouter, …)`, `createCaller`,
-`toWebHandler`, `serve`, the TanStack Query, Next.js, TanStack Start and Electron adapters, the
-test harness, and `inferRouterInputs<typeof AppRouter>`.
+Wire format, tags and every client are the same as for the equivalent `query({...})` router. While
+`make` reads no services, as here, the class works as the router everywhere: `createClient(AppRouter, …)`,
+`createCaller`, `toWebHandler`, `serve`, the TanStack Query, Next.js, TanStack Start and Electron
+adapters, the test harness, and `inferRouterInputs<typeof AppRouter>`. A `make` that reads
+services is [served differently](#make-that-reads-services).
 
-## `make` must not read services
+## `make` that reads services
 
-`make` is an `Effect` **value** with no requirements and no failure: `Effect<Record, never, never>`.
-Services belong inside the handlers, as in the example above. A `make` that needs a service is a
-compile error at every entry point.
+`make` is an `Effect` value. When it needs nothing (`Effect<Record, never, never>`), every API can
+run it, as above. It may also read services and fail, so that config can shape the handlers and a
+service is read once instead of in every handler:
 
-The reason is the client. A client has no server layers, yet it needs the runtime schemas to decode
-a `Post` instance or a `PostNotFound` error. So every API, client and server, evaluates `make`
-synchronously (once per class per process, memoized) to get the procedures. That evaluation must not
-need a database, a config or a clock service to succeed.
+<<< @/snippets/concepts/router-service-effectful.ts#service [router.ts]
 
-- One-time setup (opening a connection, reading config) belongs in the service's own layer, for
-  example `DatabaseLive`. The handler reads the ready service per call.
-- If you force a `make` that needs a service, fails or is asynchronous (a cast, `Effect.sleep`), the
-  first use throws an error that names the service and the rule instead of hanging:
-  `Cannot build a router from the router service "AppRouter": make must not require services or be asynchronous, and must not fail (read services inside the procedure handlers instead)`.
+Such a router (an _effectful_ router service) is served by the class and used everywhere else
+through a **contract**, because only the server has the services:
+
+- `Handlers.fromService(AppRouter)` takes the class. `make` runs inside the layer, with the real
+  services, once per layer build. The layer's error is the error of `make` and its requirements are
+  what `make` reads plus what the handlers read, so you provide `AppConfig` and `Database` once.
+- Everything that needs the router synchronously takes the contract instead: `createClient`,
+  `toWebHandler`, `serve`, `createCaller`, the framework adapters and the test harness. A client has
+  no server layers, yet it needs the runtime schemas to decode a `Post` or a `PostNotFound`.
+- The contract is a schema-only `Router.make` router with the same tags, schemas and middleware, and
+  no handlers. It is normally the `router.client.gen.ts` that
+  [`@effect-trpc/codegen`](../advanced/codegen) writes from the class (it reads `Effect.gen` makes);
+  you can also write it by hand:
+
+<<< @/snippets/concepts/router-service-effectful.ts#contract [router.client.gen.ts]
+
+<<< @/snippets/concepts/router-service-effectful.ts#server [server.ts]
+
+<<< @/snippets/concepts/router-service-effectful.ts#client [client.ts]
+
+- Passing the class to one of those APIs is a compile error. If you force it with a cast, it throws
+  `Cannot build a router from the router service "AppRouter": make reads services, so this API cannot build the router: give it the contract (router.client.gen.ts) and serve the class with Handlers.fromService`.
+- Router services nest as before, pure or effectful, at any depth. Their `make` effects run in the
+  same layer, and their errors and requirements join the layer's.
+- `yield* AppRouter` returns the record that build's `make` produced.
+- `Router.buildService(AppRouter)` is the same build as an `Effect`, if you provide the services
+  yourself.
+- `make` must still produce its schemas without a service: a schema that uses a value read in
+  `make` cannot exist on the client, and codegen reports it.
+- A pure `make` is still the simplest: one-time setup (opening a connection) can live in the
+  service's own layer, with the handler reading the ready service per call.
 
 ## Implement and serve it
 
@@ -52,8 +76,7 @@ exclude `Scope` and the services a procedure's middleware provides, so a handler
 `CurrentUser` that `Auth` provides without it becoming a requirement.
 
 The layer also provides the class itself: `yield* AppRouter` returns exactly the record `make`
-produced (`Router.serviceValue(AppRouter)`, from the same single evaluation), so a router service
-nested in it is the class, as its type says.
+produced, so a router service nested in it is the class, as its type says.
 
 Every adapter takes the class and the layer, exactly as it takes a router and `Handlers.make`:
 
@@ -172,19 +195,25 @@ The router from the [quick start](../quick-start), written in this style, is in
   clients the handler-free `router.client.gen.ts` that
   [`@effect-trpc/codegen`](../advanced/codegen) writes, or use `Router.make` with `query({...})`
   and keep `Handlers.make` in a server-only module.
-- `make` runs once per class. A subclass (`class B extends AppRouter {}`) gets its own evaluation. A
-  `make` that fails is not cached.
+- A pure `make` runs once per class for the synchronous APIs. A subclass
+  (`class B extends AppRouter {}`) gets its own evaluation. A `make` that fails is not cached.
+  `Handlers.fromService` runs a `make` that reads services once per layer build, but reuses the
+  router when a sync API already built the pure class.
+- A pure `make` that reads a `Context.Reference` (a service with a default value) is memoized by the
+  synchronous APIs with the default: a different value provided to the layer later is not seen. Read
+  such a service inside the handlers.
 - A second `.input`, `.output` or `.error` call replaces the earlier schema. `.middleware`
   accumulates.
 - Providing the layer is still required. `Handlers.fromService(AppRouter)` alone is not a complete
   server: provide its requirements (`Layer.provide(DatabaseLive)`) and merge the middleware layers.
 - `Client<typeof AppRouter>` is a type error: write `Client<Router.Of<typeof AppRouter>>`.
-- An async `make` is a runtime error, a `make` that needs services is a compile error. Both name the
-  rule above.
+- An async `make` is a runtime error. A `make` that needs services is a compile error for every API
+  but `Handlers.fromService`, and a runtime error naming the contract if forced.
 
 :::
 
 See also: [`Procedure`](/api/core#procedure), [`Router.from`](/api/core#router-from),
-[`Router.fromService`](/api/core#router-fromservice), [`Router.isService`](/api/core#router-isservice),
+[`Router.fromService`](/api/core#router-fromservice), [`Router.buildService`](/api/core#router-buildservice),
+[`Router.isService`](/api/core#router-isservice),
 [`Handlers.fromService`](/api/server#handlers-fromservice),
 [`Handlers.fromProcedures`](/api/server#handlers-fromprocedures).

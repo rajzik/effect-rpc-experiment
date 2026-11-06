@@ -167,7 +167,7 @@ export declare namespace Router {
   /**
    * The router type of a {@link Input}: a router stays as it is, a router service (pure or
    * {@link RouterService.Effectful}) maps to the router built from its `make` (what `Router.from` /
-   * `Router.fromService` return).
+   * `Router.fromService` return for a pure service and `Router.buildService` yields for any).
    *
    * @since 0.1.0
    */
@@ -328,10 +328,14 @@ export declare namespace Router {
  *
  * **Details**
  *
- * - `make` must be an `Effect` value (not a function) that needs no services and cannot fail:
- *   read services inside the handlers instead. A `make` that needs services or may fail does not
- *   satisfy {@link RouterService.Any}, so every API rejects it at compile time.
- * - Every API builds the router with `Router.fromService`, which runs `make` once per class.
+ * - `make` must be an `Effect` value (not a function). A `make` that needs no services and cannot
+ *   fail satisfies {@link RouterService.Any}, which every API accepts: they build the router with
+ *   `Router.fromService`, which runs `make` once per class.
+ * - A `make` that reads services or may fail is a {@link RouterService.Effectful}. It does not
+ *   satisfy {@link RouterService.Any}, so the synchronous APIs (`Router.from`, `createClient`,
+ *   `toWebHandler`, ...) reject it at compile time: give them a schema-only contract (normally
+ *   `router.client.gen.ts`) and serve the class with `Handlers.fromService`, which runs `make` in
+ *   its layer via {@link Router.buildService}.
  *
  * **Example** (A router service)
  *
@@ -351,6 +355,7 @@ export declare namespace Router {
  * ```
  *
  * @see {@link Router.fromService}
+ * @see {@link Router.buildService}
  * @category type-level
  * @since 0.1.0
  */
@@ -407,6 +412,10 @@ export declare namespace RouterService {
    * What `Router.withSchemas(source, schemas)` returns for a router service `X`: a service with
    * `X`'s key whose `make` builds `X` (with `X`'s error and services) and succeeds with the
    * patched record ({@link Router.WithSchemas}). Pure when `X` is pure.
+   *
+   * The type says the record keeps the shape of `X`'s `make`; the runtime value (what `yield*` the
+   * service returns) is the patched, resolved record: nested router services are routers there, not
+   * classes.
    *
    * @since 0.1.0
    */
@@ -771,10 +780,12 @@ const checkRecord = (svc: RouterService.Effectful, record: unknown): Router.Serv
  * **Gotchas**
  *
  * - `make` must be an `Effect<Record, never, never>`: a `make` that needs services or may fail is a
- *   compile error. A `make` that is asynchronous (e.g. sleeps), or that fails or reads a service
- *   despite its type, throws an `Error` naming the service key and the rule
- *   ("make must not require services or be asynchronous"), with the Effect failure as `cause`.
- *   A `make` that dies with an `Error` throws with that error's message instead.
+ *   compile error. A `make` that reads a service despite its type throws an `Error` naming the
+ *   fix ("make reads services, so this API cannot build the router: give it the contract
+ *   (router.client.gen.ts) and serve the class with Handlers.fromService"). One that is
+ *   asynchronous (e.g. sleeps) or fails throws "make must not require services or be
+ *   asynchronous", with the Effect failure as `cause`. A `make` that dies with an `Error` throws
+ *   with that error's message instead. For a `make` that reads services use {@link buildService}.
  * - A failed `make` is not memoized: the next call runs it again.
  *
  * **Example** (Getting the router of a service)
@@ -829,8 +840,9 @@ const fromService = <S extends RouterService.Any>(service: S): Router.Of<S> => {
  *
  * **When to use**
  *
- * Use when you provide the service yourself, e.g. `Layer.succeed(Svc)(Router.serviceValue(Svc))`
- * (this is what `Handlers.fromService` does from `@effect-trpc/server`).
+ * Use when you provide a pure service yourself, e.g. `Layer.succeed(Svc)(Router.serviceValue(Svc))`.
+ * `Handlers.fromService` (from `@effect-trpc/server`) does not use it: it takes the value from
+ * {@link buildService}.
  *
  * **Details**
  *
@@ -944,6 +956,9 @@ const buildIn = (
  *   built (a pure service used by a synchronous API), whose memoized router and value are reused.
  * - A service that nests itself, a `make` that succeeds with a router or a non-record, and an
  *   invalid router key are defects (`Effect.die`), not typed failures.
+ * - A pure `make` that reads a `Context.Reference` (a service with a default) is memoized by the
+ *   synchronous APIs with the default; once a sync API built the class, a later provided override
+ *   is not seen here. Read such a service inside the handlers.
  *
  * **Example** (Building a router whose make reads a service)
  *
