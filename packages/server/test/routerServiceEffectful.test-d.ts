@@ -133,4 +133,16 @@ describe('Handlers.fromService types (effectful make)', () => {
     // @ts-expect-error - make reads services: give toWebHandler the contract
     void toWebHandler(AppRouter, { handlers: live }); // oxlint-disable-line effecttsgo/missing-effect-context -- the service is passed on purpose to prove the compile error
   });
+
+  it('a scoped make does not leak Scope into the layer', () => {
+    class Scoped extends Context.Service<Scoped>()('Scoped', {
+      make: Effect.gen(function* () {
+        yield* Effect.addFinalizer(() => Effect.void);
+        return { ping: Procedure.output(Schema.String).query(() => Effect.succeed('pong')) };
+      }),
+    }) {}
+    expectTypeOf(Handlers.fromService(Scoped)).toEqualTypeOf<
+      Layer.Layer<Rpc.Handler<'ping'> | Scoped>
+    >();
+  });
 });

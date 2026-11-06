@@ -31,10 +31,18 @@ export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
 // #endregion service
 
 // #region contract
-// router.client.gen.ts (codegen): the schema-only contract the synchronous APIs take.
+// The schema-only contract the synchronous APIs take (codegen writes it as router.client.gen.ts).
 export const AppRouterContract = Router.make({
   post: { byId: query({ payload: { id: Schema.Finite }, success: Post, error: PostNotFound }) },
 });
+
+// Written by hand: check it against the class, as codegen does. This fails to compile when the
+// contract drifts from the class (a schema, a procedure or a `.middleware(...)` it misses).
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+export const contractMatchesRouter: Same<
+  Router.Rpcs<typeof AppRouterContract>,
+  Router.Rpcs<typeof AppRouter>
+> = true;
 // #endregion contract
 
 declare const AppConfigLive: Layer.Layer<AppConfig>;

@@ -144,4 +144,25 @@ describe('Handlers.fromService with an effectful make', () => {
     expect(await caller.$promise.a.b.x()).toBe('x');
     expect(await caller.$promise.c.d()).toBe('d v1');
   });
+
+  it('a scoped make: its finalizer runs when the server is disposed', async () => {
+    const closed = { count: 0 };
+    class Scoped extends Context.Service<Scoped>()('Scoped', {
+      make: Effect.gen(function* () {
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            closed.count++;
+          }),
+        );
+        return { ping: Procedure.output(Schema.String).query(() => Effect.succeed('pong')) };
+      }),
+    }) {}
+    const scopedContract = Router.make({ ping: query({ success: Schema.String }) });
+    {
+      await using caller = createCaller(scopedContract, { handlers: Handlers.fromService(Scoped) });
+      expect(await caller.$promise.ping()).toBe('pong');
+      expect(closed.count).toBe(0);
+    }
+    expect(closed.count).toBe(1);
+  });
 });

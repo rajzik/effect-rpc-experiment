@@ -45,10 +45,13 @@ through a **contract**, because only the server has the services:
   no server layers, yet it needs the runtime schemas to decode a `Post` or a `PostNotFound`.
 - The contract is a schema-only `Router.make` router with the same tags, schemas and middleware, and
   no handlers. It is normally the `router.client.gen.ts` that
-  [`@effect-trpc/codegen`](../advanced/codegen) writes from the class (it reads `Effect.gen` makes);
-  you can also write it by hand:
+  [`@effect-trpc/codegen`](../advanced/codegen) writes from the class (it reads `Effect.gen` makes),
+  with a compile-time check that it still matches the class.
+- If you write the contract by hand, add that check yourself (below). The server serves the
+  contract's procedures, middleware included: a contract that misses `.middleware(Auth)` serves the
+  procedure without `Auth`, and no type asks for `AuthLive`.
 
-<<< @/snippets/concepts/router-service-effectful.ts#contract [router.client.gen.ts]
+<<< @/snippets/concepts/router-service-effectful.ts#contract [contract.ts]
 
 <<< @/snippets/concepts/router-service-effectful.ts#server [server.ts]
 
@@ -77,7 +80,9 @@ exclude `Scope` and the services a procedure's middleware provides, so a handler
 `CurrentUser` that `Auth` provides without it becoming a requirement.
 
 The layer also provides the class itself: `yield* AppRouter` returns exactly the record `make`
-produced, so a router service nested in it is the class, as its type says.
+produced, so a router service nested in it is the class, as its type says. Serving codegen's
+`router.gen.ts` (a `Router.withSchemas` wrapper) is the exception: its value holds the resolved
+record, so a nested router service is a `Router` there, not the class.
 
 Every adapter takes the class and the layer, exactly as it takes a router and `Handlers.make`:
 
