@@ -124,7 +124,7 @@ describe('Handlers.fromService types', () => {
     Handlers.fromService(LegacyRouter);
   });
 
-  it('fromService rejects a service whose make needs services', () => {
+  it('fromService accepts a service whose make needs services', () => {
     class NeedsDb extends Context.Service<NeedsDb>()('NeedsDb', {
       make: Effect.gen(function* () {
         yield* Database;
@@ -132,8 +132,10 @@ describe('Handlers.fromService types', () => {
       }),
     }) {}
     expectTypeOf(NeedsDb).not.toExtend<RouterService.Any>();
-    // @ts-expect-error - make must be Effect<Record, never, never>
-    Handlers.fromService(NeedsDb); // oxlint-disable-line effecttsgo/missing-effect-context -- the service is passed on purpose to prove the compile error
+    // make's requirements become the layer's (see routerServiceEffectful.test-d.ts).
+    expectTypeOf(Handlers.fromService(NeedsDb)).toEqualTypeOf<
+      Layer.Layer<Rpc.Handler<'ok'> | NeedsDb, never, Database>
+    >();
   });
 
   it('the layer serves the service router through createCaller and toWebHandler', () => {

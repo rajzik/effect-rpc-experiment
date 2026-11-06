@@ -503,95 +503,102 @@ const fromProcedures = <R extends Router.Any>(
  * **When to use**
  *
  * Use to serve a router service: pass the layer, merged with the middleware implementations
- * and provided with the services the handlers read, to `toWebHandler`, `layerHttp`,
+ * and provided with the services `make` and the handlers read, to `toWebHandler`, `layerHttp`,
  * `createCaller` or `@effect-trpc/server/node`.
  *
  * **Details**
  *
- * - The router is `Router.fromService(Svc)`: `make` is evaluated once per class per process,
- *   shared with every other API that uses the class.
+ * - `make` may read services and fail: the layer runs it (and every nested router service's
+ *   `make`) with `Router.buildService` when it is built, once per layer build (not memoized), and
+ *   the router (tags, schemas, handlers) comes from that run.
+ * - The layer's error is `RouterService.MakeError<Svc>` and its requirements are
+ *   `RouterService.MakeServices<Svc>` (minus `Scope`) plus the handlers' requirements
+ *   ({@link Handlers.ProcedureServices}, minus `Scope` and middleware-provided services such as
+ *   `CurrentUser`). For a `make` that needs nothing both make parts are `never`.
  * - The layer provides one `Rpc.Handler<Tag>` per procedure (tags as `Router.make` assigns them)
- *   and `Svc`, so `yield* Svc` returns exactly the record `make` produced
- *   (`Router.serviceValue(Svc)`, from the same single evaluation), nested router services
- *   included as their classes.
- * - Requirements are inferred ({@link Handlers.ProcedureServices}): the union of the handlers'
- *   requirements minus `Scope` and middleware-provided services (e.g. `CurrentUser`).
+ *   and `Svc`, so `yield* Svc` returns exactly the record this build's `make` produced, nested
+ *   router services included as their classes.
  *
  * **Gotchas**
  *
+ * - The synchronous APIs (`toWebHandler`, `createCaller`, `createClient`, ...) cannot run a `make`
+ *   that reads services: give them the contract (a schema-only `Router.make` router, normally
+ *   `router.client.gen.ts`) and serve the class with this layer. A `make` that needs nothing can
+ *   be passed to them directly.
  * - A procedure defined with `query` / `mutation` / `subscription({...})` inside the service
- *   is a compile error naming its path; if forced with a cast it throws. Use `Handlers.make`
- *   for routers mixing both styles.
- * - A `make` that needs services is a compile error; an async or failing `make` throws the
- *   error of `Router.fromService`.
+ *   is a compile error naming its path; if forced with a cast, building the layer dies with an
+ *   error naming the paths. Use `Handlers.make` for routers mixing both styles.
  *
- * **Example** (Serving a router service)
+ * **Example** (Serving a router service whose make reads services)
  *
  * ```ts
  * import { Context, Effect, Layer, Schema } from 'effect';
- * import { Procedure } from '@effect-trpc/core';
+ * import { Procedure, query, Router } from '@effect-trpc/core';
  * import { Handlers, toWebHandler } from '@effect-trpc/server';
  *
- * class Post extends Schema.Class<Post>('Post')({ id: Schema.Finite, title: Schema.String }) {}
- * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
- *   id: Schema.Finite,
- * }) {}
+ * class AppConfig extends Context.Service<AppConfig, { readonly prefix: string }>()('AppConfig') {}
  * class Database extends Context.Service<
  *   Database,
- *   { readonly findPost: (id: number) => Effect.Effect<Post, PostNotFound> }
+ *   { readonly title: (id: number) => Effect.Effect<string> }
  * >()('Database') {}
  *
  * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
- *   make: Effect.succeed({
- *     post: {
- *       byId: Procedure.input({ id: Schema.Finite })
- *         .output(Post)
- *         .error(PostNotFound)
- *         .query(
- *           Effect.fn(function* ({ id }) {
- *             const db = yield* Database; // read services inside handlers
- *             return yield* db.findPost(id);
- *           }),
+ *   make: Effect.gen(function* () {
+ *     const cfg = yield* AppConfig; // read once per layer build
+ *     return {
+ *       title: Procedure.input({ id: Schema.Finite })
+ *         .output(Schema.String)
+ *         .query(({ id }) =>
+ *           Effect.flatMap(Database, (db) => db.title(id)).pipe(
+ *             Effect.map((title) => `${cfg.prefix}${title}`),
+ *           ),
  *         ),
- *     },
+ *     };
  *   }),
  * }) {}
  *
+ * // The contract the synchronous APIs take (normally router.client.gen.ts).
+ * const contract = Router.make({
+ *   title: query({ payload: { id: Schema.Finite }, success: Schema.String }),
+ * });
+ *
+ * declare const AppConfigLive: Layer.Layer<AppConfig>;
  * declare const DatabaseLive: Layer.Layer<Database>;
  *
- * // Layer<Rpc.Handler<'post.byId'> | AppRouter, never, Database>
+ * // Layer<Rpc.Handler<'title'> | AppRouter, never, AppConfig | Database>
  * const HandlersLive = Handlers.fromService(AppRouter);
  *
- * const web = await toWebHandler(AppRouter, {
- *   handlers: HandlersLive.pipe(Layer.provide(DatabaseLive)),
+ * const web = await toWebHandler(contract, {
+ *   handlers: HandlersLive.pipe(Layer.provide([AppConfigLive, DatabaseLive])),
  * });
  * ```
  *
  * @category constructors
  * @since 0.1.0
  */
-const fromService = <S extends RouterService.Any>(
+const fromService = <S extends RouterService.Effectful>(
   service: S & Handlers.RequireHandlers<Router.Of<S>>,
 ): Layer.Layer<
   Handlers.Provides<Router.Of<S>> | Context.Service.Identifier<S>,
-  never,
-  Handlers.ProcedureServices<Router.Of<S>>
+  RouterService.MakeError<S>,
+  Exclude<RouterService.MakeServices<S>, Scope.Scope> | Handlers.ProcedureServices<Router.Of<S>>
 > => {
-  const router: Router.Any = Router.fromService(service);
-  const handlers = toLayer<
-    Handlers.Provides<Router.Of<S>>,
-    never,
-    Handlers.ProcedureServices<Router.Of<S>>
-  >(
-    router,
-    proceduresHandlers(router, `Handlers.fromService: the router service "${service.key}"`),
-  );
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a service key's identifier is its class (`Context.Service.Identifier<S>`); `RouterService.Any` erases it to `any`
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a service key's identifier is its class (`Context.Service.Identifier<S>`); `RouterService.Effectful` erases it to `any`
   const key = service as unknown as Context.Key<
     Context.Service.Identifier<S>,
     Context.Service.Shape<S>
   >;
-  return Layer.merge(handlers, Layer.succeed(key)(Router.serviceValue(service)));
+  return Layer.unwrap(
+    Effect.map(Router.buildService(service), ({ router, value }) =>
+      Layer.merge(
+        toLayer<Handlers.Provides<Router.Of<S>>, never, Handlers.ProcedureServices<Router.Of<S>>>(
+          router,
+          proceduresHandlers(router, `Handlers.fromService: the router service "${service.key}"`),
+        ),
+        Layer.succeed(key)(value),
+      ),
+    ),
+  );
 };
 
 /** `of` for a router or a router service: validates the input with `Router.from`. */
