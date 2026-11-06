@@ -40,7 +40,7 @@ need a database, a config or a clock service to succeed.
   example `DatabaseLive`. The handler reads the ready service per call.
 - If you force a `make` that needs a service, fails or is asynchronous (a cast, `Effect.sleep`), the
   first use throws an error that names the service and the rule instead of hanging:
-  `Cannot build a router from the router service "AppRouter": make must not require services or be asynchronous, and must not fail`.
+  `Cannot build a router from the router service "AppRouter": make must not require services or be asynchronous, and must not fail (read services inside the procedure handlers instead)`.
 
 ## Implement and serve it
 

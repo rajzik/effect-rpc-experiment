@@ -521,7 +521,7 @@ const fromProcedures = <R extends Router.Any>(
  *
  * ```ts
  * import { Context, Effect, Layer, Schema } from 'effect';
- * import { Procedure, Router } from '@effect-trpc/core';
+ * import { Procedure } from '@effect-trpc/core';
  * import { Handlers, toWebHandler } from '@effect-trpc/server';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Finite, title: Schema.String }) {}
@@ -554,7 +554,7 @@ const fromProcedures = <R extends Router.Any>(
  * // Layer<Rpc.Handler<'post.byId'> | AppRouter, never, Database>
  * const HandlersLive = Handlers.fromService(AppRouter);
  *
- * const web = await toWebHandler(Router.from(AppRouter), {
+ * const web = await toWebHandler(AppRouter, {
  *   handlers: HandlersLive.pipe(Layer.provide(DatabaseLive)),
  * });
  * ```
