@@ -165,12 +165,13 @@ export declare namespace Router {
   export type Input = Any | RouterService.Any;
 
   /**
-   * The router type of a {@link Input}: a router stays as it is, a router service maps to the
-   * router built from its `make` (what `Router.from` / `Router.fromService` return).
+   * The router type of a {@link Input}: a router stays as it is, a router service (pure or
+   * {@link RouterService.Effectful}) maps to the router built from its `make` (what `Router.from` /
+   * `Router.fromService` return).
    *
    * @since 0.1.0
    */
-  export type Of<X> = X extends RouterService.Any
+  export type Of<X> = X extends RouterService.Effectful
     ? Router<ServiceRecord<X>>
     : X extends Any
       ? X
@@ -193,7 +194,7 @@ export declare namespace Router {
    *
    * @since 0.1.0
    */
-  export type Record<R> = R extends RouterService.Any
+  export type Record<R> = R extends RouterService.Effectful
     ? ServiceRecord<R>
     : R extends Router<infer Rec>
       ? Rec
@@ -206,11 +207,11 @@ export declare namespace Router {
    *
    * @since 0.1.0
    */
-  export type Rpcs<R> = R extends RouterService.Any
+  export type Rpcs<R> = R extends RouterService.Effectful
     ? RpcsOf<ServiceRecord<R>, ''>
     : R extends Any
       ? RpcsOf<R['record'], ''>
-      : R extends ServiceShape
+      : R extends RouterService.EffectfulShape
         ? RpcsOf<Resolve<R>, ''>
         : never;
 
@@ -363,7 +364,62 @@ export declare namespace RouterService {
   export type Any = Context.Key<any, any> & {
     readonly make: Effect.Effect<Router.ServiceShape>;
   };
+
+  /**
+   * A router service whose `make` may read services and fail: a `Context` service class whose
+   * static `make` is an `Effect<EffectfulShape, E, R>` for any `E` / `R`. Pure services
+   * ({@link Any}) satisfy it too. The type helpers (`Router.Of`, `Router.Paths`, ...) accept it;
+   * the synchronous APIs (`Router.from`, `Router.make`) do not.
+   *
+   * @since 0.1.0
+   */
+  export type Effectful = Context.Key<any, any> & {
+    readonly make: Effect.Effect<EffectfulShape, unknown, unknown>;
+  };
+
+  /**
+   * The record an {@link Effectful} service's `make` returns: procedure definitions, routers,
+   * router services (pure or effectful) or nested records, keyed by path segment.
+   *
+   * @since 0.1.0
+   */
+  export type EffectfulShape = {
+    readonly [key: string]: ProcedureDef.Any | Router.Any | Effectful | EffectfulShape;
+  };
+
+  /**
+   * The union of the error types of `S`'s `make` and of every nested router service's `make` (at
+   * any depth of plain records; routers contribute `never`). `never` for a pure service.
+   *
+   * @since 0.1.0
+   */
+  export type MakeError<S> = MakeOf<S, 'error'>;
+
+  /**
+   * The union of the services required by `S`'s `make` and by every nested router service's
+   * `make` (at any depth of plain records; routers contribute `never`). `never` for a pure service.
+   *
+   * @since 0.1.0
+   */
+  export type MakeServices<S> = MakeOf<S, 'services'>;
 }
+
+/** The `E` (`'error'`) or `R` (`'services'`) of a router service's `make`, nested makes included. */
+type MakeOf<S, F extends 'error' | 'services'> = S extends {
+  readonly make: Effect.Effect<infer Rec, infer E, infer R>;
+}
+  ? (F extends 'error' ? E : R) | NestedMakeOf<Rec, F>
+  : never;
+
+type NestedMakeOf<Rec, F extends 'error' | 'services'> = string extends keyof Rec
+  ? never
+  : { readonly [K in keyof Rec]-?: EntryMakeOf<Rec[K], F> }[keyof Rec];
+
+type EntryMakeOf<V, F extends 'error' | 'services'> = [V] extends [RouterService.Effectful]
+  ? MakeOf<V, F>
+  : [V] extends [ProcedureDef.Any | Router.Any]
+    ? never
+    : NestedMakeOf<V, F>;
 
 /** The record of the router built from a router service (nested services resolved). */
 type ServiceRecord<S> = S extends { readonly make: Effect.Effect<infer Rec, infer _E, infer _R> }
@@ -382,7 +438,7 @@ type Resolve<Rec> = string extends keyof Rec
     ? { readonly [K in keyof Rec]: ResolveEntry<Rec[K]> }
     : Rec;
 
-type ResolveEntry<V> = [V] extends [RouterService.Any]
+type ResolveEntry<V> = [V] extends [RouterService.Effectful]
   ? Router<ServiceRecord<V>>
   : [V] extends [ProcedureDef.Any | Router.Any]
     ? V
@@ -390,7 +446,7 @@ type ResolveEntry<V> = [V] extends [RouterService.Any]
 
 type HasService<Rec> = { readonly [K in keyof Rec]-?: EntryHasService<Rec[K]> }[keyof Rec];
 
-type EntryHasService<V> = [V] extends [RouterService.Any]
+type EntryHasService<V> = [V] extends [RouterService.Effectful]
   ? true
   : [V] extends [ProcedureDef.Any | Router.Any]
     ? false
@@ -398,7 +454,7 @@ type EntryHasService<V> = [V] extends [RouterService.Any]
       ? false
       : HasService<V>;
 
-type RecordOf<R> = R extends RouterService.Any
+type RecordOf<R> = R extends RouterService.Effectful
   ? ServiceRecord<R>
   : R extends Router<infer Rec>
     ? Rec
