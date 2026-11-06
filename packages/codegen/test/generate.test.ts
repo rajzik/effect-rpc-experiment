@@ -216,6 +216,22 @@ describe('router services whose make is Effect.gen', () => {
     expect(readOut('router.client.gen.ts')).not.toContain('Cache');
   });
 
+  it.each(['only.ts', 'mixed.ts'])(
+    'emits a router service whose make returns only nested records (%s)',
+    (file) => {
+      const nested = generate({
+        project: path.join(fixtureDir('nested'), 'tsconfig.json'),
+        routers: [path.join(fixtureDir('nested'), file)],
+        write: false,
+      });
+      expect(nested.errors).toEqual([]);
+      const client = nested.files.find((f) => f.path.endsWith('.client.gen.ts'))?.content ?? '';
+      expect(client).toContain(
+        'export const NestedRouter = __Router.make({\n  a: {\n    b: __query(',
+      );
+    },
+  );
+
   it('inlines a nested effectful service into the client record', () => {
     expect(readOut('router.client.gen.ts')).toContain(
       [

@@ -869,7 +869,7 @@ const isRouterRecord = (ctx: Ctx, record: Type, depth: number): boolean =>
     if (make !== undefined) return yieldsRouter(ctx, ctx.checker.getTypeOfSymbol(make), depth + 1);
     return (
       type.isObjectType() &&
-      (type.objectFlags & ObjectFlags.ObjectLiteral) !== 0 &&
+      ctx.checker.getSignaturesOfType(type, 0).length === 0 &&
       isRouterRecord(ctx, type, depth + 1)
     );
   });
