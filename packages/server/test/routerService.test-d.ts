@@ -378,7 +378,6 @@ describe('server adapters accept the router service class (types)', () => {
     expectTypeOf<Parameters<typeof Handlers.make<typeof plainRouter, H>>[0]>().toEqualTypeOf<
       typeof plainRouter
     >();
-    type AppRouterOf = Router.Of<typeof AppRouter>;
     expectTypeOf<
       ReturnType<typeof Handlers.make<AppRouterOf, Handlers.From<AppRouterOf>>>
     >().toEqualTypeOf<

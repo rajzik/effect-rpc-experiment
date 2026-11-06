@@ -862,11 +862,9 @@ const build = (input: Router.ServiceShape): Router<Router.Shape> => {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the group is compiled from `record`, so its rpcs are `Router.Rpcs<Rec>`
     group: group as unknown as RpcGroup.RpcGroup<Router.Rpcs<Router.Shape>>,
     procedures,
-    middleware: <M extends RpcMiddleware.AnyService>(middleware: M) =>
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `applyMiddleware` adds `M` to every definition, which is what `WithMiddleware` describes
-      build(applyMiddleware(record, middleware)) as unknown as Router<
-        Router.WithMiddleware<Router.Shape, M>
-      >,
+    // `applyMiddleware` adds `M` to every definition, which is what `WithMiddleware` describes.
+    middleware: (middleware: RpcMiddleware.AnyService) =>
+      build(applyMiddleware(record, middleware)),
   };
   return Object.freeze(router);
 };
@@ -936,8 +934,9 @@ const make: {
   <const Rec extends Router.Shape>(record: Rec): Router<Rec>;
   <const Rec extends Router.ServiceShape>(record: Rec): Router<Resolve<Rec>>;
 } =
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `build` stores a record without services as-is (first overload) and resolves the services of any other record (second overload, what `Resolve` describes)
-  build as unknown as typeof make;
+  // `build` stores a record without services as-is (first overload) and resolves the services of
+  // any other record (second overload, what `Resolve` describes).
+  build;
 
 /**
  * Merges two routers into one (tRPC's `mergeRouters`).
