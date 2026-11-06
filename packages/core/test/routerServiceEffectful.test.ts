@@ -1,4 +1,4 @@
-import { Context, Effect, Ref, Schema } from 'effect';
+import { Cause, Context, Effect, Exit, Ref, Schema } from 'effect';
 import { describe, expect, it } from 'vite-plus/test';
 import { Procedure, Router } from '../src/index.js';
 
@@ -58,6 +58,15 @@ const provideApp =
       Effect.provideService(Database, { title: (id) => Effect.succeed(`post ${id}`) }),
     );
 
+/** Runs `effect` and returns its defect, asserting it died (no typed failure). */
+const defectOf = async (effect: Effect.Effect<unknown, unknown>): Promise<unknown> => {
+  const exit = await Effect.runPromiseExit(effect);
+  if (!Exit.isFailure(exit)) throw new Error('expected a failure');
+  expect(Cause.hasDies(exit.cause)).toBe(true);
+  expect(Cause.hasFails(exit.cause)).toBe(false);
+  return Cause.squash(exit.cause);
+};
+
 describe('Router.buildService', () => {
   it('buildService runs make with provided services', async () => {
     const { router, value } = await Effect.runPromise(
@@ -100,8 +109,28 @@ describe('Router.buildService', () => {
         Effect.succeed({ loop: { again: Loop } }),
       ),
     }) {}
-    const exit = await Effect.runPromiseExit(Router.buildService(Loop));
-    expect(String(exit)).toMatch(/LoopRouter.*nests the service itself/);
+    const defect = await defectOf(Router.buildService(Loop));
+    expect(defect).toBeInstanceOf(Error);
+    expect(String(defect)).toMatch(/LoopRouter.*nests the service itself/);
+  });
+
+  it('a make that succeeds with a router or a non-record dies', async () => {
+    class RouterMake extends Context.Service<RouterMake>()('RouterMakeRouter', {
+      make: Effect.succeed(
+        Router.make({ ping: Procedure.output(Schema.String).query(() => Effect.succeed('p')) }),
+      ),
+    }) {}
+    class NumberMake extends Context.Service<NumberMake>()('NumberMakeRouter', {
+      make: Effect.succeed(42),
+    }) {}
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a cast that hides the router result from the types
+    expect(String(await defectOf(Router.buildService(RouterMake as never)))).toMatch(
+      /RouterMakeRouter.*make must succeed with a record of procedures, not a router/,
+    );
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a cast that hides the non-record result from the types
+    expect(String(await defectOf(Router.buildService(NumberMake as never)))).toMatch(
+      /NumberMakeRouter.*make must succeed with a record of procedures$/,
+    );
   });
 
   it('forced effectful class in Router.from throws', () => {

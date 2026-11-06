@@ -69,6 +69,28 @@ describe('effectful router services (types)', () => {
     >();
   });
 
+  it('buildService carries the router, the value and every make error and service', () => {
+    expectTypeOf(Router.buildService(AppRouter)).toEqualTypeOf<
+      Effect.Effect<
+        {
+          readonly router: Router.Of<typeof AppRouter>;
+          readonly value: Context.Service.Shape<typeof AppRouter>;
+        },
+        ConfigError,
+        AppConfig | Database
+      >
+    >();
+    expectTypeOf(Router.buildService(PureRouter)).toEqualTypeOf<
+      Effect.Effect<
+        {
+          readonly router: Router.Of<typeof PureRouter>;
+          readonly value: Context.Service.Shape<typeof PureRouter>;
+        }
+        // E and R default to never: no error, no services
+      >
+    >();
+  });
+
   it('a pure service makes with no error and no services', () => {
     expectTypeOf<RouterService.MakeError<typeof PureRouter>>().toEqualTypeOf<never>();
     expectTypeOf<RouterService.MakeServices<typeof PureRouter>>().toEqualTypeOf<never>();
