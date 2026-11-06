@@ -2,9 +2,9 @@
 // client contract check), serve the server module and call it through the client module.
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { Effect, Layer, Stream } from 'effect';
+import { Context, Effect, Layer, Stream } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vite-plus/test';
-import { RpcDefect } from '@effect-trpc/core';
+import { Router, RpcDefect } from '@effect-trpc/core';
 import { createClient, httpLink } from '@effect-trpc/client';
 import type { Client } from '@effect-trpc/client';
 import { Handlers, toWebHandler } from '@effect-trpc/server';
@@ -15,6 +15,9 @@ import { copyFixture, fixtureDir, removeDir, typeCheck } from './helpers.js';
 import { AppRouter as ClientRouter } from './fixtures/app/router.client.gen.js';
 import { AppRouter as ServerRouter } from './fixtures/app/router.gen.js';
 import { Auth, Forbidden, Log, Post, PostNotFound, Unauthorized } from './fixtures/app/models.js';
+import { Roles } from './fixtures/annotated/meta.js';
+import { AppRouter as AnnotatedClient } from './fixtures/annotated/router.client.gen.js';
+import { AppRouter as AnnotatedServer } from './fixtures/annotated/router.gen.js';
 import { AppRouter as EffectfulClient } from './fixtures/effectful/router.client.gen.js';
 import { AppRouter as EffectfulServer } from './fixtures/effectful/router.gen.js';
 import { Database } from './fixtures/effectful/db.js';
@@ -339,6 +342,60 @@ describe('router services whose make is Effect.gen', () => {
       await client.dispose();
       await web.dispose();
     }
+  });
+});
+
+describe('annotated procedures', () => {
+  let annotated: string;
+  let out: GenerateResult;
+  beforeAll(() => {
+    annotated = copyFixture('annotated');
+    out = generate({
+      project: path.join(annotated, 'tsconfig.json'),
+      routers: [path.join(annotated, 'router.ts')],
+    });
+  });
+  afterAll(() => {
+    removeDir(annotated);
+  });
+
+  it('reads a trailing .annotate like a trailing .middleware', () => {
+    expect(out.errors).toEqual([]);
+    expect(out.procedures.map((p) => p.path)).toEqual(['stats', 'early', 'plain']);
+  });
+
+  it('the client module drops annotations and keeps middleware', () => {
+    const client = readFileSync(path.join(annotated, 'router.client.gen.ts'), 'utf8');
+    expect(client).not.toContain('annotate');
+    expect(client).not.toContain('Roles');
+    expect(client).toContain('  stats: __query({ success: __Schema.Number }).middleware(Log),');
+    expect(client).toContain('  early: __query({ success: __Schema.String }),');
+    expect(client).toContain('  status: query({ success: Schema.String }),');
+  });
+
+  it('type-checks, including the client contract check', () => {
+    expect(typeCheck(annotated)).toBe('');
+  });
+
+  it('the committed fixture output is up to date', () => {
+    const fresh = generate({
+      project: path.join(fixtureDir('annotated'), 'tsconfig.json'),
+      routers: [path.join(fixtureDir('annotated'), 'router.ts')],
+      write: false,
+    });
+    expect(fresh.errors).toEqual([]);
+    expect(fresh.files.filter((f) => f.changed).map((f) => f.path)).toEqual([]);
+  });
+
+  it('the server module keeps the annotations, the client module has none', () => {
+    const tags = ['stats', 'early', 'status'] as const;
+    for (const tag of tags)
+      expect(Context.get(Router.getRpc(AnnotatedServer, tag).annotations, Roles)).toEqual([
+        'admin',
+      ]);
+    expect(Context.get(Router.getRpc(AnnotatedServer, 'plain').annotations, Roles)).toEqual([]);
+    for (const tag of tags)
+      expect(Context.get(Router.getRpc(AnnotatedClient, tag).annotations, Roles)).toEqual([]);
   });
 });
 

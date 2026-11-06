@@ -75,9 +75,9 @@ export type NormalizePayload<P> = P extends Schema.Struct.Fields ? Schema.Struct
  *   record, so the same definition can live under several paths.
  * - Definitions are frozen; `.middleware(M)` and `.annotate(key, value)` return a new definition.
  * - `.annotate(key, value)` is tRPC's `.meta()`: runtime metadata on the compiled rpc
- *   (`rpc.annotations`, after the {@link ProcedureKind} annotation) that middleware reads with
- *   `Context.get(rpc.annotations, key)`. It does not change the definition's type; annotating the
- *   same key again replaces the value.
+ *   (`rpc.annotations`) that middleware reads with `Context.get(rpc.annotations, key)`. It does not
+ *   change the definition's type; annotating the same key again replaces the value. The
+ *   {@link ProcedureKind} annotation is applied last: annotating that key does not change the kind.
  * - `Payload` – input schema (`Schema.Void` when the procedure takes no input)
  * - `Success` – output schema; for subscriptions this is the schema of each streamed element
  * - `Error` – typed failure schema (`Schema.Never` when the procedure cannot fail)
@@ -463,7 +463,7 @@ interface DefState {
   readonly successSchema: Schema.Top;
   readonly errorSchema: Schema.Top;
   readonly middlewares: ReadonlyArray<RpcMiddleware.AnyService>;
-  /** User annotations, applied to the compiled rpc after `ProcedureKind`. */
+  /** User annotations, applied to the compiled rpc before `ProcedureKind` (the kind wins). */
   readonly annotations: Context.Context<never>;
   /** Only procedures built with `Procedure` have one; plain definitions omit the key. */
   readonly handler?: AnyHandler;
@@ -527,7 +527,7 @@ class ProcedureDefImpl implements DefState {
     for (const middleware of this.middlewares) {
       rpc = rpc.middleware(middleware);
     }
-    return rpc.annotate(ProcedureKind, this.kind).annotateMerge(this.annotations);
+    return rpc.annotateMerge(this.annotations).annotate(ProcedureKind, this.kind);
   }
 }
 

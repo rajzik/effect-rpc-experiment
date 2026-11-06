@@ -48,6 +48,20 @@ describe('annotate', () => {
     expect(Context.get(annotations(def), Audit)).toBe(true);
   });
 
+  it('never changes the kind: ProcedureKind is applied after user annotations', () => {
+    const def = query({ success: Schema.String }).annotate(ProcedureKind, 'mutation');
+    expect(Context.get(annotations(def), ProcedureKind)).toBe('query');
+    const built = Procedure.annotate(ProcedureKind, 'subscription').mutation(() => Effect.void);
+    expect(Context.get(annotations(built), ProcedureKind)).toBe('mutation');
+  });
+
+  it('carries annotations of procedures in nested records', () => {
+    const router = Router.make({
+      a: { b: query({ success: Schema.String }).annotate(Roles, ['x']) },
+    });
+    expect(Context.get(Router.getRpc(router, 'a.b').annotations, Roles)).toEqual(['x']);
+  });
+
   it('keeps annotations through definition and router middleware', () => {
     const def = query({ success: Schema.String })
       .annotate(Roles, ['admin'])
