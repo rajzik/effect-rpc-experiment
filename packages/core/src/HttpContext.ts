@@ -1,0 +1,212 @@
+/**
+ * Request and response access for procedure handlers and middleware: read the HTTP request, set
+ * response headers and cookies.
+ *
+ * When a call arrives over HTTP, `effect/rpc`'s `RpcServer` runs the handler with the HTTP
+ * request fiber's context, so Effect's `HttpServerRequest` is available and response changes can
+ * be registered with `HttpEffect.appendPreResponseHandler`. These helpers wrap both without adding
+ * a requirement, so handlers that use them still run under `createCaller`, `localLink`, Electron
+ * and tests (there they read `None` and the setters do nothing).
+ *
+ * @since 0.1.0
+ */
+import { Effect, Option } from 'effect';
+import { Cookies, Headers, HttpEffect, HttpServerRequest, HttpServerResponse } from 'effect/http';
+
+/**
+ * The HTTP request of the current call: `Some` when it arrived over HTTP, `None` otherwise.
+ *
+ * **Details**
+ *
+ * - Over WebSocket it is the upgrade request (shared by every call of the connection).
+ * - `None` under `createCaller`, `localLink`, Electron and the test harness.
+ *
+ * **Example** (Reading a header)
+ *
+ * ```ts
+ * import { Effect, Option, Schema } from 'effect';
+ * import { HttpContext, Procedure } from '@effect-trpc/core';
+ *
+ * const userAgent = Procedure.output(Schema.String).query(() =>
+ *   Effect.map(
+ *     HttpContext.request,
+ *     Option.match({
+ *       onNone: () => 'unknown',
+ *       onSome: (request) => request.headers['user-agent'] ?? 'unknown',
+ *     }),
+ *   ),
+ * );
+ * ```
+ *
+ * @category getters
+ * @since 0.1.0
+ */
+const request: Effect.Effect<Option.Option<HttpServerRequest.HttpServerRequest>> =
+  Effect.serviceOption(HttpServerRequest.HttpServerRequest);
+
+const onResponse = (
+  update: (
+    response: HttpServerResponse.HttpServerResponse,
+  ) => HttpServerResponse.HttpServerResponse,
+): Effect.Effect<void> =>
+  Effect.flatMap(request, (option) =>
+    Option.isNone(option)
+      ? Effect.void
+      : Effect.sync(() =>
+          HttpEffect.appendPreResponseHandlerUnsafe(option.value, (_, response) =>
+            Effect.succeed(update(response)),
+          ),
+        ),
+  );
+
+/**
+ * Sets a response header, replacing any value set before.
+ *
+ * **Details**
+ *
+ * - Header names are case-insensitive (stored lowercased).
+ * - A no-op when the call did not arrive over HTTP.
+ *
+ * **Example** (Disabling caching)
+ *
+ * ```ts
+ * import { Effect, Schema } from 'effect';
+ * import { HttpContext, Procedure } from '@effect-trpc/core';
+ *
+ * const now = Procedure.output(Schema.Finite).query(() =>
+ *   HttpContext.setHeader('cache-control', 'no-store').pipe(Effect.as(Date.now())),
+ * );
+ * ```
+ *
+ * @category combinators
+ * @since 0.1.0
+ */
+const setHeader = (name: string, value: string): Effect.Effect<void> =>
+  onResponse(HttpServerResponse.setHeader(name, value));
+
+/**
+ * Appends a value to a response header, keeping the values set before (`a, b`).
+ *
+ * **Example** (Adding to `vary`)
+ *
+ * ```ts
+ * import { Effect, Schema } from 'effect';
+ * import { HttpContext, Procedure } from '@effect-trpc/core';
+ *
+ * const greeting = Procedure.output(Schema.String).query(() =>
+ *   HttpContext.appendHeader('vary', 'accept-language').pipe(Effect.as('hello')),
+ * );
+ * ```
+ *
+ * @category combinators
+ * @since 0.1.0
+ */
+const appendHeader = (name: string, value: string): Effect.Effect<void> =>
+  onResponse((response) =>
+    HttpServerResponse.setHeader(
+      response,
+      name,
+      Option.match(Headers.get(response.headers, name), {
+        onNone: () => value,
+        onSome: (previous) => `${previous}, ${value}`,
+      }),
+    ),
+  );
+
+/**
+ * Sets a response cookie (a `set-cookie` header).
+ *
+ * **Example** (A login mutation setting a session cookie)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { HttpContext, Procedure } from '@effect-trpc/core';
+ *
+ * const login = Procedure.input({ token: Schema.String }).mutation(({ token }) =>
+ *   HttpContext.setCookie('session', token, { httpOnly: true, secure: true, path: '/' }),
+ * );
+ * ```
+ *
+ * @category combinators
+ * @since 0.1.0
+ */
+const setCookie = (
+  name: string,
+  value: string,
+  options?: Cookies.Cookie['options'],
+): Effect.Effect<void> =>
+  Effect.flatMap(
+    Effect.orDie(Effect.fromResult(Cookies.makeCookie(name, value, options))),
+    (cookie) => onResponse(HttpServerResponse.updateCookies(Cookies.setCookie(cookie))),
+  );
+
+/**
+ * Reads the HTTP request of the current call and sets response headers and cookies, from a
+ * procedure handler or a middleware.
+ *
+ * **When to use**
+ *
+ * Use to read request data that is not part of the rpc payload (a header, the client address, a
+ * cookie) or to change the HTTP response — e.g. a `login` mutation that sets a session cookie.
+ * Prefer a middleware that `provides` a service (e.g. `CurrentUser`) when many procedures need
+ * the same value derived from the request.
+ *
+ * **Details**
+ *
+ * | API                                       | Description                                          |
+ * | ----------------------------------------- | ---------------------------------------------------- |
+ * | `HttpContext.request`                     | `Option<HttpServerRequest>` of the current call.     |
+ * | `HttpContext.setHeader(name, value)`      | Sets a response header (replaces earlier values).    |
+ * | `HttpContext.appendHeader(name, value)`   | Appends to a response header (`a, b`).               |
+ * | `HttpContext.setCookie(name, value, opt)` | Sets a cookie; `opt` is `Cookies.Cookie['options']`. |
+ *
+ * - None of them adds a requirement or an error: they are `Effect<…, never, never>`, so a
+ *   handler using them still runs under every transport.
+ * - Outside HTTP (`createCaller`, `localLink`, Electron, tests) `request` is `None` and the
+ *   setters do nothing.
+ * - Changes apply to the response when it is written, in call order.
+ *
+ * **Gotchas**
+ *
+ * - The response is written as soon as the first response chunk exists: the `Exit` of a query or
+ *   mutation, the first element of a subscription. Headers and cookies set after that (e.g. by a
+ *   subscription after its first element) are silently dropped.
+ * - Several calls sent in one HTTP request share one response: a header set by one of them
+ *   applies to all, and only if set before the first of them writes its response chunk.
+ * - Over WebSocket, `request` is the upgrade request and the setters have no effect (the upgrade
+ *   response was sent before any call).
+ * - `appendHeader` joins values with `", "`; use `setCookie` for cookies, never
+ *   `appendHeader('set-cookie', …)`.
+ * - `setCookie` with an invalid name, value or option dies (a defect, `RpcDefect` on the client),
+ *   with or without HTTP.
+ *
+ * **Example** (A login mutation that reads a header and sets a cookie)
+ *
+ * ```ts
+ * import { Effect, Option, Schema } from 'effect';
+ * import { HttpContext, Procedure, Router } from '@effect-trpc/core';
+ *
+ * const appRouter = Router.make({
+ *   login: Procedure.input({ token: Schema.String }).mutation(({ token }) =>
+ *     Effect.gen(function* () {
+ *       const request = yield* HttpContext.request;
+ *       const agent = Option.match(request, {
+ *         onNone: () => 'local',
+ *         onSome: (req) => req.headers['user-agent'] ?? 'unknown',
+ *       });
+ *       yield* HttpContext.setHeader('x-login-agent', agent);
+ *       yield* HttpContext.setCookie('session', token, { httpOnly: true, path: '/' });
+ *     }),
+ *   ),
+ * });
+ * ```
+ *
+ * @category combinators
+ * @since 0.1.0
+ */
+export const HttpContext = {
+  request,
+  setHeader,
+  appendHeader,
+  setCookie,
+} as const;

@@ -43,3 +43,4 @@ export {
   type ClientInfrastructureError,
 } from './ClientError.js';
 export * as Codecs from './Codecs.js';
+export { HttpContext } from './HttpContext.js';
