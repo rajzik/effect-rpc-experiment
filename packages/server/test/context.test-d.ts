@@ -55,6 +55,19 @@ describe('context option types', () => {
     void toWebHandler(router, { handlers: HandlersNeedingRequestId, context: contextNeedingClock });
   });
 
+  it('toWebHandler with a router service: handlers may require the context services', () => {
+    class Svc extends Context.Service<Svc>()('Svc', {
+      make: Effect.succeed({ echo: Procedure.output(Schema.String).query(() => RequestId) }),
+    }) {}
+    const handlers = Handlers.fromService(Svc);
+    expectTypeOf(handlers).toEqualTypeOf<
+      Layer.Layer<Rpc.Handler<'echo'> | Svc, never, RequestId>
+    >();
+    expectTypeOf(toWebHandler(Svc, { handlers, context })).toEqualTypeOf<Promise<WebHandler>>();
+    // @ts-expect-error - without `context`, RequestId is an unmet requirement of the handlers
+    void toWebHandler(Svc, { handlers });
+  });
+
   it('layerHttp: context services are not requirements of the layer', () => {
     expectTypeOf(layerHttp(router, { handlers: HandlersNeedingRequestId, context })).toEqualTypeOf<
       Layer.Layer<never, never, HttpRouter.HttpRouter>

@@ -76,7 +76,7 @@ describe('context over toWebHandler', () => {
   it('reads services of the handlers layer output', async () => {
     const stamped = Effect.map(Clock2, (clock) => Context.make(RequestId, clock.now));
     await using web = await toWebHandler(router, {
-      handlers: handlers.pipe(Layer.provideMerge(Layer.succeed(Clock2)({ now: 't-1' }))),
+      handlers: Layer.merge(handlers, Layer.succeed(Clock2)({ now: 't-1' })),
       context: stamped,
     });
     expect(exitFrame(await call(web, { tag: 'echo' }))).toEqual({ _tag: 'Success', value: 't-1' });

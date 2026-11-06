@@ -110,6 +110,8 @@ export interface OnErrorInfo {
  *   part of the procedure's errors). A defect in it fails the call with `RpcDefect`.
  * - The services of `context` exist only while a call runs: reading them while the handlers
  *   layer is built fails.
+ * - Explicit type arguments (`toWebHandler<typeof appRouter>(...)`) fix the `context` types to
+ *   `never`; let them be inferred.
  *
  * **Example** (A request id from a header, for every handler)
  *
