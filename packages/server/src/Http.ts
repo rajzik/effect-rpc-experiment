@@ -11,12 +11,14 @@
  * @since 0.1.0
  */
 import { Layer, ManagedRuntime } from 'effect';
-import type { Context } from 'effect';
+import type { Cause, Context, Effect } from 'effect';
 import { HttpRouter } from 'effect/http';
+import type { Headers } from 'effect/http';
 import { RpcSerialization, RpcServer } from 'effect/rpc';
 import type { Rpc, RpcGroup } from 'effect/rpc';
 import { Router } from '@effect-trpc/core';
 import type { Handlers } from './Handlers.js';
+import { withHooks } from './internal/hooks.js';
 
 /**
  * Wire format of the rpc endpoint: `"ndjson"` (default for HTTP; streams subscription chunks as
@@ -33,6 +35,57 @@ import type { Handlers } from './Handlers.js';
  * @since 0.1.0
  */
 export type Serialization = 'json' | 'ndjson' | Layer.Layer<RpcSerialization.RpcSerialization>;
+
+/**
+ * What the `onError` server option receives about a failed call (tRPC's `onError` options).
+ *
+ * **When to use**
+ *
+ * Use to log or report failures centrally: every call that fails (typed failure or defect,
+ * including failures of middleware such as auth) is reported once, with its procedure path.
+ *
+ * **Details**
+ *
+ * - `cause` is the full `Cause` of the failure: typed errors are `Fail` reasons, defects `Die`
+ *   reasons. Calls that are only interrupted (client abort, shutdown) are not reported.
+ * - `headers` are the call's headers, request headers included.
+ *
+ * **Gotchas**
+ *
+ * - The failure is sent once `onError` completes and the hook is not interrupted (not even by a
+ *   client abort), so a slow hook delays the response; fork long work. Failures and defects of
+ *   the hook itself are ignored and never change the response.
+ *
+ * **Example** (Logging failed calls)
+ *
+ * ```ts
+ * import { Cause, Effect, Schema } from 'effect';
+ * import { query, Router } from '@effect-trpc/core';
+ * import { Handlers, toWebHandler } from '@effect-trpc/server';
+ * import type { OnErrorInfo } from '@effect-trpc/server';
+ *
+ * class NotFound extends Schema.TaggedError<NotFound>()('NotFound', {}) {}
+ * const appRouter = Router.make({ post: query({ success: Schema.String, error: NotFound }) });
+ * const HandlersLive = Handlers.make(appRouter, { post: () => Effect.fail(new NotFound()) });
+ *
+ * const onError = ({ path, cause, headers }: OnErrorInfo) =>
+ *   Effect.logError(`${path} failed (user ${headers['x-user'] ?? '-'})`, Cause.pretty(cause));
+ *
+ * const { handler } = await toWebHandler(appRouter, { handlers: HandlersLive, onError });
+ * ```
+ *
+ * @see {@link ServerOptions}
+ * @category models
+ * @since 0.1.0
+ */
+export interface OnErrorInfo {
+  /** The procedure path, e.g. `"post.byId"`. */
+  readonly path: string;
+  /** Why the call failed. Never interrupt-only. */
+  readonly cause: Cause.Cause<unknown>;
+  /** The call's headers (the HTTP request headers plus the rpc message headers). */
+  readonly headers: Headers.Headers;
+}
 
 /**
  * Options shared by the HTTP adapters (`layerHttp`, `toWebHandler`, `serve`, `runServer`).
@@ -56,6 +109,12 @@ export interface ServerOptions {
   readonly spanPrefix?: string | undefined;
   /** Maximum number of requests handled concurrently. Defaults to `"unbounded"`. */
   readonly concurrency?: number | 'unbounded' | undefined;
+  /**
+   * Called for every call that fails (typed failure or defect, middleware failures included),
+   * before the failure is sent; not for interruptions. Its own failures are ignored. See
+   * {@link OnErrorInfo}.
+   */
+  readonly onError?: ((error: OnErrorInfo) => Effect.Effect<void>) | undefined;
 }
 
 /**
@@ -154,16 +213,17 @@ const layerHttpFor = <R extends Router.Any, LOut = never, LE = never, LR = never
   options: LayerHttpOptions<LOut, LE, LR> = {},
 ): Layer.Layer<never, LE, HttpRouter.HttpRouter | LR | Exclude<Handlers.Requirements<R>, LOut>> => {
   const protocol = options.protocol ?? 'http';
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Router.Any` erases the group's rpcs on purpose; the return type below restores them via `Handlers.Requirements<R>`
+  const hooks = withHooks(router.group as RpcGroup.RpcGroup<Rpc.Any>, options);
   const server = RpcServer.layerHttp({
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Router.Any` erases the group's rpcs on purpose; the return type below restores them via `Handlers.Requirements<R>`
-    group: router.group as RpcGroup.RpcGroup<Rpc.Any>,
+    group: hooks.group,
     path: options.path ?? defaultPath,
     protocol,
     disableFatalDefects: true,
     disableTracing: options.disableTracing,
     spanPrefix: options.spanPrefix,
     concurrency: options.concurrency,
-  }).pipe(Layer.provide(serializationLayer(options.serialization)));
+  }).pipe(Layer.provide([serializationLayer(options.serialization), hooks.layer]));
   return options.handlers === undefined ? server : server.pipe(Layer.provide(options.handlers));
 };
 
@@ -282,6 +342,7 @@ const toWebHandlerFor = async <R extends Router.Any, LE = never>(
     disableTracing: options.disableTracing,
     spanPrefix: options.spanPrefix,
     concurrency: options.concurrency,
+    onError: options.onError,
     protocol: 'http',
     handlers: Layer.succeedContext(context),
   }) as Layer.Layer<never, never, HttpRouter.HttpRouter>;

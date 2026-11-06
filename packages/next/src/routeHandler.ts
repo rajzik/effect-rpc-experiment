@@ -10,7 +10,7 @@
  */
 import { Router } from '@effect-trpc/core';
 import { toWebHandler } from '@effect-trpc/server';
-import type { Handlers, Serialization, WebHandler } from '@effect-trpc/server';
+import type { Handlers, Serialization, ServerOptions, WebHandler } from '@effect-trpc/server';
 import type { Layer } from 'effect';
 
 /**
@@ -45,6 +45,11 @@ export interface RouteHandlerOptions<R extends Router.Any, LE = never> {
   readonly basePath?: `/${string}` | undefined;
   /** Wire format, must match the client's `httpLink`. Defaults to `"ndjson"`. */
   readonly serialization?: Serialization | undefined;
+  /**
+   * Called for every call that fails, before the failure is sent (see `OnErrorInfo` in
+   * `@effect-trpc/server`).
+   */
+  readonly onError?: ServerOptions['onError'];
 }
 
 /**
@@ -135,6 +140,7 @@ const createRouteHandlerFor = <R extends Router.Any, LE = never>(
       handlers: options.handlers,
       path,
       serialization: options.serialization,
+      onError: options.onError,
     }).catch((error: unknown) => {
       // Let the next request retry instead of caching the failure forever.
       server = undefined;

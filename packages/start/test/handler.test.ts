@@ -63,6 +63,17 @@ describe('createStartHandler', () => {
     );
   });
 
+  test('onError is passed through to the server', async () => {
+    const paths: Array<string> = [];
+    const handler = createStartHandler(appRouter, {
+      handlers: makeFixture().handlers,
+      onError: ({ path }) => Effect.sync(() => paths.push(path)),
+    });
+    handlers.push(handler);
+    await handler({ request: rpcRequest('http://x/api/rpc', 'post.byId', { id: 404 }) });
+    expect(paths).toEqual(['post.byId']);
+  });
+
   test('encodes defects as Die and keeps serving', async () => {
     const { handler } = make();
     const died = await handler({ request: rpcRequest('http://x/api/rpc', 'boom') });

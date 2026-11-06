@@ -76,6 +76,17 @@ describe('createRouteHandler', () => {
     expect(Exit.isFailure(decoded)).toBe(true);
   });
 
+  test('onError is passed through to the server', async () => {
+    const { handlers } = makeFixture();
+    const paths: Array<string> = [];
+    await using route = createRouteHandler(appRouter, {
+      handlers,
+      onError: ({ path }) => Effect.sync(() => paths.push(path)),
+    });
+    await route.POST(rpcRequest('http://localhost/api/rpc', 'post.byId', { id: 404 }));
+    expect(paths).toEqual(['post.byId']);
+  });
+
   test('subscriptions stream NDJSON chunks', async () => {
     const { handlers } = makeFixture();
     await using route = createRouteHandler(appRouter, { handlers });

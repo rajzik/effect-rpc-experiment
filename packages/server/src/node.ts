@@ -88,6 +88,7 @@ const appLayer = <R extends Router.Any, LE, LR>(
     disableTracing: options.disableTracing,
     spanPrefix: options.spanPrefix,
     concurrency: options.concurrency,
+    onError: options.onError,
     protocol: 'http',
   });
 

@@ -16,6 +16,7 @@ export {
   toHttpLayer,
   toWebHandler,
   type LayerHttpOptions,
+  type OnErrorInfo,
   type Serialization,
   type ServerOptions,
   type WebHandler,

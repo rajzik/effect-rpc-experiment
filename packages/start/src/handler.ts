@@ -38,7 +38,8 @@ export const defaultStartPath = '/api/rpc' as const;
 
 /**
  * Options of {@link createStartHandler}: the `toWebHandler` options (`handlers` required,
- * `serialization`, `disableTracing`, `spanPrefix`, `concurrency`) plus the mount `path`.
+ * `serialization`, `disableTracing`, `spanPrefix`, `concurrency`, `onError`) plus the mount
+ * `path`.
  *
  * **Gotchas**
  *
@@ -133,6 +134,7 @@ const createStartHandlerFor = <R extends Router.Any, LE = never>(
       disableTracing: options.disableTracing,
       spanPrefix: options.spanPrefix,
       concurrency: options.concurrency,
+      onError: options.onError,
     }).catch((error: unknown) => {
       web = undefined;
       throw error;
