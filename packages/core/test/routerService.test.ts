@@ -147,7 +147,7 @@ describe('Router.fromService', () => {
     );
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a cast that hides the requirement from the types
     expect(() => Router.fromService(NeedsDb as unknown as RouterService.Any)).toThrow(
-      /NeedsDbRouter.*make must not require services or be asynchronous/,
+      /NeedsDbRouter.*make reads services, so this API cannot build the router/,
     );
   });
 
