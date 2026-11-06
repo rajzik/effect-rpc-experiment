@@ -1,0 +1,4 @@
+# Generated: anchored to site/ so snippet folders named api/ are not ignored.
+/.vitepress/cache
+/.vitepress/dist
+/api/

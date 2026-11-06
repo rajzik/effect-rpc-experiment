@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Check, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version comes from the `packageManager` field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Package `exports.types` point at dist/*.d.mts, so packages must be built
+      # before typecheck and type-aware lint can resolve cross-package types.
+      - name: Build
+        run: pnpm exec vp run -r build
+
+      - name: Format, lint (incl. Effect rules), type-aware lint
+        run: pnpm run check # effect-tsgo vp check: Oxlint with the Effect rules
+
+      - name: Typecheck (tsgo --build)
+        run: pnpm exec vp run typecheck
+
+      - name: Test
+        run: pnpm exec vp run -r test
+
+      - name: JSDoc contract and examples
+        run: node scripts/verify-jsdoc.mjs

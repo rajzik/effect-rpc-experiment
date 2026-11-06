@@ -1,0 +1,50 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Builds and tests the site. Deploys (production from main, a preview per PR) are Vercel's: see
+# site/README.md.
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build documentation site
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history: VitePress's "Last updated" reads each page's git log
+
+      # Version comes from the `packageManager` field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Samples and the API generator read the packages' dist/*.d.mts.
+      - name: Build packages
+        run: pnpm exec vp run -r build
+
+      - name: Type-check samples
+        run: pnpm -C site docs:snippets
+
+      - name: Build site (fails on dead links)
+        run: pnpm docs:build
+
+      - name: Site tests (build output, theme, API coverage, samples)
+        run: pnpm -C site docs:test

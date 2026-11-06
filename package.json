@@ -1,0 +1,30 @@
+{
+  "name": "effect-trpc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "effect-tsgo vp check --deny-warnings",
+    "lint": "effect-tsgo vp lint --deny-warnings",
+    "fmt": "vp fmt",
+    "test": "vp run -r test",
+    "build": "vp run -r build",
+    "ready": "effect-tsgo vp check --deny-warnings && vp run typecheck && vp run -r test && vp run -r build && node scripts/verify-jsdoc.mjs",
+    "examples:test": "pnpm -C examples/next example:test && pnpm -C examples/start example:test && pnpm -C examples/electron example:test",
+    "docs:check": "node scripts/verify-jsdoc.mjs",
+    "docs:dev": "pnpm -C site docs:dev",
+    "docs:build": "pnpm -C site docs:build"
+  },
+  "devDependencies": {
+    "@effect/language-service": "catalog:",
+    "@effect/tsgo": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "packageManager": "pnpm@11.25.0"
+}

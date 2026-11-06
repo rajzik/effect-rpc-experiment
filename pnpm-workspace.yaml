@@ -1,0 +1,66 @@
+packages:
+  - packages/*
+  - examples/*
+  - site
+
+catalogMode: prefer
+
+catalog:
+  effect: ^4.0.1
+  '@effect/platform-node': ^4.0.1
+  '@effect/platform-browser': ^4.0.1
+  '@effect/vitest': ^4.0.1
+  '@tanstack/react-query': ^5.104.1
+  '@tanstack/query-core': ^5.104.1
+  react: ^19.3.0
+  react-dom: ^19.3.0
+  '@types/react': ^19.3.0
+  '@types/react-dom': ^19.3.0
+  '@types/node': ^24.19.1
+  typescript: ^7.0.2
+  '@typescript/native-preview': 7.0.0-dev.20260707.2
+  '@testing-library/react': ^16.3.3
+  '@testing-library/dom': ^10.4.0
+  jsdom: ^30.1.2
+  next: ^16.3.8
+  '@tanstack/react-start': ^1.168.60
+  '@tanstack/react-router': ^1.170.41
+  electron: ^44.5.1
+  '@playwright/test': ^1.64.1
+  vite-plus: 1.4.0
+  unplugin: ^3.4.0
+  rollup: ^4.67.5
+  esbuild: ^0.21.5
+  '@effect/language-service': ^0.87.3
+  '@effect/tsgo': 0.67.1
+  vitepress: 1.6.4
+  vue: ^3.5.44
+  '@fontsource/inter': ^5.3.0
+  '@fontsource/jetbrains-mono': ^5.3.0
+
+overrides:
+  vite: npm:@voidzero-dev/vite-plus-core@1.4.0
+  # VitePress 1.x needs real Vite 5 (esbuild-based); scoped so packages keep Vite+.
+  'vitepress>vite': ^5.4.21
+  vitest: 5.0.5
+
+minimumReleaseAgeExclude:
+  - '@effect/tsgo-darwin-arm64@0.67.1'
+  - '@effect/tsgo-darwin-x64@0.67.1'
+  - '@effect/tsgo-linux-arm64@0.67.1'
+  - '@effect/tsgo-linux-arm@0.67.1'
+  - '@effect/tsgo-linux-x64@0.67.1'
+  - '@effect/tsgo-win32-arm64@0.67.1'
+  - '@effect/tsgo-win32-x64@0.67.1'
+  - '@effect/tsgo@0.67.1'
+
+allowBuilds:
+  # esbuild (pulled in by VitePress via Vite 5) installs its platform binary in postinstall.
+  esbuild: true
+  # Electron 44's package.json has no lifecycle scripts: the binary downloads on first use
+  # (`require('electron')`, so on Playwright's `_electron.launch`) or via its `install-electron`
+  # bin (`install.js`), which CI runs explicitly. This entry runs nothing (checked: approving it
+  # downloads no binary). It is here because pnpm 11 reported `electron` under
+  # ERR_PNPM_IGNORED_BUILDS in this workspace without it; the cause is pnpm's build detection, not
+  # a script we need.
+  electron: true

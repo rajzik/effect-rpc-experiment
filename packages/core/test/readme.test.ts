@@ -1,0 +1,247 @@
+// Mirrors the example in README.md so the documentation stays correct.
+import { Context, Effect, Exit, Layer, Schema, Stream } from 'effect';
+import { Headers } from 'effect/http';
+import { Rpc, RpcMessage, RpcMiddleware, RpcTest } from 'effect/rpc';
+import { describe, expect, expectTypeOf, it } from 'vite-plus/test';
+import {
+  causeToClientError,
+  Codecs,
+  isClientInfrastructureError,
+  mutation,
+  Procedure,
+  query,
+  Router,
+  subscription,
+} from '../src/index.js';
+import type {
+  ClientError,
+  inferError,
+  inferInput,
+  inferOutput,
+  inferRouterInputs,
+} from '../src/index.js';
+
+class Post extends Schema.Class<Post>('Post')({
+  id: Schema.Finite,
+  title: Schema.String,
+  createdAt: Schema.Date,
+}) {
+  get slug() {
+    return this.title.toLowerCase().replaceAll(' ', '-');
+  }
+}
+class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
+  id: Schema.Finite,
+}) {}
+class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
+  reason: Schema.String,
+}) {}
+class Unauthorized extends Schema.TaggedError<Unauthorized>()('Unauthorized', {}) {}
+class Auth extends RpcMiddleware.Service<Auth>()('Auth', { error: Unauthorized }) {}
+
+const byId = query({
+  payload: { id: Schema.Finite },
+  success: Post,
+  error: Schema.Union([PostNotFound, Forbidden]),
+});
+
+const appRouter = Router.make({
+  health: query({ success: Schema.Literal('ok') }),
+  post: {
+    byId,
+    create: mutation({
+      payload: { title: Schema.String },
+      success: Post,
+      error: Forbidden,
+    }).middleware(Auth),
+    onCreated: subscription({ success: Post }),
+  },
+});
+
+const HandlersLive = appRouter.group.toLayer({
+  health: () => Effect.succeed('ok' as const),
+  'post.byId': ({ id }) =>
+    id === 1
+      ? Effect.succeed(new Post({ id, title: 'Hello', createdAt: new Date() }))
+      : Effect.fail(new PostNotFound({ id })),
+  'post.create': ({ title }) => Effect.succeed(new Post({ id: 2, title, createdAt: new Date() })),
+  'post.onCreated': () => Stream.empty,
+});
+
+// Server side of the Auth middleware (a no-op here).
+const AuthLive = Layer.succeed(Auth)(Auth.of((effect) => effect));
+
+class Database extends Context.Service<
+  Database,
+  { readonly findPost: (id: number) => Effect.Effect<Post, PostNotFound> }
+>()('Database') {}
+
+const blogRouter = Router.make({
+  post: {
+    byId: Procedure.input({ id: Schema.Finite })
+      .output(Post)
+      .error(PostNotFound)
+      .query(
+        Effect.fn(function* ({ id }) {
+          const db = yield* Database;
+          return yield* db.findPost(id);
+        }),
+      ),
+    create: Procedure.input({ title: Schema.String })
+      .output(Post)
+      .middleware(Auth)
+      .mutation(({ title }) => Effect.succeed(new Post({ id: 2, title, createdAt: new Date() }))),
+    onCreated: Procedure.output(Post).subscription(() => Stream.empty),
+  },
+});
+
+const handler = blogRouter.record.post.byId.handler;
+
+class AdminRouter extends Context.Service<AdminRouter>()('AdminRouter', {
+  make: Effect.succeed({ count: Procedure.output(Schema.Finite).query(() => Effect.succeed(1)) }),
+}) {}
+
+class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
+  make: Effect.succeed({
+    health: query({ success: Schema.Literal('ok') }),
+    post: {
+      byId: Procedure.input({ id: Schema.Finite })
+        .output(Post)
+        .error(PostNotFound)
+        .query(
+          Effect.fn(function* ({ id }) {
+            const db = yield* Database;
+            return yield* db.findPost(id);
+          }),
+        ),
+    },
+    admin: AdminRouter,
+  }),
+}) {}
+
+const DatabaseLive = Layer.succeed(Database)({
+  findPost: (id) =>
+    id === 1
+      ? Effect.succeed(new Post({ id, title: 'Hello', createdAt: new Date(0) }))
+      : Effect.fail(new PostNotFound({ id })),
+});
+
+describe('README example', () => {
+  it('builder procedures keep their handlers', async () => {
+    expectTypeOf<
+      Procedure.HandlerRequirements<typeof blogRouter.record.post.byId>
+    >().toEqualTypeOf<Database>();
+    expectTypeOf<inferError<typeof blogRouter.record.post.create>>().toEqualTypeOf<Unauthorized>();
+    expect([...blogRouter.group.requests.keys()]).toEqual([
+      'post.byId',
+      'post.create',
+      'post.onCreated',
+    ]);
+    const ctx: Procedure.HandlerContext = {
+      client: new Rpc.ServerClient(0),
+      requestId: RpcMessage.RequestId(1),
+      headers: Headers.empty,
+      rpc: Router.getRpc(blogRouter, 'post.byId'),
+    };
+    const found = await Effect.runPromise(
+      handler({ id: 1 }, ctx).pipe(Effect.provide(DatabaseLive)),
+    );
+    expect(found.title).toBe('Hello');
+    const missing = await Effect.runPromise(
+      Effect.flip(handler({ id: 7 }, ctx)).pipe(Effect.provide(DatabaseLive)),
+    );
+    expect(missing).toBeInstanceOf(PostNotFound);
+  });
+
+  it('infers procedure types', () => {
+    expectTypeOf<inferInput<typeof byId>>().toEqualTypeOf<{ readonly id: number }>();
+    expectTypeOf<inferOutput<typeof byId>>().toEqualTypeOf<Post>();
+    expectTypeOf<inferError<typeof byId>>().toEqualTypeOf<PostNotFound | Forbidden>();
+    expect([...appRouter.group.requests.keys()]).toEqual([
+      'health',
+      'post.byId',
+      'post.create',
+      'post.onCreated',
+    ]);
+  });
+
+  it('inference mode: the output type comes from the handler; values need the generated schemas', async () => {
+    const inferredRouter = Router.make({
+      byId: Procedure.input({ id: Schema.Finite }).query(({ id }) =>
+        id === 1
+          ? Effect.succeed(new Post({ id, title: 'Hello', createdAt: new Date(0) }))
+          : Effect.fail(new PostNotFound({ id })),
+      ),
+    });
+    expectTypeOf<inferOutput<typeof inferredRouter.record.byId>>().toEqualTypeOf<Post>();
+    const { byId: inferredById } = inferredRouter.record;
+    const exit = await Effect.runPromiseExit(
+      inferredById.handler(
+        { id: 1 },
+        {
+          client: new Rpc.ServerClient(0),
+          requestId: RpcMessage.RequestId(1),
+          headers: Headers.empty,
+          rpc: Router.getRpc(inferredRouter, 'byId'),
+        },
+      ),
+    );
+    expect(Exit.isFailure(exit) && String(exit.cause)).toMatch(/no output schema/);
+  });
+
+  it('classifies client errors', async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(appRouter.group);
+      const exit = yield* Effect.exit(client['post.byId']({ id: 7 }));
+      if (Exit.isSuccess(exit)) return 'success';
+      const error = causeToClientError(exit.cause);
+      expectTypeOf(error).toEqualTypeOf<ClientError<PostNotFound | Forbidden>>();
+      if (isClientInfrastructureError(error)) return 'infrastructure';
+      return error._tag === 'PostNotFound'
+        ? `not found: ${error.id}` // error: PostNotFound
+        : `forbidden: ${error.reason}`; // error: Forbidden
+    });
+    const result = await Effect.runPromise(
+      program.pipe(Effect.scoped, Effect.provide(Layer.merge(HandlersLive, AuthLive))),
+    );
+    expect(result).toBe('not found: 7');
+  });
+
+  it('round-trips exits and values through JSON with Codecs', () => {
+    const rpc = Router.getRpc(appRouter, 'post.byId');
+    const encodedExit = JSON.stringify(
+      Codecs.encodeExitSync(rpc, Exit.fail(new PostNotFound({ id: 7 }))),
+    );
+    expect(JSON.parse(encodedExit)).toEqual({
+      _tag: 'Failure',
+      cause: [{ _tag: 'Fail', error: { _tag: 'PostNotFound', id: 7 } }],
+    });
+    const exit = Codecs.decodeExitSync(rpc, JSON.parse(encodedExit));
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(causeToClientError(Exit.isFailure(exit) ? exit.cause : null!)).toBeInstanceOf(
+      PostNotFound,
+    );
+
+    const post = new Post({ id: 1, title: 'Hello World', createdAt: new Date(0) });
+    const encodedPost = JSON.stringify(Codecs.encodeSuccessSync(rpc, post));
+    const decoded = Codecs.decodeSuccessSync(rpc, JSON.parse(encodedPost));
+    expect(decoded).toBeInstanceOf(Post);
+    expect(decoded.slug).toBe('hello-world');
+    expect(decoded.createdAt).toBeInstanceOf(Date);
+  });
+
+  it('routers as services', () => {
+    expectTypeOf<inferRouterInputs<typeof AppRouter>['post']['byId']>().toEqualTypeOf<{
+      readonly id: number;
+    }>();
+    expectTypeOf<Router.Paths<typeof AppRouter>>().toEqualTypeOf<
+      'health' | 'post.byId' | 'admin.count'
+    >();
+    const router = Router.from(AppRouter);
+    const mixed = Router.make({ app: AppRouter });
+    expect([...router.procedures.keys()]).toEqual(['health', 'post.byId', 'admin.count']);
+    expect(mixed.record.app).toBe(router);
+    expect(Router.fromService(AppRouter)).toBe(router);
+    expect(Router.isService(AppRouter)).toBe(true);
+  });
+});

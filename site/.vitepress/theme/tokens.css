@@ -1,0 +1,123 @@
+/*
+ * Design tokens: effect.website's public palette and type (zinc neutrals, monochrome brand,
+ * emerald focus), mapped onto VitePress's default-theme variables. Our own CSS, not copied.
+ */
+:root {
+  --et-zinc-50: #fafafa;
+  --et-zinc-100: #f4f4f5;
+  --et-zinc-200: #e4e4e7;
+  --et-zinc-300: #d4d4d8;
+  --et-zinc-400: #a1a1aa;
+  --et-zinc-500: #71717a;
+  --et-zinc-600: #52525b;
+  --et-zinc-700: #3f3f46;
+  --et-zinc-800: #27272a;
+  --et-zinc-900: #18181b;
+  --et-zinc-950: #09090b;
+  --et-emerald-400: #34d399;
+  --et-emerald-500: #10b981;
+  --et-emerald-600: #059669;
+
+  --et-radius: 8px;
+  --et-ring: var(--et-emerald-500);
+
+  --vp-font-family-base:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --vp-font-family-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --vp-c-bg: #ffffff;
+  --vp-c-bg-alt: var(--et-zinc-50);
+  --vp-c-bg-elv: #ffffff;
+  --vp-c-bg-soft: var(--et-zinc-100);
+
+  --vp-c-text-1: var(--et-zinc-900);
+  --vp-c-text-2: var(--et-zinc-600);
+  --vp-c-text-3: var(--et-zinc-500);
+
+  --vp-c-divider: var(--et-zinc-200);
+  --vp-c-border: var(--et-zinc-300);
+  --vp-c-gutter: var(--et-zinc-200);
+
+  --vp-c-brand-1: var(--et-zinc-900);
+  --vp-c-brand-2: var(--et-zinc-700);
+  --vp-c-brand-3: var(--et-zinc-900);
+  --vp-c-brand-soft: rgb(24 24 27 / 0.08);
+
+  --vp-c-default-soft: var(--et-zinc-100);
+
+  --vp-button-brand-bg: var(--et-zinc-900);
+  --vp-button-brand-text: var(--et-zinc-50);
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-hover-bg: var(--et-zinc-700);
+  --vp-button-brand-hover-text: var(--et-zinc-50);
+  --vp-button-brand-active-bg: var(--et-zinc-800);
+  --vp-button-alt-bg: var(--et-zinc-100);
+  --vp-button-alt-text: var(--et-zinc-900);
+  --vp-button-alt-hover-bg: var(--et-zinc-200);
+
+  --vp-code-color: var(--et-zinc-900);
+  --vp-code-bg: var(--et-zinc-100);
+  --vp-code-block-bg: var(--et-zinc-50);
+  --vp-code-block-divider-color: var(--et-zinc-200);
+  --vp-code-tab-bg: var(--et-zinc-50);
+  --vp-code-tab-divider: var(--et-zinc-200);
+  --vp-code-copy-code-bg: var(--et-zinc-100);
+
+  --vp-custom-block-tip-border: var(--et-zinc-200);
+  --vp-custom-block-tip-bg: var(--et-zinc-50);
+  --vp-custom-block-tip-text: var(--et-zinc-900);
+  --vp-custom-block-tip-code-bg: var(--et-zinc-100);
+
+  --vp-home-hero-name-color: var(--et-zinc-900);
+  --vp-sidebar-bg-color: var(--vp-c-bg);
+  --vp-nav-bg-color: rgb(255 255 255 / 0.85);
+}
+
+.dark {
+  --et-ring: var(--et-emerald-400);
+
+  --vp-c-bg: var(--et-zinc-950);
+  --vp-c-bg-alt: #0c0c0e;
+  --vp-c-bg-elv: var(--et-zinc-900);
+  --vp-c-bg-soft: var(--et-zinc-900);
+
+  --vp-c-text-1: var(--et-zinc-50);
+  --vp-c-text-2: var(--et-zinc-400);
+  --vp-c-text-3: var(--et-zinc-500);
+
+  --vp-c-divider: var(--et-zinc-800);
+  --vp-c-border: var(--et-zinc-700);
+  --vp-c-gutter: var(--et-zinc-800);
+
+  --vp-c-brand-1: var(--et-zinc-50);
+  --vp-c-brand-2: var(--et-zinc-300);
+  --vp-c-brand-3: var(--et-zinc-50);
+  --vp-c-brand-soft: rgb(250 250 250 / 0.08);
+
+  --vp-c-default-soft: var(--et-zinc-800);
+
+  --vp-button-brand-bg: var(--et-zinc-50);
+  --vp-button-brand-text: var(--et-zinc-900);
+  --vp-button-brand-hover-bg: var(--et-zinc-300);
+  --vp-button-brand-hover-text: var(--et-zinc-900);
+  --vp-button-brand-active-bg: var(--et-zinc-200);
+  --vp-button-alt-bg: var(--et-zinc-800);
+  --vp-button-alt-text: var(--et-zinc-50);
+  --vp-button-alt-hover-bg: var(--et-zinc-700);
+
+  --vp-code-color: var(--et-zinc-50);
+  --vp-code-bg: var(--et-zinc-800);
+  --vp-code-block-bg: #0e0e11;
+  --vp-code-block-divider-color: var(--et-zinc-800);
+  --vp-code-tab-bg: #0e0e11;
+  --vp-code-tab-divider: var(--et-zinc-800);
+  --vp-code-copy-code-bg: var(--et-zinc-800);
+
+  --vp-custom-block-tip-border: var(--et-zinc-800);
+  --vp-custom-block-tip-bg: var(--et-zinc-900);
+  --vp-custom-block-tip-text: var(--et-zinc-50);
+  --vp-custom-block-tip-code-bg: var(--et-zinc-800);
+
+  --vp-home-hero-name-color: var(--et-zinc-50);
+  --vp-nav-bg-color: rgb(9 9 11 / 0.85);
+}

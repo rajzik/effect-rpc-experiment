@@ -1,0 +1,31 @@
+{
+  "name": "@effect-trpc/test-utils",
+  "version": "0.0.0",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "vp pack",
+    "test": "vp test"
+  },
+  "dependencies": {
+    "@effect-trpc/client": "workspace:*",
+    "@effect-trpc/core": "workspace:*",
+    "@effect-trpc/server": "workspace:*",
+    "@effect/platform-node": "catalog:",
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {}
+}
