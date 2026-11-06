@@ -1,7 +1,7 @@
 # effect-trpc documentation site
 
 The [VitePress](https://vitepress.dev) site published at
-<https://rajzik.github.io/effect-rpc-experiment/>. Guides are hand-written Markdown, every code
+<https://effect-trpc-docs.vercel.app>. Guides are hand-written Markdown, every code
 sample is a type-checked file, and the API reference is generated from the packages' JSDoc.
 
 ## Run it
