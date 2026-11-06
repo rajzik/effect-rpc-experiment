@@ -26,12 +26,18 @@ import type { ServerOptions } from './Http.js';
  * @category options
  * @since 0.1.0
  */
-export interface NodeServeOptions<R extends Router.Any, LE, LR> extends ServerOptions {
+export interface NodeServeOptions<
+  R extends Router.Any,
+  LE,
+  LR,
+  C = never,
+  CR = never,
+> extends ServerOptions<C, CR> {
   /**
    * Layer providing every handler of the router and the server implementation of every
-   * middleware it uses.
+   * middleware it uses, plus what `context` needs. It may require the services of `context`.
    */
-  readonly handlers: Layer.Layer<Handlers.Requirements<R>, LE, LR>;
+  readonly handlers: Layer.Layer<NoInfer<Handlers.Requirements<R> | CR>, LE, LR>;
   /** TCP port. `0` picks a free ephemeral port. */
   readonly port: number;
   /** Interface to listen on. Defaults to all interfaces. */
@@ -77,10 +83,10 @@ const nodeServerLayer = (options: {
     gracefulShutdownTimeout: options.gracefulShutdownTimeout,
   });
 
-const appLayer = <R extends Router.Any, LE, LR>(
+const appLayer = <R extends Router.Any, LE, LR, C, CR>(
   router: R,
-  options: NodeServeOptions<R, LE, LR>,
-): Layer.Layer<never, LE, HttpRouter.HttpRouter | LR> =>
+  options: NodeServeOptions<R, LE, LR, C, CR>,
+): Layer.Layer<never, LE, HttpRouter.HttpRouter | Exclude<LR, C>> =>
   layerHttp(router, {
     handlers: options.handlers,
     path: options.path,
@@ -89,14 +95,15 @@ const appLayer = <R extends Router.Any, LE, LR>(
     spanPrefix: options.spanPrefix,
     concurrency: options.concurrency,
     onError: options.onError,
+    context: options.context,
     protocol: 'http',
   });
 
 /** `serve` for a router. */
-const serveFor = <R extends Router.Any, LE = never, LR = never>(
+const serveFor = <R extends Router.Any, LE = never, LR = never, C = never, CR = never>(
   router: R,
-  options: NodeServeOptions<R, LE, LR>,
-): Layer.Layer<never, LE | HttpServerError.ServeError, LR> =>
+  options: NodeServeOptions<R, LE, LR, C, CR>,
+): Layer.Layer<never, LE | HttpServerError.ServeError, Exclude<LR, C>> =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion -- widening only: the inferred requirements are `Exclude<LR, ...>` (a subset of `LR`) and the error `Without<LE> | ServeError`, which TypeScript cannot relate to the generic `LR` / `LE`
   HttpRouter.serve(appLayer(router, options), {
     disableLogger: true,
@@ -104,7 +111,7 @@ const serveFor = <R extends Router.Any, LE = never, LR = never>(
   }).pipe(Layer.provide(nodeServerLayer(options))) as Layer.Layer<
     never,
     LE | HttpServerError.ServeError,
-    LR
+    Exclude<LR, C>
   >;
 
 /** `serve` for a router or a router service: normalises the input with `Router.from`. */
@@ -132,7 +139,8 @@ const serveFromInput = (
  *   normalised with `Router.from` (its `make` runs once per process) and typed as `Router.Of<X>`.
  * - Always `protocol: "http"` with `disableFatalDefects: true`, at `path` (default `"/rpc"`).
  * - The listen log is off unless `listenLog: true`; the request logger is always off.
- * - `handlers` may have requirements (`LR`); they stay requirements of the returned layer.
+ * - `handlers` may have requirements (`LR`); they stay requirements of the returned layer,
+ *   except the services of `context` (see `ServerOptions`).
  *
  * **Example** (A standalone Node server)
  *
@@ -156,24 +164,26 @@ const serveFromInput = (
  * @since 0.1.0
  */
 export const serve: {
-  <R extends Router.Any, LE = never, LR = never>(
+  <R extends Router.Any, LE = never, LR = never, C = never, CR = never>(
     router: R,
-    options: NodeServeOptions<R, LE, LR>,
-  ): Layer.Layer<never, LE | HttpServerError.ServeError, LR>;
-  <X extends Router.Input, LE = never, LR = never>(
+    options: NodeServeOptions<R, LE, LR, C, CR>,
+  ): Layer.Layer<never, LE | HttpServerError.ServeError, Exclude<LR, C>>;
+  <X extends Router.Input, LE = never, LR = never, C = never, CR = never>(
     router: X,
-    options: NodeServeOptions<Router.Of<X>, LE, LR>,
-  ): Layer.Layer<never, LE | HttpServerError.ServeError, LR>;
+    options: NodeServeOptions<Router.Of<X>, LE, LR, C, CR>,
+  ): Layer.Layer<never, LE | HttpServerError.ServeError, Exclude<LR, C>>;
 } =
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
   serveFromInput as unknown as typeof serve;
 
 /** `runServer` for a router. */
-const runServerFor = async <R extends Router.Any, LE = never>(
+const runServerFor = async <R extends Router.Any, LE = never, C = never, CR = never>(
   router: R,
-  options: NodeServeOptions<R, LE, never>,
+  options: NodeServeOptions<R, LE, NoInfer<C>, C, CR>,
 ): Promise<RunningServer> => {
-  const layer = HttpRouter.serve(appLayer(router, options), {
+  // The requirements are `Exclude<C, C>` (none), which TypeScript does not reduce for a generic `C`.
+  const app = appLayer(router, options) as Layer.Layer<never, LE, HttpRouter.HttpRouter>;
+  const layer = HttpRouter.serve(app, {
     disableLogger: true,
     disableListenLog: options.listenLog !== true,
   }).pipe(
@@ -239,7 +249,8 @@ const runServerFromInput = (
  *
  * **Gotchas**
  *
- * - `handlers` must have no remaining requirements; provide its services first.
+ * - `handlers` must have no remaining requirements other than the services of `context`;
+ *   provide its services first.
  * - Always `await server.dispose()` (or `await using`), otherwise the process keeps listening.
  *
  * **Example** (Starting a server on a free port for a test)
@@ -262,13 +273,13 @@ const runServerFromInput = (
  * @since 0.1.0
  */
 export const runServer: {
-  <R extends Router.Any, LE = never>(
+  <R extends Router.Any, LE = never, C = never, CR = never>(
     router: R,
-    options: NodeServeOptions<R, LE, never>,
+    options: NodeServeOptions<R, LE, NoInfer<C>, C, CR>,
   ): Promise<RunningServer>;
-  <X extends Router.Input, LE = never>(
+  <X extends Router.Input, LE = never, C = never, CR = never>(
     router: X,
-    options: NodeServeOptions<Router.Of<X>, LE, never>,
+    options: NodeServeOptions<Router.Of<X>, LE, NoInfer<C>, C, CR>,
   ): Promise<RunningServer>;
 } =
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep

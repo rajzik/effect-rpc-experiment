@@ -5,6 +5,9 @@ import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { createFileRoute, type AnyRoute, type Register } from '@tanstack/react-router';
 import type { RouteMethodHandlerFn } from '@tanstack/react-start';
+import { Procedure, Router } from '@effect-trpc/core';
+import { Handlers } from '@effect-trpc/server';
+import { Context, Effect, Schema } from 'effect';
 import { absurd } from 'effect/Function';
 import { describe, expectTypeOf, test } from 'vite-plus/test';
 import {
@@ -73,6 +76,18 @@ describe('createStartHandler', () => {
     createStartHandler(appRouter, {});
     // @ts-expect-error -- path must be a string
     createStartHandler(appRouter, { handlers: makeFixture().handlers, path: 1 });
+  });
+
+  test('handlers may require the services of `context`', () => {
+    class RequestId extends Context.Service<RequestId, string>()('RequestId') {}
+    const router = Router.make({ echo: Procedure.output(Schema.String).query(() => RequestId) });
+    const handlersNeedingRequestId = Handlers.fromProcedures(router);
+    const context = Effect.succeed(Context.make(RequestId, 'r-1'));
+    expectTypeOf(
+      createStartHandler(router, { handlers: handlersNeedingRequestId, context }),
+    ).toEqualTypeOf<StartHandler>();
+    // @ts-expect-error -- without `context`, RequestId is an unmet requirement of the handlers
+    createStartHandler(router, { handlers: handlersNeedingRequestId });
   });
 });
 

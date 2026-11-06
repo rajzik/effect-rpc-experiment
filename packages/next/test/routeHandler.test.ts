@@ -1,8 +1,9 @@
 // Route handler adapter (tRPC `tests/server/adapters/next.test.ts` + `next-app-dir.test.ts`):
 // `export const { GET, POST } = createRouteHandler(...)` in `app/api/rpc/[[...rpc]]/route.ts`.
 import { createClient, httpLink } from '@effect-trpc/client';
-import { Codecs, Router } from '@effect-trpc/core';
-import { Effect, Exit, Layer } from 'effect';
+import { Codecs, Procedure, Router } from '@effect-trpc/core';
+import { Handlers } from '@effect-trpc/server';
+import { Context, Effect, Exit, Layer, Schema } from 'effect';
 import { describe, expect, test } from 'vite-plus/test';
 import { createRouteHandler } from '../src/index.js';
 import { appRouter, makeFixture, Post, PostNotFound } from './fixtures.js';
@@ -85,6 +86,17 @@ describe('createRouteHandler', () => {
     });
     await route.POST(rpcRequest('http://localhost/api/rpc', 'post.byId', { id: 404 }));
     expect(paths).toEqual(['post.byId']);
+  });
+
+  test('context is passed through to the server', async () => {
+    class RequestId extends Context.Service<RequestId, string>()('RequestId') {}
+    const router = Router.make({ echo: Procedure.output(Schema.String).query(() => RequestId) });
+    await using route = createRouteHandler(router, {
+      handlers: Handlers.fromProcedures(router),
+      context: Effect.succeed(Context.make(RequestId, 'r-1')),
+    });
+    const response = await route.POST(rpcRequest('http://localhost/api/rpc', 'echo', null));
+    expect(exitOf(await readFrames(response))).toEqual({ _tag: 'Success', value: 'r-1' });
   });
 
   test('subscriptions stream NDJSON chunks', async () => {
