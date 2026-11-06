@@ -1,3 +1,5 @@
+import { Context, Effect, Layer } from 'effect';
+import { Procedure } from '@effect-trpc/core';
 import type { Router } from '@effect-trpc/core';
 import { describe, expectTypeOf, it } from 'vite-plus/test';
 import { createClient, localLink } from '../src/index.js';
@@ -73,6 +75,19 @@ describe('createClient with a router service (types)', () => {
     expectTypeOf<ReturnType<typeof createClient<AppRouterOf>>>().toEqualTypeOf<
       Client<AppRouterOf>
     >();
+  });
+
+  it('rejects a router service whose make needs services', () => {
+    class Config extends Context.Service<Config, { readonly url: string }>()('Config') {}
+    class NeedsConfig extends Context.Service<NeedsConfig>()('NeedsConfig', {
+      make: Effect.gen(function* () {
+        yield* Config;
+        return { ok: Procedure.query(() => Effect.void) };
+      }),
+    }) {}
+    expectTypeOf(NeedsConfig).not.toExtend<Router.Input>();
+    // @ts-expect-error - make must be Effect<Record, never, never>: read services inside handlers
+    createClient(NeedsConfig, { link: localLink({ handlers: Layer.empty }) }); // oxlint-disable-line effecttsgo/missing-effect-context -- the service is passed on purpose to prove the compile error
   });
 
   it('a link missing handlers is still a type error', () => {

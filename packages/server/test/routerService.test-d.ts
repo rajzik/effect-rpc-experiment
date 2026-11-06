@@ -267,6 +267,18 @@ describe('server adapters accept the router service class (types)', () => {
     });
   });
 
+  it('toWebHandler rejects a router service whose make needs services', () => {
+    class NeedsDb extends Context.Service<NeedsDb>()('NeedsDb', {
+      make: Effect.gen(function* () {
+        yield* Database;
+        return { ok: Procedure.query(() => Effect.void) };
+      }),
+    }) {}
+    expectTypeOf(NeedsDb).not.toExtend<Router.Input>();
+    // @ts-expect-error - make must be Effect<Record, never, never>: read services inside handlers
+    void toWebHandler(NeedsDb, { handlers: live }); // oxlint-disable-line effecttsgo/missing-effect-context -- the service is passed on purpose to prove the compile error
+  });
+
   it('toWebHandler, layerHttp, serve and runServer accept typeof Svc', () => {
     expectTypeOf(toWebHandler(AppRouter, { handlers: live })).toEqualTypeOf<Promise<WebHandler>>();
     expectTypeOf(layerHttp(AppRouter, { handlers: live })).toEqualTypeOf<
