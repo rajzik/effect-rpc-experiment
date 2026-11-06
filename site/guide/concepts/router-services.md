@@ -7,7 +7,7 @@ with every adapter and can be mixed.
 
 ## The service form
 
-<<< @/snippets/concepts/router-service.ts#service
+<<< @/snippets/concepts/router-service.ts#service [router.ts]
 
 - `Context.Service<AppRouter>()('AppRouter', { make })` is the service constructor you already use.
   `make` returns a record of procedures. It nests to any depth, and `as const` is not needed.
@@ -44,7 +44,7 @@ need a database, a config or a clock service to succeed.
 
 ## Implement and serve it
 
-<<< @/snippets/concepts/router-service.ts#handlers
+<<< @/snippets/concepts/router-service-server.ts#handlers [server.ts]
 
 `Handlers.fromService(AppRouter)` builds the server implementation from the procedures' own
 handlers. The layer's requirements are the union of what the handlers read: `Database` here. They
@@ -57,11 +57,11 @@ nested in it is the class, as its type says.
 
 Every adapter takes the class and the layer, exactly as it takes a router and `Handlers.make`:
 
-<<< @/snippets/concepts/router-service.ts#serve
+<<< @/snippets/concepts/router-service-server.ts#serve [server.ts]
 
-A client imports the same module and passes the same class:
+A client imports the router module (never the server module) and passes the same class:
 
-<<< @/snippets/concepts/router-service.ts#client
+<<< @/snippets/concepts/router-service-client.ts#client [client.ts]
 
 `createClient(AppRouter, …)` has the types of the equivalent `Router.make` router. The decoded
 `Post` instance, its getters and `PostNotFound` come from the schemas in `make`, not from plain JSON.

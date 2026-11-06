@@ -1,7 +1,6 @@
-import { Context, Effect, Layer, Schema, Stream } from 'effect';
-import { createClient, httpLink } from '@effect-trpc/client';
+// The router module: shared by the server and the client. It holds no live layers.
+import { Context, Effect, Schema, Stream } from 'effect';
 import { Procedure } from '@effect-trpc/core';
-import { Handlers, toWebHandler } from '@effect-trpc/server';
 
 import { Post, PostNotFound } from '@/router';
 
@@ -37,40 +36,3 @@ export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
   }),
 }) {}
 // #endregion service
-
-// #region handlers
-export const DatabaseLive = Layer.succeed(Database)({
-  findPost: (id) =>
-    id === 1
-      ? Effect.succeed(new Post({ id, title: 'Hello Effect', createdAt: new Date('2026-01-01') }))
-      : Effect.fail(new PostNotFound({ id })),
-  titles: Stream.make('Hello Effect', 'Typed errors'),
-});
-
-// Layer<Rpc.Handler<…> | AppRouter, never, Database>: `Database` is inferred from the handlers.
-export const HandlersLive = Handlers.fromService(AppRouter);
-
-export const ServerLive = HandlersLive.pipe(Layer.provide(DatabaseLive));
-// #endregion handlers
-
-// #region serve
-// Every adapter takes the class where it takes a router.
-export const web = await toWebHandler(AppRouter, { handlers: ServerLive });
-// web.handler: (request: Request) => Promise<Response>
-// #endregion serve
-
-// #region client
-const client = createClient(AppRouter, {
-  link: httpLink({ url: 'http://localhost:3000/rpc' }),
-});
-
-const post = await client.post.byId({ id: 1 });
-post instanceof Post; // true: the client evaluates `make` to get the schemas
-post.slug; // "hello-effect"
-
-try {
-  await client.post.byId({ id: 404 });
-} catch (cause) {
-  if (cause instanceof PostNotFound) console.log(`no post #${cause.id}`);
-}
-// #endregion client
