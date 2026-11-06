@@ -70,6 +70,23 @@ through a **contract**, because only the server has the services:
 - A pure `make` is still the simplest: one-time setup (opening a connection) can live in the
   service's own layer, with the handler reading the ready service per call.
 
+### With inferred schemas
+
+`.output` and `.error` can be left out here too ([inferred schemas](#inferred-schemas-experimental)).
+The handlers close over what `make` read, and their types come from those services:
+
+<<< @/snippets/concepts/router-service-effectful-inferred.ts#written [router.ts]
+
+Codegen writes the same two modules as for a pure router. `router.gen.ts` is a lazy router service
+(nothing runs at import): serve it with `Handlers.fromService`. `router.client.gen.ts` is the
+contract for the client and every synchronous API:
+
+<<< @/snippets/concepts/router-service-effectful-inferred.gen.ts#generated [router.gen.ts]
+
+<<< @/snippets/concepts/router-service-effectful-inferred.gen.ts#server [server.ts]
+
+<<< @/snippets/concepts/router-service-effectful-inferred.client.gen.ts#client [router.client.gen.ts]
+
 ## Implement and serve it
 
 <<< @/snippets/concepts/router-service-server.ts#handlers [server.ts]
