@@ -15,8 +15,8 @@ TanStack Start and Electron.
 
 ## Documentation
 
-The reference site lives in [`site/`](site/) and is published to GitHub Pages
-(<https://rajzik.github.io/effect-rpc-experiment/>) and Vercel (`vercel.json`): guides for every package, framework setups,
+The reference site lives in [`site/`](site/) and is deployed on Vercel
+(<https://effect-trpc-docs.vercel.app>, with a preview per pull request): guides for every package, framework setups,
 advanced recipes, and an API reference generated from the JSDoc. Run it locally with
 `pnpm docs:dev` (after `pnpm exec vp run -r build`).
 
