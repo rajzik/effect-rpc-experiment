@@ -29,6 +29,11 @@ export default defineConfig({
       'site/api/**',
       // Written by the TanStack Router plugin on every build; it asks to be left unlinted.
       'examples/*/src/routeTree.gen.ts',
+      // Written by the inferred-schemas spike generator (packages/e2e/spike/infer-schemas).
+      'packages/e2e/spike/**/*.gen.ts',
+      // The spike's input router has no `.output` / `.error`: it type-checks only once the builder
+      // infers handler types (not built yet); the generated `router.gen.ts` is what runs.
+      'packages/e2e/spike/infer-schemas/router.ts',
       // Written by `next build` / `next dev` (and rewritten with its own formatting).
       'examples/next/next-env.d.ts',
     ],
@@ -123,6 +128,7 @@ export default defineConfig({
       'site/.vitepress/dist/**',
       'site/api/**',
       'examples/*/src/routeTree.gen.ts',
+      'packages/e2e/spike/**/*.gen.ts',
       // Written by `next build` / `next dev` (and rewritten with its own formatting).
       'examples/next/next-env.d.ts',
     ],
