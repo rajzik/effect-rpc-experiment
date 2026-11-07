@@ -46,6 +46,13 @@ const fromHeader = Effect.map(HttpContext.request, (request) =>
   ),
 );
 
+/** A `context` given only when `enabled`: typed `Effect | undefined`. */
+const optional = (enabled: boolean) => (enabled ? fromHeader : undefined);
+
+/** A `context` needing `Clock2`, which only a sibling of the handlers (`ClockLive`) provides. */
+const stamped = Effect.map(Clock2, (clock) => Context.make(RequestId, clock.now));
+const ClockLive = Layer.succeed(Clock2)({ now: 't-1' });
+
 /** A `context` counting its evaluations. */
 const counting = () => {
   let count = 0;
@@ -74,12 +81,17 @@ describe('context over toWebHandler', () => {
   });
 
   it('reads services of the handlers layer output', async () => {
-    const stamped = Effect.map(Clock2, (clock) => Context.make(RequestId, clock.now));
     await using web = await toWebHandler(router, {
-      handlers: Layer.merge(handlers, Layer.succeed(Clock2)({ now: 't-1' })),
+      handlers: Layer.merge(handlers, ClockLive),
       context: stamped,
     });
     expect(exitFrame(await call(web, { tag: 'echo' }))).toEqual({ _tag: 'Success', value: 't-1' });
+  });
+
+  it('a context that is undefined at runtime leaves its services missing (Gotcha)', async () => {
+    await using web = await toWebHandler(router, { handlers, context: optional(false) });
+    const frames = await call(web, { tag: 'echo' });
+    expect(exitFrame(frames)).toMatchObject({ _tag: 'Failure', cause: [{ _tag: 'Die' }] });
   });
 
   it('a dying context fails the call with a defect, reported to onError', async () => {
@@ -101,33 +113,56 @@ describe('context over runServer', () => {
     );
     expect(exitFrame(await readFrames(response))).toEqual({ _tag: 'Success', value: 'n-1' });
   });
+
+  it('reads services of the handlers layer output', async () => {
+    await using server = await runServer(router, {
+      handlers: Layer.merge(handlers, ClockLive),
+      context: stamped,
+      port: 0,
+    });
+    const response = await fetch(rpcRequest([{ tag: 'echo' }], { url: server.url }));
+    expect(exitFrame(await readFrames(response))).toEqual({ _tag: 'Success', value: 't-1' });
+  });
 });
+
+/** Serves `app` (a WebSocket rpc route) and calls `echo`, then `tagged`, on one connection. */
+const callOverWebSocket = (app: Layer.Layer<never, never, HttpRouter.HttpRouter>) => {
+  const ServerLive = HttpRouter.serve(app, { disableLogger: true, disableListenLog: true }).pipe(
+    Layer.provideMerge(NodeHttpServer.layerTest),
+  );
+  const ClientLive = Layer.unwrap(
+    Effect.gen(function* () {
+      const address = HttpServer.formatAddress((yield* HttpServer.HttpServer).address);
+      return RpcClient.layerProtocolSocket().pipe(
+        Layer.provide([
+          Socket.layerWebSocket(`${address.replace(/^http/, 'ws')}/rpc`).pipe(
+            Layer.provide(Socket.layerWebSocketConstructorGlobal),
+          ),
+          RpcSerialization.layerNdjson,
+        ]),
+      );
+    }),
+  ).pipe(Layer.provide(ServerLive));
+  return Effect.runPromise(
+    Effect.gen(function* () {
+      const client = yield* RpcClient.make(router.group);
+      return [yield* client.echo(), yield* client.tagged()];
+    }).pipe(Effect.scoped, Effect.provide(ClientLive)),
+  );
+};
 
 describe('context over WebSocket', () => {
   it('runs per call on one connection', async () => {
-    const ServerLive = HttpRouter.serve(
-      layerHttp(router, { handlers, protocol: 'websocket', context: counting() }),
-      { disableLogger: true, disableListenLog: true },
-    ).pipe(Layer.provideMerge(NodeHttpServer.layerTest));
-    const ClientLive = Layer.unwrap(
-      Effect.gen(function* () {
-        const address = HttpServer.formatAddress((yield* HttpServer.HttpServer).address);
-        return RpcClient.layerProtocolSocket().pipe(
-          Layer.provide([
-            Socket.layerWebSocket(`${address.replace(/^http/, 'ws')}/rpc`).pipe(
-              Layer.provide(Socket.layerWebSocketConstructorGlobal),
-            ),
-            RpcSerialization.layerNdjson,
-          ]),
-        );
-      }),
-    ).pipe(Layer.provide(ServerLive));
-    const values = await Effect.runPromise(
-      Effect.gen(function* () {
-        const client = yield* RpcClient.make(router.group);
-        return [yield* client.echo(), yield* client.tagged()];
-      }).pipe(Effect.scoped, Effect.provide(ClientLive)),
-    );
-    expect(values).toEqual(['1', 'mw:2']);
+    const app = layerHttp(router, { handlers, protocol: 'websocket', context: counting() });
+    expect(await callOverWebSocket(app)).toEqual(['1', 'mw:2']);
+  });
+
+  it('reads services of the handlers layer output', async () => {
+    const app = layerHttp(router, {
+      handlers: Layer.merge(handlers, ClockLive),
+      protocol: 'websocket',
+      context: stamped,
+    });
+    expect(await callOverWebSocket(app)).toEqual(['t-1', 'mw:t-1']);
   });
 });

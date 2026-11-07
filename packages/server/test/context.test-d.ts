@@ -26,6 +26,7 @@ const context = Effect.map(HttpContext.request, (request) =>
   ),
 );
 const contextNeedingClock = Effect.map(Clock2, (clock) => Context.make(RequestId, clock.now));
+declare const maybeContext: typeof context | undefined;
 
 describe('context option types', () => {
   it('the handlers layer requires the context service', () => {
@@ -44,6 +45,12 @@ describe('context option types', () => {
     const failing: Effect.Effect<Context.Context<RequestId>, string> = Effect.fail('nope');
     // @ts-expect-error - `context` cannot fail with a typed error (use middleware)
     void toWebHandler(router, { handlers: HandlersNeedingRequestId, context: failing });
+  });
+
+  it('toWebHandler: a possibly undefined `context` still accepts the handlers (Gotcha)', () => {
+    expectTypeOf(
+      toWebHandler(router, { handlers: HandlersNeedingRequestId, context: maybeContext }),
+    ).toEqualTypeOf<Promise<WebHandler>>();
   });
 
   it('toWebHandler: what `context` needs is provided by the handlers layer output', () => {

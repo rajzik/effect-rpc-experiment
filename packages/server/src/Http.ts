@@ -48,7 +48,9 @@ export type Serialization = 'json' | 'ndjson' | Layer.Layer<RpcSerialization.Rpc
  *
  * - `cause` is the full `Cause` of the failure: typed errors are `Fail` reasons, defects `Die`
  *   reasons. Calls that are only interrupted (client abort, shutdown) are not reported.
- * - `headers` are the call's headers, request headers included.
+ * - `headers` are the call's headers, request headers included. Rpc message headers (sent by
+ *   the client) override HTTP request headers of the same name; read a header set by a trusted
+ *   proxy from `HttpContext.request` instead.
  *
  * **Gotchas**
  *
@@ -87,7 +89,10 @@ export interface OnErrorInfo {
   readonly path: string;
   /** Why the call failed. Never interrupt-only. */
   readonly cause: Cause.Cause<unknown>;
-  /** The call's headers (the HTTP request headers plus the rpc message headers). */
+  /**
+   * The call's headers: the HTTP request headers plus the rpc message headers, which win on a
+   * name clash.
+   */
   readonly headers: Headers.Headers;
 }
 
@@ -112,6 +117,8 @@ export interface OnErrorInfo {
  *   layer is built fails.
  * - Explicit type arguments (`toWebHandler<typeof appRouter>(...)`) fix the `context` types to
  *   `never`; let them be inferred.
+ * - A `context` typed `Effect | undefined` (`enabled ? context : undefined`) still lets handlers
+ *   require its services; when it is `undefined`, those calls die. Pass it unconditionally.
  *
  * **Example** (A request id from a header, for every handler)
  *
@@ -301,7 +308,7 @@ const layerHttpFor = <
   }).pipe(Layer.provide([serializationLayer(options.serialization), hooks.layer]));
   const served =
     options.handlers === undefined ? server : server.pipe(Layer.provide(options.handlers));
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion -- removes `C` (provided per call by `context`) and adds what is erased: `Handlers.Requirements<R>` (`Router.Any`) and `CR` (`context` reads it from the call's context)
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion -- removes `C` from the requirements: `context` provides it per call; and adds what `Router.Any` erased (`Handlers.Requirements<R>`)
   return served as LayerHttpFor<R, LOut, LE, LR, C, CR>;
 };
 
