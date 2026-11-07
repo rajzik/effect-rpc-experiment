@@ -332,6 +332,10 @@ there is no handler record to write:
   });
   ```
 
+  When a procedure's output is inferred (no `.output(...)`), pass the `AppRouter` of
+  `router.gen.ts` (the class with the generated schemas) instead of the original class: the
+  original keeps the inference guard, so such a handler dies when it returns a value.
+
 - `Handlers.fromProcedures(router)` does the same for a plain `Router.make` router of `Procedure`
   procedures (services nested in it included), without providing a service.
 - Requirements are inferred from the handlers (`Effect` and `Stream` alike) minus `Scope` and the
@@ -345,7 +349,8 @@ there is no handler record to write:
   functions reject it at compile time (TypeScript reports a missing property named
   `procedure '<path>' has no handler ...`). If forced with a cast, both name every such path:
   `fromProcedures` throws, `fromService` dies when its layer is built. Implement routers that mix both styles with `Handlers.make`.
-- Adapters take the class too when its `make` reads no services: `toWebHandler`, `layerHttp`,
+- Adapters take the class too when its `make` (and every nested service's `make`) is synchronous,
+  reads no services and cannot fail (a `RouterService.Pure`): `toWebHandler`, `layerHttp`,
   `createCaller`, `serve` / `runServer` and `Handlers.make` / `flat` / `of` accept `AppRouter`
   directly (normalised with `Router.from`). Type helpers that take a router type take `Router.Of<typeof AppRouter>`
   (`Caller<Router.Of<typeof AppRouter>>`, `Handlers.Requirements<Router.Of<typeof AppRouter>>`).
