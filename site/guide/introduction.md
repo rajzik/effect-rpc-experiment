@@ -44,7 +44,7 @@ serialization formats, `RpcMiddleware`, `RpcTest`.
 | resolver function                    | `Handlers.make(router, { post: { byId } })`      | `group.toLayer(…)`                    |
 | `TRPCError`                          | your `Schema.TaggedError` + `ClientError<E>`     | typed `Exit` failures                 |
 | middleware + `ctx`                   | `RpcMiddleware` that `provides` services         | `RpcMiddleware`                       |
-| `createContext`                      | the `context` option of the adapters             | —                                     |
+| `createContext`                      | `Handlers.withContext(handlers, context)`        | —                                     |
 | fetch adapter                        | `toWebHandler(router, { handlers })`             | `RpcServer.layerHttp`                 |
 | `createTRPCClient` + `httpBatchLink` | `createClient(…, { link: httpBatchLink(…) })`    | `RpcClient` + a protocol              |
 | `@trpc/tanstack-react-query`         | `@effect-trpc/tanstack-react-query`              | —                                     |

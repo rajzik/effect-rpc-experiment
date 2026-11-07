@@ -17,9 +17,10 @@ pieces:
 - **`createCaller(router, { handlers })`** — an in-process typed caller (tRPC's `createCaller`):
   Effect and Promise APIs, middleware included, no serialization.
 - **`Middleware`** — `effect/rpc`'s `RpcMiddleware` plus `Middleware.make` for auth/context.
-- **`context` and `onError` options** — on every HTTP adapter: `context` (tRPC's `createContext`)
-  provides services computed per call, `onError` reports failed calls in one place. Handlers read
-  the request and set response headers and cookies with `HttpContext` from `@effect-trpc/core`.
+- **`Handlers.withContext` and the `onError` option** — `Handlers.withContext(handlers, context)`
+  (tRPC's `createContext`) gives every HTTP adapter services computed per call; `onError` reports
+  failed calls in one place. Handlers read the request and set response headers and cookies with
+  `HttpContext` from `@effect-trpc/core`.
 - **`@effect-trpc/server/node`** — `serve` (a Layer) and `runServer` (a Promise) on Node's `http`.
 
 Every function that takes a `router` also takes a pure router service class (`toWebHandler(AppRouter,
@@ -39,7 +40,7 @@ instances (methods, `Date` fields, `instanceof`).
   `Handlers.fromProcedures` for `Procedure` routers) and serve it over HTTP
   (`toWebHandler`, `layerHttp`, `@effect-trpc/server/node`);
 - you call a router in-process from tests, scripts or SSR (`createCaller`);
-- you add auth with `Middleware`, per-call services with the `context` option, or central failure
+- you add auth with `Middleware`, per-call services with `Handlers.withContext`, or central failure
   reporting with the `onError` option of the HTTP adapters.
 
 Use a sibling instead to define procedures and routers (`@effect-trpc/core`), to call a server
@@ -48,10 +49,10 @@ from another process or the browser (`@effect-trpc/client`), or for React Query 
 
 **Entry points**
 
-| import path                | exports                                                                                                                                                                                                                                                                                                                                   | source                                                                                  |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `@effect-trpc/server`      | `Handlers` (`make`, `flat`, `of`, `fromService`, `fromProcedures`), `toWebHandler`, `layerHttp` / `toHttpLayer`, `serializationLayer`, `createCaller`, `Middleware`; types `Caller`, `CallerOptions`, `CallOptions`, `PromiseCallOptions`, `WebHandler`, `ServerOptions` (`context`, `onError`, ...), `OnErrorInfo`, `Serialization`, ... | `src/index.ts` → `src/Handlers.ts`, `src/Http.ts`, `src/Caller.ts`, `src/Middleware.ts` |
-| `@effect-trpc/server/node` | `serve` (Layer), `runServer` (Promise); types `NodeServeOptions`, `RunningServer`                                                                                                                                                                                                                                                         | `src/node.ts` (needs the optional peer `@effect/platform-node`)                         |
+| import path                | exports                                                                                                                                                                                                                                                                                                                                       | source                                                                                  |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `@effect-trpc/server`      | `Handlers` (`make`, `flat`, `of`, `fromService`, `fromProcedures`, `withContext`), `toWebHandler`, `layerHttp` / `toHttpLayer`, `serializationLayer`, `createCaller`, `Middleware`; types `Caller`, `CallerOptions`, `CallOptions`, `PromiseCallOptions`, `WebHandler`, `ServerOptions` (`onError`, ...), `OnErrorInfo`, `Serialization`, ... | `src/index.ts` → `src/Handlers.ts`, `src/Http.ts`, `src/Caller.ts`, `src/Middleware.ts` |
+| `@effect-trpc/server/node` | `serve` (Layer), `runServer` (Promise); types `NodeServeOptions`, `RunningServer`                                                                                                                                                                                                                                                             | `src/node.ts` (needs the optional peer `@effect/platform-node`)                         |
 
 **Golden path**
 
@@ -163,10 +164,9 @@ const onError = ({ path, cause, headers }: OnErrorInfo) =>
     Cause.pretty(cause),
   );
 
-// `RequestId` is a requirement of the handlers, not of `toWebHandler`: `context` provides it.
+// `RequestId` is a requirement of `fromProcedures`; `withContext` provides it per call.
 const { handler } = await toWebHandler(appRouter, {
-  handlers: Handlers.fromProcedures(appRouter),
-  context,
+  handlers: Handlers.withContext(Handlers.fromProcedures(appRouter), context),
   onError,
 });
 ```
@@ -183,9 +183,9 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - Promise caller rejections are `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; Effect caller calls fail with exactly `E`.
 - Every function taking a `router` takes a `Router.Input` (a router or a router service class) and calls `Router.from` once; types are computed with `Router.Of<X>`, so a service and the equivalent `Router.make` router infer the same caller / handler types. Type helpers (`Caller<R>`, `Handlers.Requirements<R>`, ...) take a router type: `Router.Of<typeof AppRouter>`.
 - `toWebHandler` / `runServer` build the handler layer eagerly (the promise rejects on failure); `createCaller` builds it on the first call.
-- `context` (on `toWebHandler`, `layerHttp`, `serve`, `runServer`, and the Next / Start adapters) is `Effect<Context<C>, never, CR>`, evaluated once per call (over WebSocket too) before every middleware and the handler, whose services it provides to both. `C` is not a requirement of the adapter, while the `handlers` layer may require it; `CR` is read from the `handlers` layer output (`toWebHandler`, `serve` and `runServer` need `handlers` to provide it; for `layerHttp` an unmet `CR` stays a requirement of the layer). It cannot fail with a typed error (use a middleware); a defect in it fails the call with `RpcDefect`. Explicit type arguments (`toWebHandler<typeof appRouter>(...)`) fix `C` / `CR` to `never`.
+- `Handlers.withContext(handlers, context)` takes `context: Effect<Context<C>, never, CR>` (required) and returns the handlers layer without the requirement `C`. Every HTTP adapter (`toWebHandler`, `layerHttp`, `serve`, `runServer`, the Next / Start adapters) evaluates `context` once per call (over WebSocket too) before every middleware and the handler, and provides its services to both. `CR` is read from the output of `handlers`; what it does not provide stays a requirement of the returned layer. It cannot fail with a typed error (use a middleware); a defect in it fails the call with `RpcDefect`. `createCaller` and `localLink` do not apply it.
 - `onError({ path, cause, headers })` is called once for every call that fails while running (handler or middleware; typed failure or defect; a subscription failing mid-stream), before the failure is sent. It is not called for interruptions, nor for calls rejected outside the handler and middleware (invalid payload, unknown procedure, a success value that fails to encode: they reach the client as `RpcDefect`; tRPC's `BAD_REQUEST` input errors do reach its `onError`). It is awaited and uninterruptible; its own failures are ignored and never change the response.
-- With neither `context` nor `onError` the served group and the wire behaviour are unchanged.
+- The HTTP adapters always add one internal middleware (outermost) for the request context and `onError`; without them it only runs the call.
 - Response headers and cookies set with `HttpContext` (from `@effect-trpc/core`) apply when the response is written: with `ndjson` only if set before the first response chunk, with `json` until the last call of the request ends; the HTTP status cannot be set. Calls batched by `httpBatchLink` share one response.
 - `$promise`, `$router` and `dispose` are reserved top-level keys on a caller: `createCaller` throws for a router that uses them.
 - `Handlers.fromService` / `Handlers.fromProcedures` produce the same handler layer as `Handlers.make` (same tags) from the procedures' `handler`s; their requirements are the handlers' services minus `Scope` and middleware-provided services. `fromService` also provides the service (`yield* AppRouter` is exactly what that build's `make` produced; nested router services stay classes). It accepts a router service whose `make` reads services and fails: it runs `make` (and nested makes) with `Router.buildService` once per layer build, and adds `RouterService.MakeError` to the layer's error and `RouterService.MakeServices` to its requirements (only `Scope` is excluded from those; middleware-provided services are excluded from the handlers' requirements only).
@@ -204,9 +204,10 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - Don't write `Caller<typeof AppRouter>` for a router service → `Caller<Router.Of<typeof AppRouter>>` (functions take the class directly; type helpers take a router type).
 - Don't pass a router service whose `make` reads services (`yield* AppConfig`) to `toWebHandler`, `serve`, `createCaller` or `Handlers.make` → it is a compile error (a runtime error naming the fix if cast away); pass the contract (`router.client.gen.ts`) and give the class to `Handlers.fromService`.
 - Don't write `ReturnType<typeof Handlers.make>` (uninstantiated: TS2589 "excessively deep", because `Handlers.make` is overloaded for router services) → `Handlers.Provides<R>` / `Handlers.Services<R, H>` / `Handlers.Requirements<R>`, or the instantiated form `ReturnType<typeof Handlers.make<typeof appRouter, Handlers.From<typeof appRouter>>>`.
-- Don't `yield*` a service in a handler without providing it → either a middleware `provides` it, the `context` option provides it, or it is provided to the handlers layer; otherwise it is a requirement of the adapter (compile error).
-- Don't fail the `context` effect to reject a call → it cannot fail with a typed error; reject in a middleware.
-- Don't read a `context` service while the handlers layer is built (`Layer.effect(… yield* RequestId)`) → it exists only while a call runs; read it inside the handler.
+- Don't `yield*` a service in a handler without providing it → either a middleware `provides` it, `Handlers.withContext` provides it, or it is provided to the handlers layer; otherwise it is a requirement of the adapter (compile error).
+- Don't fail the `withContext` effect to reject a call → it cannot fail with a typed error; reject in a middleware.
+- Don't read a `withContext` service while the handlers layer is built (`Layer.effect(… yield* RequestId)`) → it exists only while a call runs; read it inside the handler.
+- Don't give a `Handlers.withContext` layer to `createCaller` or `localLink` → they do not apply it (calls needing its services die); provide the services to the plain handlers layer.
 - Don't rely on `onError` to see invalid payloads or unknown procedures → they reach the client as `RpcDefect` without calling it.
 - Don't make `onError` slow or hanging → the failure is sent after it completes and it is not interrupted (a client abort does not stop it, and `dispose()` waits); fork long work.
 - Don't call `HttpContext` setters per subscription element → set them before the first element, once.
@@ -214,7 +215,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 
 **Where to look**
 
-- `test/readme.test.ts` (this README's example), `test/handlers.test.ts` / `test/handlers.test-d.ts` (`Handlers`), `test/routerService.test.ts` / `test/routerService.test-d.ts` (`Handlers.fromService` / `fromProcedures`, fixtures in `test/service-fixtures.ts`), `test/routerServiceEffectful.test.ts` / `.test-d.ts` (a `make` that reads services), `test/web-handler.test.ts` (`toWebHandler`: errors, defects, NDJSON, path, dispose → 503), `test/node.test.ts` (`runServer`, `layerHttp` in an Effect app), `test/caller.test.ts` / `test/caller.test-d.ts` (`createCaller`, abort, dispose), `test/middlewares.test.ts` (ordering, provided services, middleware errors), `test/context.test.ts` / `test/context.test-d.ts` (`context` option and its types), `test/onError.test.ts` (`onError`), `test/httpContext.test.ts` (`HttpContext` over HTTP, WebSocket and the caller), `test/annotate.test.ts` (annotations read by middleware), `test/procedure-errors.test.ts` (typed errors vs defects), `test/streaming.test.ts`, `test/validation.test.ts`, `test/PARITY.md`.
+- `test/readme.test.ts` (this README's example), `test/handlers.test.ts` / `test/handlers.test-d.ts` (`Handlers`), `test/routerService.test.ts` / `test/routerService.test-d.ts` (`Handlers.fromService` / `fromProcedures`, fixtures in `test/service-fixtures.ts`), `test/routerServiceEffectful.test.ts` / `.test-d.ts` (a `make` that reads services), `test/web-handler.test.ts` (`toWebHandler`: errors, defects, NDJSON, path, dispose → 503), `test/node.test.ts` (`runServer`, `layerHttp` in an Effect app), `test/caller.test.ts` / `test/caller.test-d.ts` (`createCaller`, abort, dispose), `test/middlewares.test.ts` (ordering, provided services, middleware errors), `test/context.test.ts` / `test/context.test-d.ts` (`Handlers.withContext` and its types), `test/onError.test.ts` (`onError`), `test/httpContext.test.ts` (`HttpContext` over HTTP, WebSocket and the caller), `test/annotate.test.ts` (annotations read by middleware), `test/procedure-errors.test.ts` (typed errors vs defects), `test/streaming.test.ts`, `test/validation.test.ts`, `test/PARITY.md`.
 - JSDoc on every export (`src/*.ts`) follows `docs/jsdoc-style.md`.
 
 **Verify**
@@ -450,9 +451,10 @@ an `effect/rpc` client). For an existing Effect HTTP app use `layerHttp(appRoute
 
 ## Request context, response headers and `onError`
 
-`context` is tRPC's `createContext`: an `Effect` of services, evaluated once per call before every
-middleware and the handler, and provided to both. The `handlers` layer may require them; the
-adapter does not. Read the request with `HttpContext.request` inside it:
+`Handlers.withContext(handlers, context)` is tRPC's `createContext`: `context` is an `Effect` of
+services, evaluated once per call before every middleware and the handler, and provided to both.
+The `handlers` layer may require them; the layer `withContext` returns does not. Read the request
+with `HttpContext.request` inside it:
 
 ```ts
 import { Context, Effect, Option } from 'effect';
@@ -470,15 +472,17 @@ const context = Effect.map(HttpContext.request, (request) =>
   ),
 );
 
-const { handler } = await toWebHandler(appRouter, { handlers: HandlersLive, context });
+const { handler } = await toWebHandler(appRouter, {
+  handlers: Handlers.withContext(HandlersLive, context),
+});
 ```
 
 `onError({ path, cause, headers })` runs for every call that fails while running (a handler or
 middleware, typed failure or defect), before the failure is sent; it is not called for
 interruptions or for calls rejected outside the handler and middleware (invalid payload, unknown
-procedure, success that fails to encode). `context` and `onError` are options of `toWebHandler`,
-`layerHttp`, `serve` and `runServer` here, and of `createRouteHandler` / `createStartHandler` in
-the Next.js and Start packages. Handlers and middleware also use `HttpContext.setHeader`,
+procedure, success that fails to encode). `onError` is an option of `toWebHandler`, `layerHttp`,
+`serve` and `runServer` here, and of `createRouteHandler` / `createStartHandler` in the Next.js and
+Start packages; all of them apply a `Handlers.withContext` context. Handlers and middleware also use `HttpContext.setHeader`,
 `appendHeader` and `setCookie` (from `@effect-trpc/core`) to change the response; with `ndjson`
 only before the first response chunk.
 
@@ -498,7 +502,7 @@ server.url; // "http://localhost:54321/rpc"
 await server.dispose();
 ```
 
-Both accept `handlers`, `port`, `host`, `path`, `serialization`, `context`, `onError` and `gracefulShutdownTimeout`
+Both accept `handlers`, `port`, `host`, `path`, `serialization`, `onError` and `gracefulShutdownTimeout`
 (how long shutdown waits for in-flight requests before interrupting them; platform default 20s for
 `serve`, 1s for `runServer`). `@effect/platform-node` is an optional peer dependency used only by
 this subpath; the main entry stays platform-neutral.

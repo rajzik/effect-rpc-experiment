@@ -99,59 +99,15 @@ export interface OnErrorInfo {
 /**
  * Options shared by the HTTP adapters (`layerHttp`, `toWebHandler`, `serve`, `runServer`).
  *
- * **Details**
- *
- * - `context` (tRPC's `createContext`) is evaluated once per call, before every middleware and
- *   the handler, and its services (`C`) are provided to both. The handlers layer may require
- *   `C` (handlers and middleware `yield*` them); the adapters do not. What the effect itself
- *   needs (`CR`) comes from the handlers layer output. Read the request with
- *   `HttpContext.request` inside it. It runs per call over WebSocket too.
- *
  * **Gotchas**
  *
  * - `path` must match the URL path the requests arrive at; other paths answer `404`. Mounting
  *   the fetch handler at `app/api/rpc/route.ts` in Next.js needs `path: "/api/rpc"`.
- * - `context` cannot fail with a typed error: reject calls in a middleware instead (its error is
- *   part of the procedure's errors). A defect in it fails the call with `RpcDefect`.
- * - The services of `context` exist only while a call runs: reading them while the handlers
- *   layer is built fails.
- * - Explicit type arguments (`toWebHandler<typeof appRouter>(...)`) fix the `context` types to
- *   `never`; let them be inferred.
- * - A `context` typed `Effect | undefined` (`enabled ? context : undefined`) still lets handlers
- *   require its services; when it is `undefined`, those calls die. Pass it unconditionally.
- *
- * **Example** (A request id from a header, for every handler)
- *
- * ```ts
- * import { Context, Effect, Option, Schema } from 'effect';
- * import { HttpContext, Procedure, Router } from '@effect-trpc/core';
- * import { Handlers, toWebHandler } from '@effect-trpc/server';
- *
- * class RequestId extends Context.Service<RequestId, string>()('RequestId') {}
- *
- * const appRouter = Router.make({
- *   whoami: Procedure.output(Schema.String).query(() => RequestId),
- * });
- * // Layer<Rpc.Handler<'whoami'>, never, RequestId>: provided per call by `context`.
- * const HandlersLive = Handlers.fromProcedures(appRouter);
- *
- * const context = Effect.map(HttpContext.request, (request) =>
- *   Context.make(
- *     RequestId,
- *     Option.match(request, {
- *       onNone: () => 'local',
- *       onSome: (req) => req.headers['x-request-id'] ?? crypto.randomUUID(),
- *     }),
- *   ),
- * );
- *
- * const { handler } = await toWebHandler(appRouter, { handlers: HandlersLive, context });
- * ```
  *
  * @category options
  * @since 0.1.0
  */
-export interface ServerOptions<C = never, CR = never> {
+export interface ServerOptions {
   /** Route of the rpc endpoint. Defaults to `"/rpc"`. */
   readonly path?: HttpRouter.PathInput | undefined;
   /** Wire format, for every protocol. Defaults to `"ndjson"`, like `httpLink` and `wsLink`. */
@@ -169,12 +125,6 @@ export interface ServerOptions<C = never, CR = never> {
    * ignored. See {@link OnErrorInfo}.
    */
   readonly onError?: ((error: OnErrorInfo) => Effect.Effect<void>) | undefined;
-  /**
-   * Request context (tRPC's `createContext`): evaluated per call, its services are provided to
-   * every middleware and the handler. It may need services of the handlers layer output (`CR`);
-   * read the request with `HttpContext.request`. See the example above.
-   */
-  readonly context?: Effect.Effect<Context.Context<C>, never, CR> | undefined;
 }
 
 /**
@@ -183,14 +133,11 @@ export interface ServerOptions<C = never, CR = never> {
  * @category options
  * @since 0.1.0
  */
-export interface LayerHttpOptions<LOut, LE, LR, C = never, CR = never> extends ServerOptions<
-  C,
-  CR
-> {
+export interface LayerHttpOptions<LOut, LE, LR> extends ServerOptions {
   /**
    * The handler layer (e.g. from `Handlers.make`), merged with the server implementations of the
-   * router's middleware. Optional: whatever it (or `context`) needs and it does not provide stays
-   * a requirement of the returned layer, except the services of `context`.
+   * router's middleware. Optional: whatever it does not provide stays a requirement of the
+   * returned layer.
    */
   readonly handlers?: Layer.Layer<LOut, LE, LR> | undefined;
   /**
@@ -206,18 +153,13 @@ export interface LayerHttpOptions<LOut, LE, LR, C = never, CR = never> extends S
  * @category options
  * @since 0.1.0
  */
-export interface WebHandlerOptions<
-  R extends Router.Any,
-  LE,
-  C = never,
-  CR = never,
-> extends ServerOptions<C, CR> {
+export interface WebHandlerOptions<R extends Router.Any, LE> extends ServerOptions {
   /**
    * Layer providing every handler of the router and the server implementation of every
-   * middleware it uses (`Layer.mergeAll(HandlersLive, AuthLive)`), plus what `context` needs,
-   * with no remaining requirements other than the services of `context`.
+   * middleware it uses (`Layer.mergeAll(HandlersLive, AuthLive)`), with no remaining
+   * requirements.
    */
-  readonly handlers: Layer.Layer<NoInfer<Handlers.Requirements<R> | CR>, LE, NoInfer<C>>;
+  readonly handlers: Layer.Layer<Handlers.Requirements<R>, LE>;
 }
 
 /**
@@ -275,25 +217,11 @@ export const serializationLayer = (
   return value;
 };
 
-/** The layer `layerHttp` returns. */
-type LayerHttpFor<R extends Router.Any, LOut, LE, LR, C, CR> = Layer.Layer<
-  never,
-  LE,
-  HttpRouter.HttpRouter | Exclude<LR, C> | Exclude<Handlers.Requirements<R> | CR, LOut>
->;
-
 /** `layerHttp` for a router. */
-const layerHttpFor = <
-  R extends Router.Any,
-  LOut = never,
-  LE = never,
-  LR = never,
-  C = never,
-  CR = never,
->(
+const layerHttpFor = <R extends Router.Any, LOut = never, LE = never, LR = never>(
   router: R,
-  options: LayerHttpOptions<LOut, LE, LR, C, CR> = {},
-): LayerHttpFor<R, LOut, LE, LR, C, CR> => {
+  options: LayerHttpOptions<LOut, LE, LR> = {},
+): Layer.Layer<never, LE, HttpRouter.HttpRouter | LR | Exclude<Handlers.Requirements<R>, LOut>> => {
   const protocol = options.protocol ?? 'http';
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Router.Any` erases the group's rpcs on purpose; the return type below restores them via `Handlers.Requirements<R>`
   const hooks = withHooks(router.group as RpcGroup.RpcGroup<Rpc.Any>, options);
@@ -306,10 +234,7 @@ const layerHttpFor = <
     spanPrefix: options.spanPrefix,
     concurrency: options.concurrency,
   }).pipe(Layer.provide([serializationLayer(options.serialization), hooks.layer]));
-  const served =
-    options.handlers === undefined ? server : server.pipe(Layer.provide(options.handlers));
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion -- removes `C` from the requirements: `context` provides it per call; and adds what `Router.Any` erased (`Handlers.Requirements<R>`)
-  return served as LayerHttpFor<R, LOut, LE, LR, C, CR>;
+  return options.handlers === undefined ? server : server.pipe(Layer.provide(options.handlers));
 };
 
 /** `layerHttp` for a router or a router service: normalises the input with `Router.from`. */
@@ -340,9 +265,9 @@ const layerHttpFromInput = (
  *   the whole connection.
  * - The serialization layer is provided (default `"ndjson"` for both protocols, matching `httpLink` / `wsLink`),
  *   and so is `handlers` when given. Whatever `handlers` does not provide stays a requirement of
- *   the returned layer, together with `HttpRouter`, except the services of `context` (provided
- *   per call). What the `context` effect itself needs (`CR`) is read from the output of `handlers`;
- *   when `handlers` does not provide it, it stays a requirement too.
+ *   the returned layer, together with `HttpRouter`.
+ * - A handlers layer made with `Handlers.withContext` gets its request context per call (over
+ *   HTTP and WebSocket); `onError` reports the calls that fail.
  *
  * **Example** (Mounting the rpc route next to other routes on a Node server)
  *
@@ -372,21 +297,17 @@ const layerHttpFromInput = (
  * @since 0.1.0
  */
 export const layerHttp: {
-  <R extends Router.Any, LOut = never, LE = never, LR = never, C = never, CR = never>(
+  <R extends Router.Any, LOut = never, LE = never, LR = never>(
     router: R,
-    options?: LayerHttpOptions<LOut, LE, LR, C, CR>,
-  ): Layer.Layer<
-    never,
-    LE,
-    HttpRouter.HttpRouter | Exclude<LR, C> | Exclude<Handlers.Requirements<R> | CR, LOut>
-  >;
-  <X extends Router.Input, LOut = never, LE = never, LR = never, C = never, CR = never>(
+    options?: LayerHttpOptions<LOut, LE, LR>,
+  ): Layer.Layer<never, LE, HttpRouter.HttpRouter | LR | Exclude<Handlers.Requirements<R>, LOut>>;
+  <X extends Router.Input, LOut = never, LE = never, LR = never>(
     router: X,
-    options?: LayerHttpOptions<LOut, LE, LR, C, CR>,
+    options?: LayerHttpOptions<LOut, LE, LR>,
   ): Layer.Layer<
     never,
     LE,
-    HttpRouter.HttpRouter | Exclude<LR, C> | Exclude<Handlers.Requirements<Router.Of<X>> | CR, LOut>
+    HttpRouter.HttpRouter | LR | Exclude<Handlers.Requirements<Router.Of<X>>, LOut>
   >;
 } =
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
@@ -415,15 +336,12 @@ export const layerHttp: {
 export const toHttpLayer = layerHttp;
 
 /** `toWebHandler` for a router. */
-const toWebHandlerFor = async <R extends Router.Any, LE = never, C = never, CR = never>(
+const toWebHandlerFor = async <R extends Router.Any, LE = never>(
   router: R,
-  options: WebHandlerOptions<R, LE, C, CR>,
+  options: WebHandlerOptions<R, LE>,
 ): Promise<WebHandler> => {
-  const runtime = ManagedRuntime.make(
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion -- the layer is built without `C`: `context` provides its services per call, where handlers read them
-    options.handlers as Layer.Layer<Handlers.Requirements<R> | CR, LE>,
-  );
-  let context: Context.Context<Handlers.Requirements<R> | CR>;
+  const runtime = ManagedRuntime.make(options.handlers);
+  let context: Context.Context<Handlers.Requirements<R>>;
   try {
     context = await runtime.context();
   } catch (error) {
@@ -437,7 +355,6 @@ const toWebHandlerFor = async <R extends Router.Any, LE = never, C = never, CR =
     spanPrefix: options.spanPrefix,
     concurrency: options.concurrency,
     onError: options.onError,
-    context: options.context,
     protocol: 'http',
     handlers: Layer.succeedContext(context),
   }) as Layer.Layer<never, never, HttpRouter.HttpRouter>;
@@ -495,8 +412,7 @@ const toWebHandlerFromInput = (
  * - `path` (default `"/rpc"`) must equal the pathname the platform routes to the handler;
  *   any other path answers `404`.
  * - `handlers` must provide every handler and middleware implementation with no remaining
- *   requirements other than the services of `context`; provide services (database, config) to
- *   it first.
+ *   requirements; provide services (database, config) to it first.
  *
  * **Example** (A Next.js App Router route handler)
  *
@@ -525,13 +441,13 @@ const toWebHandlerFromInput = (
  * @since 0.1.0
  */
 export const toWebHandler: {
-  <R extends Router.Any, LE = never, C = never, CR = never>(
+  <R extends Router.Any, LE = never>(
     router: R,
-    options: WebHandlerOptions<R, LE, C, CR>,
+    options: WebHandlerOptions<R, LE>,
   ): Promise<WebHandler>;
-  <X extends Router.Input, LE = never, C = never, CR = never>(
+  <X extends Router.Input, LE = never>(
     router: X,
-    options: WebHandlerOptions<Router.Of<X>, LE, C, CR>,
+    options: WebHandlerOptions<Router.Of<X>, LE>,
   ): Promise<WebHandler>;
 } =
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep

@@ -453,7 +453,7 @@ export const appRouter = Router.make({
 }).middleware(RequireRoles);
 
 // `CurrentUser` comes from a trusted source: an auth middleware added after this one (it runs
-// first) or the `context` server option. Never take roles from a client-sent header.
+// first) or `Handlers.withContext`. Never take roles from a client-sent header.
 export const RequireRolesLive = Layer.succeed(RequireRoles)(
   RequireRoles.of((effect, { rpc }) =>
     Effect.flatMap(CurrentUser, (user) =>
@@ -505,9 +505,9 @@ export const appRouter = Router.make({
 Gotchas: with `ndjson` (the default) headers and cookies apply only if set before the first response
 chunk (the `Exit` of a query or mutation, the first element of a subscription), so set them once and
 up front, not per stream element; calls batched into one HTTP request share one response; over
-WebSocket the setters do nothing; an invalid header or cookie is a defect everywhere. The HTTP
-adapters of `@effect-trpc/server` also take a `context` option (services computed per call) and an
-`onError` option.
+WebSocket the setters do nothing; an invalid header or cookie is a defect everywhere. In
+`@effect-trpc/server`, `Handlers.withContext` adds services computed per call and the HTTP adapters
+take an `onError` option.
 
 ## The ClientError model
 

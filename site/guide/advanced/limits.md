@@ -9,7 +9,7 @@ What effect-trpc does not do (yet), and what to do instead.
 | Aborting a batched query does not stop it on the server             | `httpLink` for long queries you abort; `client.dispose()` stops all  |
 | Headers and cookies are written with the first response chunk       | set them once, before the first stream element                       |
 | A handler cannot set the HTTP status                                | typed errors; non-2xx is a transport failure on the client           |
-| `context` and `onError` exist on the HTTP adapters only             | provide services to the handlers of `createCaller` / `localLink`     |
+| `withContext` and `onError` apply on the HTTP adapters only         | provide services to the handlers of `createCaller` / `localLink`     |
 | `onError` skips invalid payloads, unknown procedures, encode errors | they reach the client as `RpcDefect` (tRPC reports `BAD_REQUEST`)    |
 | Links don't reconnect subscriptions; no `tracked()` / `lastEventId` | `sub.reset()` on error; resume from your own cursor in the input     |
 | Streamed (async-iterable) query results                             | a subscription                                                       |

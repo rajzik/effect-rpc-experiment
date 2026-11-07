@@ -31,15 +31,15 @@ hydration that keeps `Schema.Class` / `TaggedError` instances.
 
 **Entry points** (all from `@effect-trpc/start`; no subpaths):
 
-| export                                   | side    | what                                                                                                    | source           |
-| ---------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------- | ---------------- |
-| `createStartHandler`, `defaultStartPath` | server  | `({ request }) => Promise<Response>` + `dispose()` for `server.handlers` (`context`, `onError` options) | `src/handler.ts` |
-| `createServerClient`                     | server  | `Client<R>` over `localLink` (handlers in-process)                                                      | `src/client.ts`  |
-| `createBrowserClient`                    | browser | `Client<R>` over `httpLink` (relative url resolved)                                                     | `src/client.ts`  |
-| `createIsomorphicClient`                 | both    | server → `createServerClient`, browser → `createBrowserClient`                                          | `src/client.ts`  |
-| `getBaseUrl`, `getRpcUrl`                | both    | app origin / absolute rpc url (SSR needs absolute urls)                                                 | `src/client.ts`  |
-| `createStartHelpers`                     | both    | `{ rpc, getRpc, client, RpcProvider, useRpc, useRpcClient, hydration }`                                 | `src/helpers.ts` |
-| `createStartHydration`                   | both    | `{ dehydrate, hydrate, routerOptions }`, Schema-aware                                                   | `src/helpers.ts` |
+| export                                   | side    | what                                                                                        | source           |
+| ---------------------------------------- | ------- | ------------------------------------------------------------------------------------------- | ---------------- |
+| `createStartHandler`, `defaultStartPath` | server  | `({ request }) => Promise<Response>` + `dispose()` for `server.handlers` (`onError` option) | `src/handler.ts` |
+| `createServerClient`                     | server  | `Client<R>` over `localLink` (handlers in-process)                                          | `src/client.ts`  |
+| `createBrowserClient`                    | browser | `Client<R>` over `httpLink` (relative url resolved)                                         | `src/client.ts`  |
+| `createIsomorphicClient`                 | both    | server → `createServerClient`, browser → `createBrowserClient`                              | `src/client.ts`  |
+| `getBaseUrl`, `getRpcUrl`                | both    | app origin / absolute rpc url (SSR needs absolute urls)                                     | `src/client.ts`  |
+| `createStartHelpers`                     | both    | `{ rpc, getRpc, client, RpcProvider, useRpc, useRpcClient, hydration }`                     | `src/helpers.ts` |
+| `createStartHydration`                   | both    | `{ dehydrate, hydrate, routerOptions }`, Schema-aware                                       | `src/helpers.ts` |
 
 **Golden path** (paths in the app):
 
@@ -86,9 +86,9 @@ hydration that keeps `Schema.Class` / `TaggedError` instances.
   `prefetchQuery` and read `query.error` in the component.
 - Don't use `createBrowserClient` during SSR without an origin in production → set `PUBLIC_URL`,
   pass `serverOrigin`, or pass an absolute `url`.
-- Don't share handlers that `yield*` a `context` service with `createServerClient` /
-  `createIsomorphicClient` → they run in-process through `localLink` without `context` (a type
-  error); provide the service to the layer you give them.
+- Don't give a `Handlers.withContext` layer to `createServerClient` / `createIsomorphicClient` →
+  they run in-process through `localLink` without its context (calls needing its services die);
+  provide the service to the layer you give them.
 - Don't mount the handler on a path other than `path` → pass `path` (include the router
   `basepath`).
 - Don't write `StartHelpers<typeof AppRouter>` for a router service →
@@ -98,8 +98,9 @@ hydration that keeps `Schema.Class` / `TaggedError` instances.
 
 **Where to look**
 
-- Route handler (encoding, NDJSON, rewrites, 405/404/503, lazy build, retry, `dispose`, `context`
-  and `onError` pass-through): `test/handler.test.ts`; the `context` types: `test/start.test-d.tsx`.
+- Route handler (encoding, NDJSON, rewrites, 405/404/503, lazy build, retry, `dispose`,
+  `Handlers.withContext` and `onError`): `test/handler.test.ts`; the `withContext` types:
+  `test/start.test-d.tsx`.
 - Clients (`isServer` switching, `httpLink`, subscriptions, SSR url resolution):
   `test/client.test.ts`.
 - Helpers (loader `ensureQueryData`, typed errors, dehydrate/hydrate, infinite queries,
@@ -198,11 +199,11 @@ export const Route = createFileRoute('/api/rpc/$')({
   `handler.dispose()` releases the layer.
 - Typed failures and defects are encoded into the response `Exit` with status `200`.
   Subscriptions stream NDJSON. `serialization: 'json' | 'ndjson'` must match the client.
-- `context` (tRPC's `createContext`: an `Effect` of services evaluated per call, before middleware
-  and the handler) and `onError({ path, cause, headers })` are the options of `toWebHandler` from
-  `@effect-trpc/server`, passed through. They apply to this route only: the in-process
-  `createServerClient` needs handlers with no requirements left. Handlers can read the request
-  and set response headers and cookies with `HttpContext` (`@effect-trpc/core`).
+- `Handlers.withContext(handlers, context)` (tRPC's `createContext`: an `Effect` of services
+  evaluated per call, before middleware and the handler) and `onError({ path, cause, headers })`,
+  an option of `toWebHandler` from `@effect-trpc/server` passed through, apply to this route only:
+  give the in-process `createServerClient` handlers with those services provided. Handlers can
+  read the request and set response headers and cookies with `HttpContext` (`@effect-trpc/core`).
 
 ## 3. The client: `src/rpc/client.ts`
 
@@ -390,7 +391,7 @@ not provide a server-function link.
 
 | export                                                                                   | what                                                                     |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `createStartHandler(router, { handlers, path?, serialization?, context?, onError? })`    | `StartHandler`: `({ request }) => Promise<Response>` with `dispose()`    |
+| `createStartHandler(router, { handlers, path?, serialization?, onError? })`              | `StartHandler`: `({ request }) => Promise<Response>` with `dispose()`    |
 | `createIsomorphicClient(router, { server: { handlers }, client: { url }, isServer? })`   | `Client<R>`: in-process on the server, `httpLink` in the browser         |
 | `createServerClient(router, { handlers, headers? })`                                     | `Client<R>` over `localLink`                                             |
 | `createBrowserClient(router, { url?, headers?, fetch?, serialization?, serverOrigin? })` | `Client<R>` over `httpLink` (relative url resolved)                      |

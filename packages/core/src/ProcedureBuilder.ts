@@ -682,7 +682,7 @@ const hasHandler = (u: unknown): u is ProcedureWithHandler.Any =>
  * }).middleware(RequireRoles);
  *
  * // `CurrentUser` comes from a trusted source: an auth middleware added after this one (it runs
- * // first) or the `context` server option. Never take roles from a client-sent header.
+ * // first) or `Handlers.withContext`. Never take roles from a client-sent header.
  * export const RequireRolesLive = Layer.succeed(RequireRoles)(
  *   RequireRoles.of((effect, { rpc }) =>
  *     Effect.flatMap(CurrentUser, (user) =>

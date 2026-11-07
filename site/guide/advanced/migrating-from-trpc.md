@@ -14,8 +14,8 @@ errors and context work (typed errors and services instead of `TRPCError` and `c
 | `throw new TRPCError({ code: 'NOT_FOUND' })` | `Effect.fail(new PostNotFound({ id }))`, declared in `error`                    |
 | `t.router({ … })`                            | `Router.make({ … })`                                                            |
 | resolvers inline in the router               | `Handlers.make(router, { … })` in a server-only module                          |
-| `createContext` + `ctx`                      | middleware that `provides` services; the adapters' `context` option             |
-| `createContext` reading `req`                | `HttpContext.request`, inside `context` or a handler                            |
+| `createContext` + `ctx`                      | middleware that `provides` services; `Handlers.withContext`                     |
+| `createContext` reading `req`                | `HttpContext.request`, inside `withContext`'s effect or a handler               |
 | `ctx.res` headers, cookies, `responseMeta`   | `HttpContext.setHeader`, `appendHeader`, `setCookie` (no status)                |
 | `meta`, `.meta({ … })`                       | `.annotate(Key, value)`, read as `Context.get(rpc.annotations, Key)`            |
 | `onError({ error, path, input, ctx })`       | `onError({ path, cause, headers })` option of the adapters                      |
@@ -36,7 +36,7 @@ errors and context work (typed errors and services instead of `TRPCError` and `c
 2. **Errors.** For each `TRPCError` code a client branches on, add a `Schema.TaggedError` and declare
    it on the procedure. Everything else becomes a defect.
 3. **Context.** Each field of `ctx` becomes a service, provided by middleware (the user, the tenant),
-   by the `context` option (a request id, anything computed per call) or by the server layer (the
+   by `Handlers.withContext` (a request id, anything computed per call) or by the server layer (the
    database). What `createContext` read from `req` is read with `HttpContext.request`; what
    resolvers wrote to `res` is `HttpContext.setHeader` / `setCookie`
    ([request, response, context](../server/http-context)).

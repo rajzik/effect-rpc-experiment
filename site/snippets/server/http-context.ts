@@ -47,9 +47,9 @@ const context = Effect.map(HttpContext.request, (request) =>
   ),
 );
 
-// `RequestId` is a requirement of the handlers, not of the adapter: `context` provides it.
-const HandlersLive = Handlers.fromProcedures(appRouter);
-const web = await toWebHandler(appRouter, { handlers: HandlersLive, context });
+// `RequestId` is a requirement of `fromProcedures`; `withContext` provides it per call.
+const HandlersLive = Handlers.withContext(Handlers.fromProcedures(appRouter), context);
+const web = await toWebHandler(appRouter, { handlers: HandlersLive });
 // #endregion context
 
 // #region onError
@@ -59,7 +59,7 @@ const onError = ({ path, cause, headers }: OnErrorInfo) =>
     Cause.pretty(cause),
   );
 
-const reported = await toWebHandler(appRouter, { handlers: HandlersLive, context, onError });
+const reported = await toWebHandler(appRouter, { handlers: HandlersLive, onError });
 // #endregion onError
 
 void [web, reported];

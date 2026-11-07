@@ -75,12 +75,14 @@ describe('createStartHandler', () => {
     expect(paths).toEqual(['post.byId']);
   });
 
-  test('context is passed through to the server', async () => {
+  test('a Handlers.withContext context is applied by the server', async () => {
     class RequestId extends Context.Service<RequestId, string>()('RequestId') {}
     const router = Router.make({ echo: Procedure.output(Schema.String).query(() => RequestId) });
     await using handler = createStartHandler(router, {
-      handlers: Handlers.fromProcedures(router),
-      context: Effect.succeed(Context.make(RequestId, 'r-1')),
+      handlers: Handlers.withContext(
+        Handlers.fromProcedures(router),
+        Effect.succeed(Context.make(RequestId, 'r-1')),
+      ),
     });
     const response = await handler({ request: rpcRequest('http://x/api/rpc', 'echo') });
     expect(exitOf(await readFrames(response))).toEqual({ _tag: 'Success', value: 'r-1' });

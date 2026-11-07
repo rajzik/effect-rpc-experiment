@@ -24,9 +24,10 @@ The router and server modules are the ones from the [quick start](../quick-start
   request answers `500` and the next one retries. `handler.dispose()` releases it.
 - Typed failures and defects are encoded in the response with status `200`. Subscriptions stream
   NDJSON.
-- `context` and `onError` are the options of `toWebHandler`, passed through: see
-  [request, response, context](../server/http-context). They apply to this route; the in-process
-  server client runs its handlers without `context`, so give it handlers with no requirements.
+- `onError` is the option of `toWebHandler`, passed through, and a `Handlers.withContext` layer
+  gets its request context: see [request, response, context](../server/http-context). Both apply
+  to this route; the in-process server client runs its handlers without it, so give it handlers
+  with no requirements.
 
 ## Isomorphic client
 

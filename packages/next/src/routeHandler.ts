@@ -25,14 +25,13 @@ import type { Layer } from 'effect';
  * @category options
  * @since 0.1.0
  */
-export interface RouteHandlerOptions<R extends Router.Any, LE = never, C = never, CR = never> {
+export interface RouteHandlerOptions<R extends Router.Any, LE = never> {
   /**
    * Layer providing every handler of the router and the server implementation of every
-   * middleware it uses (`Layer.mergeAll(HandlersLive, AuthLive)`), plus what `context` needs,
-   * with no remaining requirements other than the services of `context`. It is built once, on
-   * the first request.
+   * middleware it uses (`Layer.mergeAll(HandlersLive, AuthLive)`), with no remaining requirements.
+   * It is built once, on the first request.
    */
-  readonly handlers: Layer.Layer<NoInfer<Handlers.Requirements<R> | CR>, LE, NoInfer<C>>;
+  readonly handlers: Layer.Layer<Handlers.Requirements<R>, LE>;
   /**
    * Path of the route handler, i.e. the folder of `route.ts` below `app/`. Defaults to
    * `"/api/rpc"` (`app/api/rpc/[[...rpc]]/route.ts` or `app/api/rpc/route.ts`). Requests below
@@ -51,11 +50,6 @@ export interface RouteHandlerOptions<R extends Router.Any, LE = never, C = never
    * is sent (see `OnErrorInfo` in `@effect-trpc/server`).
    */
   readonly onError?: ServerOptions['onError'];
-  /**
-   * Request context (tRPC's `createContext`): evaluated per call, its services are provided to
-   * every middleware and the handler (see `ServerOptions` in `@effect-trpc/server`).
-   */
-  readonly context?: ServerOptions<C, CR>['context'];
 }
 
 /**
@@ -128,9 +122,9 @@ const methodNotAllowed: NextRouteHandlerFn = (request) =>
   );
 
 /** `createRouteHandler` for a router. */
-const createRouteHandlerFor = <R extends Router.Any, LE = never, C = never, CR = never>(
+const createRouteHandlerFor = <R extends Router.Any, LE = never>(
   router: R,
-  options: RouteHandlerOptions<R, LE, C, CR>,
+  options: RouteHandlerOptions<R, LE>,
 ): RouteHandler => {
   const path = trimMountPath(options.path ?? defaultPath);
   const prefixes =
@@ -147,7 +141,6 @@ const createRouteHandlerFor = <R extends Router.Any, LE = never, C = never, CR =
       path,
       serialization: options.serialization,
       onError: options.onError,
-      context: options.context,
     }).catch((error: unknown) => {
       // Let the next request retry instead of caching the failure forever.
       server = undefined;
@@ -303,13 +296,10 @@ const createRouteHandlerFromInput = (
  * @since 0.1.0
  */
 export const createRouteHandler: {
-  <R extends Router.Any, LE = never, C = never, CR = never>(
-    router: R,
-    options: RouteHandlerOptions<R, LE, C, CR>,
-  ): RouteHandler;
-  <X extends Router.Input, LE = never, C = never, CR = never>(
+  <R extends Router.Any, LE = never>(router: R, options: RouteHandlerOptions<R, LE>): RouteHandler;
+  <X extends Router.Input, LE = never>(
     router: X,
-    options: RouteHandlerOptions<Router.Of<X>, LE, C, CR>,
+    options: RouteHandlerOptions<Router.Of<X>, LE>,
   ): RouteHandler;
 } =
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep

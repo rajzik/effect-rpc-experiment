@@ -2,14 +2,14 @@
 
 tRPC hands every resolver a `ctx` built by `createContext(req, res)`. effect-trpc splits that up.
 `HttpContext` adds no requirement to a handler, so the same handlers still run under
-`createCaller`, `localLink`, Electron and tests. The services of `context` are handler
-requirements: over HTTP the `context` option provides them, elsewhere provide them with a layer:
+`createCaller`, `localLink`, Electron and tests. The services of a request context are handler
+requirements: over HTTP `Handlers.withContext` provides them, elsewhere provide them with a layer:
 
 | You want to                                 | Use                                                  |
 | ------------------------------------------- | ---------------------------------------------------- |
 | read a header, the client address, a cookie | `HttpContext.request`                                |
 | set a response header or cookie             | `HttpContext.setHeader`, `appendHeader`, `setCookie` |
-| provide services computed for every call    | the `context` option of the HTTP adapters            |
+| provide services computed for every call    | `Handlers.withContext(handlers, context)`            |
 | log or report failed calls in one place     | the `onError` option of the HTTP adapters            |
 | derive a service that may reject (the user) | [middleware](./middleware), as before                |
 
@@ -39,28 +39,28 @@ The HTTP status is not settable: a non-2xx response is a transport failure to th
 
 ## Request context
 
-`context` is tRPC's `createContext`. It is an `Effect` of services, evaluated once per call before
-every middleware and the handler, and its services are provided to both.
+`Handlers.withContext(handlers, context)` is tRPC's `createContext`. `context` is an `Effect` of
+services, evaluated once per call before every middleware and the handler, and its services are
+provided to both.
 
 <<< @/snippets/server/http-context.ts#context
 
-- Handlers may `yield*` the services of `context`. They are not requirements of the adapter: the
-  type of `handlers` may require them, and `toWebHandler` accepts that only because `context` is
-  given. Without it, `RequestId` is an unmet requirement and does not compile.
+- Handlers may `yield*` the services of `context`. `withContext` removes them from the
+  requirements of the handlers layer, so the adapter accepts it. Without it, `RequestId` is an
+  unmet requirement and does not compile.
 - User middleware runs inside `context`, so it can `yield*` those services too.
 - What `context` itself needs (`Effect<Context<C>, never, CR>`) comes from the output of the
-  `handlers` layer. `toWebHandler`, `serve` and `runServer` reject `handlers` that do not provide it;
-  for `layerHttp` an unmet `CR` stays a requirement of the layer.
+  handlers layer you pass: merge the layers it needs into it. What that does not provide stays a
+  requirement of the layer `withContext` returns.
 - It runs per call over a WebSocket too, where `HttpContext.request` is the upgrade request.
 - It cannot fail with a typed error. To reject a call, use a middleware, whose error is part of the
   procedure's errors. A defect in `context` fails the call with `RpcDefect`.
-- A `context` typed `Effect | undefined` (`enabled ? context : undefined`) still lets handlers
-  require its services; when it is `undefined`, those calls die. Pass it unconditionally.
 
-It is an option of every HTTP adapter, with the same meaning: `toWebHandler` and `layerHttp` from
+Every HTTP adapter applies it, with the same meaning: `toWebHandler` and `layerHttp` from
 `@effect-trpc/server`, `serve` and `runServer` from `@effect-trpc/server/node`, `createRouteHandler`
 from `@effect-trpc/next` and `createStartHandler` from `@effect-trpc/start`. `createCaller`,
-`localLink` and the test harness have none: provide the services to their handlers layer directly.
+`localLink` and the test harness do not: give them the handlers layer with the services provided
+directly, since with a `withContext` layer the calls needing them die.
 
 Prefer middleware when the value depends on who is calling and can be refused (the session). Use
 `context` for what every call needs regardless: a request id, a per-request logger, a clock.
@@ -103,10 +103,9 @@ It is not called for:
   itself are ignored and never change the response.
 - The services of `context` exist only while a call runs: reading them while the handlers layer is
   built fails.
-- Explicit type arguments (`toWebHandler<typeof appRouter>(...)`) fix the `context` types to
-  `never`. Let them be inferred.
 
 :::
 
-See also: [`HttpContext`](/api/core#httpcontext), [`ServerOptions`](/api/server#serveroptions),
+See also: [`HttpContext`](/api/core#httpcontext), [`Handlers`](/api/server#handlers),
+[`ServerOptions`](/api/server#serveroptions),
 [`OnErrorInfo`](/api/server#onerrorinfo), [Middleware and context](./middleware).

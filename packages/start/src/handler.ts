@@ -38,8 +38,8 @@ export const defaultStartPath = '/api/rpc' as const;
 
 /**
  * Options of {@link createStartHandler}: the `toWebHandler` options (`handlers` required,
- * `serialization`, `disableTracing`, `spanPrefix`, `concurrency`, `onError`, `context`) plus the
- * mount `path`.
+ * `serialization`, `disableTracing`, `spanPrefix`, `concurrency`, `onError`) plus the mount
+ * `path`.
  *
  * **Gotchas**
  *
@@ -49,12 +49,10 @@ export const defaultStartPath = '/api/rpc' as const;
  * @category options
  * @since 0.1.0
  */
-export interface StartHandlerOptions<
-  R extends Router.Any,
-  LE = never,
-  C = never,
-  CR = never,
-> extends Omit<WebHandlerOptions<R, LE, C, CR>, 'path'> {
+export interface StartHandlerOptions<R extends Router.Any, LE = never> extends Omit<
+  WebHandlerOptions<R, LE>,
+  'path'
+> {
   /**
    * The url path the rpc route is mounted on, i.e. the server route file path without the
    * catch-all segment: `src/routes/api/rpc.$.ts` (`createFileRoute('/api/rpc/$')`) → `"/api/rpc"`
@@ -120,9 +118,9 @@ const rewrite = (request: Request, path: `/${string}`): Request | undefined => {
 };
 
 /** `createStartHandler` for a router. */
-const createStartHandlerFor = <R extends Router.Any, LE = never, C = never, CR = never>(
+const createStartHandlerFor = <R extends Router.Any, LE = never>(
   router: R,
-  options: StartHandlerOptions<R, LE, C, CR>,
+  options: StartHandlerOptions<R, LE>,
 ): StartHandler => {
   const path = normalizePath(options.path ?? defaultStartPath);
   let web: Promise<WebHandler> | undefined;
@@ -137,7 +135,6 @@ const createStartHandlerFor = <R extends Router.Any, LE = never, C = never, CR =
       spanPrefix: options.spanPrefix,
       concurrency: options.concurrency,
       onError: options.onError,
-      context: options.context,
     }).catch((error: unknown) => {
       web = undefined;
       throw error;
@@ -272,13 +269,10 @@ const createStartHandlerFromInput = (
  * @since 0.1.0
  */
 export const createStartHandler: {
-  <R extends Router.Any, LE = never, C = never, CR = never>(
-    router: R,
-    options: StartHandlerOptions<R, LE, C, CR>,
-  ): StartHandler;
-  <X extends Router.Input, LE = never, C = never, CR = never>(
+  <R extends Router.Any, LE = never>(router: R, options: StartHandlerOptions<R, LE>): StartHandler;
+  <X extends Router.Input, LE = never>(
     router: X,
-    options: StartHandlerOptions<Router.Of<X>, LE, C, CR>,
+    options: StartHandlerOptions<Router.Of<X>, LE>,
   ): StartHandler;
 } =
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep

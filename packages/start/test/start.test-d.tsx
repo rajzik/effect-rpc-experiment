@@ -78,15 +78,17 @@ describe('createStartHandler', () => {
     createStartHandler(appRouter, { handlers: makeFixture().handlers, path: 1 });
   });
 
-  test('handlers may require the services of `context`', () => {
+  test('handlers may require the services of a Handlers.withContext context', () => {
     class RequestId extends Context.Service<RequestId, string>()('RequestId') {}
     const router = Router.make({ echo: Procedure.output(Schema.String).query(() => RequestId) });
     const handlersNeedingRequestId = Handlers.fromProcedures(router);
     const context = Effect.succeed(Context.make(RequestId, 'r-1'));
     expectTypeOf(
-      createStartHandler(router, { handlers: handlersNeedingRequestId, context }),
+      createStartHandler(router, {
+        handlers: Handlers.withContext(handlersNeedingRequestId, context),
+      }),
     ).toEqualTypeOf<StartHandler>();
-    // @ts-expect-error -- without `context`, RequestId is an unmet requirement of the handlers
+    // @ts-expect-error -- without `withContext`, RequestId is an unmet requirement of the handlers
     createStartHandler(router, { handlers: handlersNeedingRequestId });
   });
 });

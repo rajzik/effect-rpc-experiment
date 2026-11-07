@@ -11,11 +11,12 @@
  *
  * @since 0.1.0
  */
-import { Effect, Layer } from 'effect';
-import type { Context, Scope, Stream } from 'effect';
+import { Context, Effect, Layer } from 'effect';
+import type { Scope, Stream } from 'effect';
 import type { Rpc, RpcGroup } from 'effect/rpc';
 import { Procedure, Router } from '@effect-trpc/core';
 import type { ProcedureDef, ProcedureWithHandler, RouterService } from '@effect-trpc/core';
+import { RequestContext } from './internal/hooks.js';
 
 type RecordOf<R> = R extends Router<infer Rec> ? Rec : R;
 
@@ -652,6 +653,77 @@ const of: {
 } = ofFromInput;
 
 /**
+ * Gives a handlers layer a request context (tRPC's `createContext`): `context` runs once per
+ * call, before every middleware and the handler, and its services (`C`) are provided to both.
+ *
+ * **When to use**
+ *
+ * Use when handlers or middleware need a value derived from each request (a request id, the
+ * session read from a cookie) as a service. Prefer a middleware that `provides` the service when
+ * the value belongs to some procedures only, or when deriving it can fail with a typed error.
+ *
+ * **Details**
+ *
+ * - The returned layer no longer requires `C`: the HTTP adapters (`layerHttp`, `toWebHandler`,
+ *   `serve`, `runServer` and the Next.js / TanStack Start handlers) provide it per call, over
+ *   HTTP and WebSocket. Read the request with `HttpContext.request` inside `context`.
+ * - What `context` needs (`CR`) comes from the output of `handlers` (merge the layers it needs
+ *   into it); what that does not provide stays a requirement of the returned layer.
+ *
+ * **Gotchas**
+ *
+ * - Only the HTTP adapters apply it. Under `createCaller` and `localLink` the services of
+ *   `context` are missing and the calls needing them die: give those the handlers layer with
+ *   `C` provided instead.
+ * - `context` cannot fail with a typed error: reject calls in a middleware instead (its error is
+ *   part of the procedure's errors). A defect in it fails the call with `RpcDefect`.
+ * - The services of `context` exist only while a call runs: reading them while the handlers
+ *   layer is built fails.
+ *
+ * **Example** (A request id from a header, for every handler)
+ *
+ * ```ts
+ * import { Context, Effect, Option, Schema } from 'effect';
+ * import { HttpContext, Procedure, Router } from '@effect-trpc/core';
+ * import { Handlers, toWebHandler } from '@effect-trpc/server';
+ *
+ * class RequestId extends Context.Service<RequestId, string>()('RequestId') {}
+ *
+ * const appRouter = Router.make({
+ *   whoami: Procedure.output(Schema.String).query(() => RequestId),
+ * });
+ *
+ * const context = Effect.map(HttpContext.request, (request) =>
+ *   Context.make(
+ *     RequestId,
+ *     Option.match(request, {
+ *       onNone: () => 'local',
+ *       onSome: (req) => req.headers['x-request-id'] ?? crypto.randomUUID(),
+ *     }),
+ *   ),
+ * );
+ *
+ * // `fromProcedures` requires RequestId; `withContext` provides it per call.
+ * const HandlersLive = Handlers.withContext(Handlers.fromProcedures(appRouter), context);
+ *
+ * const { handler } = await toWebHandler(appRouter, { handlers: HandlersLive });
+ * ```
+ */
+const withContext = <Out, E, R, C, CR>(
+  handlers: Layer.Layer<Out, E, R>,
+  context: Effect.Effect<Context.Context<C>, never, CR>,
+): Layer.Layer<Out, E, Exclude<R, C> | Exclude<CR, Out>> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion -- removes `C` from the requirements: the hooks middleware of the HTTP adapters reads `RequestContext` and provides `C` per call
+  Layer.effect(RequestContext)(
+    Effect.map(Effect.context<CR>(), (captured) =>
+      // What `context` needs comes from `handlers`, unless the call's own context has it.
+      Effect.updateContext(context, (current: Context.Context<never>) =>
+        Context.merge(captured, current),
+      ),
+    ),
+  ).pipe(Layer.provideMerge(handlers)) as Layer.Layer<Out, E, Exclude<R, C> | Exclude<CR, Out>>;
+
+/**
  * Handler constructors for a core `Router`: `make` (nested record), `flat` (tag-keyed record),
  * `of` (contextual typing helper), and `fromService` / `fromProcedures` (routers whose
  * procedures were built with `Procedure` and carry their handlers).
@@ -752,4 +824,5 @@ export const Handlers = {
   of,
   fromProcedures,
   fromService,
+  withContext,
 } as const;

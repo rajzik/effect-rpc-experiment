@@ -8,7 +8,7 @@ class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {}) {}
 // The key. A `Context.Reference` gives procedures that don't set it a default.
 const Roles = Context.Reference<ReadonlyArray<string>>('Roles', { defaultValue: () => [] });
 
-// Who is calling: provided by an auth middleware (or the `context` server option), never read
+// Who is calling: provided by an auth middleware (or `Handlers.withContext`), never read
 // from a client-sent header.
 class CurrentUser extends Context.Service<CurrentUser, { readonly roles: ReadonlyArray<string> }>()(
   'CurrentUser',
