@@ -142,11 +142,11 @@ describe('Router.fromService', () => {
       }),
     }) {}
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a cast that hides the failure from the types
-    expect(() => Router.fromService(Failing as unknown as RouterService.Any)).toThrow(
+    expect(() => Router.fromService(Failing as unknown as RouterService.Pure)).toThrow(
       /FailingRouter.*make must be synchronous, read no services and not fail/,
     );
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a cast that hides the requirement from the types
-    expect(() => Router.fromService(NeedsDb as unknown as RouterService.Any)).toThrow(
+    expect(() => Router.fromService(NeedsDb as unknown as RouterService.Pure)).toThrow(
       /NeedsDbRouter.*make must be synchronous, read no services and not fail/,
     );
   });
@@ -179,7 +179,7 @@ describe('Router.fromService', () => {
       make: Effect.succeed(42),
     }) {}
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a cast that hides the wrong success type
-    expect(() => Router.fromService(NotARecord as unknown as RouterService.Any)).toThrow(
+    expect(() => Router.fromService(NotARecord as unknown as RouterService.Pure)).toThrow(
       /NotARecord.*make must succeed with a record of procedures/,
     );
   });
@@ -189,7 +189,7 @@ describe('Router.fromService', () => {
       make: Effect.succeed(Router.make({ ping: query({ success: Schema.String }) })),
     }) {}
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a cast that hides the wrong success type
-    expect(() => Router.fromService(WrappedRouter as unknown as RouterService.Any)).toThrow(
+    expect(() => Router.fromService(WrappedRouter as unknown as RouterService.Pure)).toThrow(
       /WrappedRouter.*make must succeed with a record of procedures, not a router/,
     );
   });

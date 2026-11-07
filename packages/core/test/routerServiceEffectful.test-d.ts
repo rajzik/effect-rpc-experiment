@@ -39,11 +39,11 @@ class PureRouter extends Context.Service<PureRouter>()('PureRouter', {
 }) {}
 
 describe('effectful router services (types)', () => {
-  it('an effectful service is RouterService.Effectful and sync APIs reject it', () => {
-    expectTypeOf<typeof AppRouter>().toExtend<RouterService.Effectful>();
-    expectTypeOf<typeof AppRouter>().not.toExtend<RouterService.Any>();
+  it('an effectful service is RouterService.Any, not Pure, and sync APIs reject it', () => {
+    expectTypeOf<typeof AppRouter>().toExtend<RouterService.Any>();
+    expectTypeOf<typeof AppRouter>().not.toExtend<RouterService.Pure>();
     expectTypeOf<typeof AppRouter>().not.toExtend<Router.Input>();
-    expectTypeOf<typeof PostRouter>().toExtend<RouterService.Effectful>();
+    expectTypeOf<typeof PostRouter>().toExtend<RouterService.Any>();
     // @ts-expect-error -- PostRouter's make requires Database
     // oxlint-disable-next-line effecttsgo/missing-effect-context -- deliberately wrong: `make` requires Database (the @ts-expect-error case)
     Router.make({ post: PostRouter });
@@ -94,7 +94,7 @@ describe('effectful router services (types)', () => {
   it('a pure service makes with no error and no services', () => {
     expectTypeOf<RouterService.MakeError<typeof PureRouter>>().toEqualTypeOf<never>();
     expectTypeOf<RouterService.MakeServices<typeof PureRouter>>().toEqualTypeOf<never>();
+    expectTypeOf<typeof PureRouter>().toExtend<RouterService.Pure>();
     expectTypeOf<typeof PureRouter>().toExtend<RouterService.Any>();
-    expectTypeOf<typeof PureRouter>().toExtend<RouterService.Effectful>();
   });
 });

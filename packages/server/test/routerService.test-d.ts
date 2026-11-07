@@ -131,7 +131,7 @@ describe('Handlers.fromService types', () => {
         return { ok: Procedure.query(() => Effect.void) };
       }),
     }) {}
-    expectTypeOf(NeedsDb).not.toExtend<RouterService.Any>();
+    expectTypeOf(NeedsDb).not.toExtend<RouterService.Pure>();
     // make's requirements become the layer's (see routerServiceEffectful.test-d.ts).
     expectTypeOf(Handlers.fromService(NeedsDb)).toEqualTypeOf<
       Layer.Layer<Rpc.Handler<'ok'> | NeedsDb, never, Database>
@@ -195,7 +195,7 @@ describe('router-level middleware in a router service (types)', () => {
         }).middleware(Auth),
       }),
     }) {}
-    expectTypeOf(Guarded).toExtend<RouterService.Any>();
+    expectTypeOf(Guarded).toExtend<RouterService.Pure>();
     expectTypeOf<Router.Paths<typeof Guarded>>().toEqualTypeOf<
       'health' | 'admin.me' | 'admin.db'
     >();

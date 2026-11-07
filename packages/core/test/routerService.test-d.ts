@@ -119,14 +119,14 @@ describe('router services (types)', () => {
 
   it('services and routers are Router.Input', () => {
     expectTypeOf<typeof AppRouter>().toExtend<Router.Input>();
-    expectTypeOf<typeof AppRouter>().toExtend<RouterService.Any>();
+    expectTypeOf<typeof AppRouter>().toExtend<RouterService.Pure>();
     expectTypeOf<typeof plain>().toExtend<Router.Input>();
     expectTypeOf<typeof plain>().not.toExtend<RouterService.Any>();
   });
 
   it('a make that requires a service is rejected by Router.from', () => {
     expectTypeOf<typeof NeedsDb>().not.toExtend<Router.Input>();
-    expectTypeOf<typeof NeedsDb>().not.toExtend<RouterService.Any>();
+    expectTypeOf<typeof NeedsDb>().not.toExtend<RouterService.Pure>();
     expectTypeOf<typeof MayFail>().not.toExtend<Router.Input>();
     // @ts-expect-error -- make requires Database
     // oxlint-disable-next-line effecttsgo/missing-effect-context -- deliberately wrong: `make` requires Database (the @ts-expect-error case)
@@ -199,7 +199,7 @@ describe('router services (types)', () => {
     const u: unknown = AppRouter;
     if (Router.isService(u)) {
       expectTypeOf(u).toEqualTypeOf<RouterService.Any>();
-      expectTypeOf(Router.from(u)).toExtend<Router.Any>();
+      expectTypeOf<Router.Of<typeof u>>().toExtend<Router.Any>();
     }
   });
 

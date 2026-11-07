@@ -150,14 +150,15 @@ export declare namespace Router {
   };
 
   /**
-   * A router record whose entries may also be router services (see {@link RouterService}), at any
-   * depth: what `Router.make` and a router service's `make` accept. `Router.make` resolves the
-   * services to routers, so the stored record is a {@link Shape}.
+   * A router record whose entries may also be router services `S` (see {@link RouterService}), at
+   * any depth: what `Router.make` (pure services, the default `S`) and a router service's `make`
+   * accept. `Router.make` resolves the services to routers, so the stored record is a
+   * {@link Shape}.
    *
    * @since 0.1.0
    */
-  export type ServiceShape = {
-    readonly [key: string]: ProcedureDef.Any | Any | RouterService.Any | ServiceShape;
+  export type ServiceShape<S = RouterService.Pure> = {
+    readonly [key: string]: ProcedureDef.Any | Any | S | ServiceShape<S>;
   };
 
   /**
@@ -166,16 +167,16 @@ export declare namespace Router {
    *
    * @since 0.1.0
    */
-  export type Input = Any | RouterService.Any;
+  export type Input = Any | RouterService.Pure;
 
   /**
-   * The router type of a {@link Input}: a router stays as it is, a router service (pure or
-   * {@link RouterService.Effectful}) maps to the router built from its `make` (what `Router.from` /
+   * The router type of a {@link Input}: a router stays as it is, a router service (any
+   * {@link RouterService.Any}) maps to the router built from its `make` (what `Router.from` /
    * `Router.fromService` return for a pure service and `Router.buildService` yields for any).
    *
    * @since 0.1.0
    */
-  export type Of<X> = X extends RouterService.Effectful
+  export type Of<X> = X extends RouterService.Any
     ? Router<ServiceRecord<X>>
     : X extends Any
       ? X
@@ -198,7 +199,7 @@ export declare namespace Router {
    *
    * @since 0.1.0
    */
-  export type Record<R> = R extends RouterService.Effectful
+  export type Record<R> = R extends RouterService.Any
     ? ServiceRecord<R>
     : R extends Router<infer Rec>
       ? Rec
@@ -211,11 +212,11 @@ export declare namespace Router {
    *
    * @since 0.1.0
    */
-  export type Rpcs<R> = R extends RouterService.Effectful
+  export type Rpcs<R> = R extends RouterService.Any
     ? RpcsOf<ServiceRecord<R>, ''>
     : R extends Any
       ? RpcsOf<R['record'], ''>
-      : R extends RouterService.EffectfulShape
+      : R extends ServiceShape<RouterService.Any>
         ? RpcsOf<Resolve<R>, ''>
         : never;
 
@@ -326,20 +327,20 @@ export declare namespace Router {
  *
  * **When to use**
  *
- * Use {@link RouterService.Any} to constrain code that takes a router service, or
- * {@link Router.Input} for code that takes a router or a router service. Write the service itself
- * with the ordinary `Context.Service<Self>()(id, { make })`; there is no factory to learn.
+ * Use {@link RouterService.Any} to constrain code that takes any router service,
+ * {@link RouterService.Pure} for one the synchronous APIs can build, or {@link Router.Input} for
+ * code that takes a router or a pure router service. Write the service itself with the ordinary
+ * `Context.Service<Self>()(id, { make })`; there is no factory to learn.
  *
  * **Details**
  *
  * - `make` must be an `Effect` value (not a function). A `make` that needs no services and cannot
- *   fail satisfies {@link RouterService.Any}, which every API accepts: they build the router with
+ *   fail satisfies {@link RouterService.Pure}, which every API accepts: they build the router with
  *   `Router.fromService`, which runs `make` once per class.
- * - A `make` that reads services or may fail is a {@link RouterService.Effectful}. It does not
- *   satisfy {@link RouterService.Any}, so the synchronous APIs (`Router.from`, `createClient`,
- *   `toWebHandler`, ...) reject it at compile time: give them a schema-only contract (normally
- *   `router.client.gen.ts`) and serve the class with `Handlers.fromService`, which runs `make` in
- *   its layer via {@link Router.buildService}.
+ * - A `make` that reads services or may fail is only a {@link RouterService.Any}, so the
+ *   synchronous APIs (`Router.from`, `createClient`, `toWebHandler`, ...) reject it at compile
+ *   time: give them a schema-only contract (normally `router.client.gen.ts`) and serve the class
+ *   with `Handlers.fromService`, which runs `make` in its layer via {@link Router.buildService}.
  *
  * **Example** (A router service)
  *
@@ -354,7 +355,7 @@ export declare namespace Router {
  *   }),
  * }) {}
  *
- * const service: RouterService.Any = AppRouter;
+ * const service: RouterService.Pure = AppRouter;
  * const paths: Router.Paths<typeof AppRouter> = 'health';
  * ```
  *
@@ -366,34 +367,26 @@ export declare namespace Router {
 export declare namespace RouterService {
   /**
    * Any router service: a `Context` service class whose static `make` is an
-   * `Effect<Router.ServiceShape, never, never>` (no requirements, no failure).
+   * `Effect<Router.ServiceShape<Any>, E, R>` for any `E` / `R` (it may read services and fail, and
+   * nest any router service). The type helpers (`Router.Of`, `Router.Paths`, ...),
+   * `Router.buildService` and `Handlers.fromService` accept it; the synchronous APIs take a
+   * {@link Pure} one.
    *
    * @since 0.1.0
    */
   export type Any = Context.Key<any, any> & {
+    readonly make: Effect.Effect<Router.ServiceShape<Any>, unknown, unknown>;
+  };
+
+  /**
+   * A pure router service: its static `make` is an `Effect<Router.ServiceShape, never, never>` (no
+   * requirements, no failure, nested router services pure too), so every API can build its router
+   * synchronously.
+   *
+   * @since 0.1.0
+   */
+  export type Pure = Context.Key<any, any> & {
     readonly make: Effect.Effect<Router.ServiceShape>;
-  };
-
-  /**
-   * A router service whose `make` may read services and fail: a `Context` service class whose
-   * static `make` is an `Effect<EffectfulShape, E, R>` for any `E` / `R`. Pure services
-   * ({@link Any}) satisfy it too. The type helpers (`Router.Of`, `Router.Paths`, ...) accept it;
-   * the synchronous APIs (`Router.from`, `Router.make`) do not.
-   *
-   * @since 0.1.0
-   */
-  export type Effectful = Context.Key<any, any> & {
-    readonly make: Effect.Effect<EffectfulShape, unknown, unknown>;
-  };
-
-  /**
-   * The record an {@link Effectful} service's `make` returns: procedure definitions, routers,
-   * router services (pure or effectful) or nested records, keyed by path segment.
-   *
-   * @since 0.1.0
-   */
-  export type EffectfulShape = {
-    readonly [key: string]: ProcedureDef.Any | Router.Any | Effectful | EffectfulShape;
   };
 
   /**
@@ -419,7 +412,7 @@ export declare namespace RouterService {
    *
    * @since 0.1.0
    */
-  export type WithSchemas<X extends Effectful, S> = Context.Key<
+  export type WithSchemas<X extends Any, S> = Context.Key<
     Context.Service.Identifier<X>,
     Context.Service.Shape<X>
   > & {
@@ -429,7 +422,7 @@ export declare namespace RouterService {
 }
 
 /** A router record whose entries may be any router service. */
-type AnyServiceShape = RouterService.EffectfulShape;
+type AnyServiceShape = Router.ServiceShape<RouterService.Any>;
 
 /** The `E` (`'error'`) or `R` (`'services'`) of a router service's `make`, nested makes included. */
 type MakeOf<S, F extends 'error' | 'services'> = S extends {
@@ -442,7 +435,7 @@ type NestedMakeOf<Rec, F extends 'error' | 'services'> = string extends keyof Re
   ? never
   : { readonly [K in keyof Rec]-?: EntryMakeOf<Rec[K], F> }[keyof Rec];
 
-type EntryMakeOf<V, F extends 'error' | 'services'> = [V] extends [RouterService.Effectful]
+type EntryMakeOf<V, F extends 'error' | 'services'> = [V] extends [RouterService.Any]
   ? MakeOf<V, F>
   : [V] extends [ProcedureDef.Any | Router.Any]
     ? never
@@ -467,7 +460,7 @@ type Resolve<Rec> = string extends keyof Rec
     ? { readonly [K in keyof Rec]: ResolveEntry<Rec[K]> }
     : Rec;
 
-type ResolveEntry<V> = [V] extends [RouterService.Effectful]
+type ResolveEntry<V> = [V] extends [RouterService.Any]
   ? Router<ServiceRecord<V>>
   : [V] extends [ProcedureDef.Any | Router.Any]
     ? V
@@ -475,7 +468,7 @@ type ResolveEntry<V> = [V] extends [RouterService.Effectful]
 
 type HasService<Rec> = { readonly [K in keyof Rec]-?: EntryHasService<Rec[K]> }[keyof Rec];
 
-type EntryHasService<V> = [V] extends [RouterService.Effectful]
+type EntryHasService<V> = [V] extends [RouterService.Any]
   ? true
   : [V] extends [ProcedureDef.Any | Router.Any]
     ? false
@@ -483,7 +476,7 @@ type EntryHasService<V> = [V] extends [RouterService.Effectful]
       ? false
       : HasService<V>;
 
-type RecordOf<R> = R extends RouterService.Effectful
+type RecordOf<R> = R extends RouterService.Any
   ? ServiceRecord<R>
   : R extends Router<infer Rec>
     ? Rec
@@ -709,14 +702,14 @@ const isPlainRecord = (u: unknown): u is AnyServiceShape => {
 const isService = (u: unknown): u is RouterService.Any =>
   Context.isKey(u) && Predicate.hasProperty(u, 'make') && Effect.isEffect(u.make);
 
-const serviceError = (svc: RouterService.Effectful, rule: string, cause?: unknown): Error =>
+const serviceError = (svc: RouterService.Any, rule: string, cause?: unknown): Error =>
   new Error(
     `Cannot build a router from the router service "${svc.key}": ${rule}`,
     cause === undefined ? undefined : { cause },
   );
 
 /** Checks that a service's `make` succeeded with a plain record (not a router). */
-const checkRecord = (svc: RouterService.Effectful, record: unknown): AnyServiceShape => {
+const checkRecord = (svc: RouterService.Any, record: unknown): AnyServiceShape => {
   if (isRouter(record)) {
     throw serviceError(
       svc,
@@ -730,12 +723,12 @@ const checkRecord = (svc: RouterService.Effectful, record: unknown): AnyServiceS
 };
 
 /** `make` with its error and services erased (`buildService`'s signature restores them). */
-const makeOf = (svc: RouterService.Effectful): Effect.Effect<unknown> =>
+const makeOf = (svc: RouterService.Any): Effect.Effect<unknown> =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion, effecttsgo/any-unknown-in-error-context -- erases make's error and services (see above); the success is validated by `checkRecord`
   svc.make as Effect.Effect<unknown>;
 
 /** Runs `make` synchronously; an asynchronous, failing or service-reading `make` throws. */
-const runMake = (svc: RouterService.Effectful): unknown => {
+const runMake = (svc: RouterService.Any): unknown => {
   const exit = Effect.runSyncExit(makeOf(svc));
   if (Exit.isSuccess(exit)) return exit.value;
   const cause = Cause.squash(exit.cause);
@@ -758,9 +751,9 @@ interface Built {
  * built (a class met again there nests itself) and `make` runs a class's `make`.
  */
 interface Builder {
-  readonly memo: WeakMap<RouterService.Effectful, Built>;
-  readonly pending: Set<RouterService.Effectful>;
-  readonly make: (svc: RouterService.Effectful) => Effect.Effect<unknown>;
+  readonly memo: WeakMap<RouterService.Any, Built>;
+  readonly pending: Set<RouterService.Any>;
+  readonly make: (svc: RouterService.Any) => Effect.Effect<unknown>;
 }
 
 /**
@@ -774,14 +767,12 @@ const sync: Builder = {
 };
 
 /** The schemas `Router.withSchemas` set on `svc`, if it made `svc`. */
-const schemasOf = (
-  svc: RouterService.Effectful,
-): { readonly [key: string]: unknown } | undefined =>
+const schemasOf = (svc: RouterService.Any): { readonly [key: string]: unknown } | undefined =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- only `withSchemas` sets the key, to its schemas record
   Predicate.hasProperty(svc, SchemasTypeId) ? (svc[SchemasTypeId] as never) : undefined;
 
 /** Builds the router of `svc`: runs its `make`, resolves nested services and sets its schemas. */
-const buildIn = (svc: RouterService.Effectful, builder: Builder): Effect.Effect<Built> =>
+const buildIn = (svc: RouterService.Any, builder: Builder): Effect.Effect<Built> =>
   Effect.suspend(() => {
     const done = builder.memo.get(svc);
     if (done !== undefined) return Effect.succeed(done);
@@ -884,7 +875,7 @@ const resolve = (record: AnyServiceShape, builder: Builder): Effect.Effect<Route
  * @category constructors
  * @since 0.1.0
  */
-const fromService = <S extends RouterService.Any>(service: S): Router.Of<S> =>
+const fromService = <S extends RouterService.Pure>(service: S): Router.Of<S> =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the router is built from `service.make`'s record, which is what `Router.Of<S>` describes
   Effect.runSync(buildIn(service, sync)).router as unknown as Router.Of<S>;
 
@@ -894,16 +885,16 @@ const fromService = <S extends RouterService.Any>(service: S): Router.Of<S> =>
  *
  * **When to use**
  *
- * Use for a router service whose `make` reads services (a {@link RouterService.Effectful}), which
- * {@link fromService} cannot build synchronously. `Handlers.fromService` (from
- * `@effect-trpc/server`) calls it for you; call it yourself when you provide the services and need
- * the router or the service value.
+ * Use for a router service whose `make` reads services (a {@link RouterService.Any} that is not
+ * {@link RouterService.Pure}), which {@link fromService} cannot build synchronously.
+ * `Handlers.fromService` (from `@effect-trpc/server`) calls it for you; call it yourself when you
+ * provide the services and need the router or the service value.
  *
  * **Details**
  *
  * - Succeeds with `router` (nested router services resolved) and `value`: the record `make`
  *   returned, nested services kept as classes (what `yield* Svc` returns once provided).
- * - Nested router services (pure or effectful) are built the same way, in the same context; each
+ * - Nested router services (pure or not) are built the same way, in the same context; each
  *   class's `make` runs at most once per run, so a class nested twice yields one router.
  * - The error and requirements are those of every `make` in the tree
  *   ({@link RouterService.MakeError}, {@link RouterService.MakeServices}).
@@ -946,7 +937,7 @@ const fromService = <S extends RouterService.Any>(service: S): Router.Of<S> =>
  * @category constructors
  * @since 0.1.0
  */
-const buildService = <S extends RouterService.Effectful>(
+const buildService = <S extends RouterService.Any>(
   service: S,
 ): Effect.Effect<
   { readonly router: Router.Of<S>; readonly value: Context.Service.Shape<S> },
@@ -1256,12 +1247,12 @@ const withSchemas: {
     source: X,
     schemas: S & Router.NoExtraSchemas<S, Router.SchemasOf<Router.Record<X>>>,
   ): Router<Router.WithSchemas<Router.Record<X>, S>>;
-  <const X extends RouterService.Effectful, const S extends Router.SchemasOf<Router.Record<X>>>(
+  <const X extends RouterService.Any, const S extends Router.SchemasOf<Router.Record<X>>>(
     source: X,
     schemas: S & Router.NoExtraSchemas<S, Router.SchemasOf<Router.Record<X>>>,
   ): RouterService.WithSchemas<X, S>;
 } = (
-  source: Router.Any | RouterService.Effectful,
+  source: Router.Any | RouterService.Any,
   schemas: { readonly [key: string]: unknown },
 ): never => {
   if (isRouter(source)) {

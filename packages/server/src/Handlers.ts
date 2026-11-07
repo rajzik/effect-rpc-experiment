@@ -578,14 +578,14 @@ const fromProcedures = <R extends Router.Any>(
  * @category constructors
  * @since 0.1.0
  */
-const fromService = <S extends RouterService.Effectful>(
+const fromService = <S extends RouterService.Any>(
   service: S & Handlers.RequireHandlers<Router.Of<S>>,
 ): Layer.Layer<
   Handlers.Provides<Router.Of<S>> | Context.Service.Identifier<S>,
   RouterService.MakeError<S>,
   Exclude<RouterService.MakeServices<S>, Scope.Scope> | Handlers.ProcedureServices<Router.Of<S>>
 > => {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a service key's identifier is its class (`Context.Service.Identifier<S>`); `RouterService.Effectful` erases it to `any`
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a service key's identifier is its class (`Context.Service.Identifier<S>`); `RouterService.Any` erases it to `any`
   const key = service as unknown as Context.Key<
     Context.Service.Identifier<S>,
     Context.Service.Shape<S>

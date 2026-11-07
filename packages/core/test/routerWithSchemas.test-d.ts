@@ -89,7 +89,7 @@ describe('Router.withSchemas types', () => {
     >();
     expectTypeOf<RouterService.MakeServices<typeof wrapped>>().toEqualTypeOf<Database>();
     expectTypeOf<RouterService.MakeError<typeof wrapped>>().toEqualTypeOf<DbError>();
-    expectTypeOf(wrapped).toExtend<RouterService.Effectful>();
+    expectTypeOf(wrapped).toExtend<RouterService.Any>();
     expectTypeOf(wrapped).not.toExtend<Router.Input>();
     // @ts-expect-error -- no such procedure
     Router.withSchemas(DbRouter, { missing: { output: Post } });

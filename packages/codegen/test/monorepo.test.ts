@@ -64,7 +64,7 @@ describe('schemas from other packages', () => {
     const models = await load<Mod<'User'>>('node_modules/@fx/models/src/index.ts');
     const errors = await load<Mod<'UserNotFound'>>('node_modules/@fx/models/src/errors.ts');
     const vendor = await load<Mod<'Money'>>('node_modules/vendor-lib/lib/index.js');
-    const server = await load<{ readonly AppRouter: RouterService.Any }>('router.gen.ts');
+    const server = await load<{ readonly AppRouter: RouterService.Pure }>('router.gen.ts');
     const contract = await load<{ readonly AppRouter: Router.Any }>('router.client.gen.ts');
     const web = await toWebHandler(server.AppRouter, {
       handlers: Handlers.fromService(server.AppRouter),
