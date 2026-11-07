@@ -23,6 +23,7 @@ import type {
   ProcedureInfo,
 } from '@effect-trpc/core';
 import type { Handlers } from './Handlers.js';
+import { withHooks } from './internal/hooks.js';
 
 /**
  * Per-call options of the Effect caller (`caller.post.byId(input, options)`).
@@ -258,11 +259,11 @@ const createCallerFor = <R extends Router.Any, LE = never>(
       );
     }
   }
-  // `RpcTest.makeClient` wires an in-memory RpcServer to an RpcClient: no serialization.
+  // The hooks middleware applies the request context of `Handlers.withContext`, as over HTTP.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Router.Any` erases the group's rpcs on purpose; `Caller<R>` restores the per-procedure types at the public API
-  const makeClient = RpcTest.makeClient(router.group as RpcGroup.RpcGroup<Rpc.AnyWithProps>, {
-    flatten: true,
-  });
+  const hooks = withHooks(router.group as RpcGroup.RpcGroup<Rpc.AnyWithProps>, {});
+  // `RpcTest.makeClient` wires an in-memory RpcServer to an RpcClient: no serialization.
+  const makeClient = RpcTest.makeClient(hooks.group, { flatten: true });
   const clientLayer = Layer.effect(CallerClient)(
     Effect.map(makeClient, (flat) => {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the flat client of `Rpc.AnyWithProps` types its payload as `never`; tags and payloads come from the router (`lookup`) and are typed by `Caller<R>`
@@ -277,7 +278,9 @@ const createCallerFor = <R extends Router.Any, LE = never>(
       });
     }),
   );
-  const runtime = ManagedRuntime.make(clientLayer.pipe(Layer.provide(options.handlers)));
+  const runtime = ManagedRuntime.make(
+    clientLayer.pipe(Layer.provide(hooks.layer), Layer.provide(options.handlers)),
+  );
   let disposed: Promise<void> | undefined;
   const builtClient = Effect.orDie(
     Effect.map(runtime.contextEffect, (context) => Context.get(context, CallerClient)),

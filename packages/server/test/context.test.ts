@@ -6,7 +6,7 @@ import { Socket } from 'effect/socket';
 import { NodeHttpServer } from '@effect/platform-node';
 import { HttpContext, Procedure, Router } from '@effect-trpc/core';
 import { describe, expect, it } from 'vite-plus/test';
-import { Handlers, layerHttp, Middleware, toWebHandler } from '../src/index.js';
+import { createCaller, Handlers, layerHttp, Middleware, toWebHandler } from '../src/index.js';
 import type { OnErrorInfo } from '../src/index.js';
 import { runServer } from '../src/node.js';
 import { call, exitFrame, readFrames, rpcRequest } from './wire.js';
@@ -167,5 +167,22 @@ describe('withContext over WebSocket', () => {
       protocol: 'websocket',
     });
     expect(await callOverWebSocket(app)).toEqual(['t-1', 'mw:t-1']);
+  });
+});
+
+describe('withContext under createCaller', () => {
+  it('runs per call, with no HTTP request', async () => {
+    await using caller = createCaller(router, {
+      handlers: Handlers.withContext(handlers, fromHeader),
+    });
+    expect(await caller.$promise.echo()).toBe('none');
+    expect(await caller.$promise.tagged()).toBe('mw:none');
+  });
+
+  it('reads services of the handlers layer output', async () => {
+    await using caller = createCaller(router, {
+      handlers: Handlers.withContext(Layer.merge(handlers, ClockLive), stamped),
+    });
+    expect(await caller.$promise.echo()).toBe('t-1');
   });
 });

@@ -68,9 +68,10 @@ that read the cache, and server actions that keep typed errors.
   (default `"ndjson"`) must match `createNextRpcClient`.
 - `createRouteHandler` takes the `onError` option of `toWebHandler` unchanged
   (`@effect-trpc/server`): `onError({ path, cause, headers })` reports failed calls. It applies the
-  per-call context of a `Handlers.withContext(handlers, context)` layer. Both work on the HTTP
-  route only: `createRscHelpers({ handlers })` and `createServerActionCaller` run the handlers
-  in-process, so give them handlers with the services of `context` provided directly. Handlers
+  per-call context of a `Handlers.withContext(handlers, context)` layer, and so does
+  `createServerActionCaller` (built on `createCaller`). `onError` works on the HTTP route only, and
+  `createRscHelpers({ handlers })` runs the handlers through `localLink` without the context, so
+  give it handlers with the services of `context` provided directly. Handlers
   can read the request and set response headers and cookies with `HttpContext`
   (`@effect-trpc/core`) over HTTP.
 - `GET` always answers `405`; every call (subscriptions included) is a `POST`.
@@ -91,9 +92,9 @@ that read the cache, and server actions that keep typed errors.
   `createRscHelpers` (per request) or `makeQueryClient()` per request.
 - Don't import `trpc/server.tsx` or `server/handlers.ts` from a `'use client'` file → client code
   imports only the router (schemas), `trpc/client.tsx` and action functions.
-- Don't give a `Handlers.withContext` layer to `createRscHelpers` / `createServerActionCaller` →
-  they run in-process without its context (calls needing its services die); provide the service to
-  the layer you give them.
+- Don't give a `Handlers.withContext` layer to `createRscHelpers` → it runs in-process through
+  `localLink` without its context (calls needing its services die); provide the service to the
+  layer you give it.
 - Don't leave `createRscHelpers` on its default `HydrationBoundary` in a real app → pass the one
   exported by your `'use client'` module.
 - Don't `throw` procedure errors from a server action or export `actions` from a `'use server'`

@@ -672,9 +672,9 @@ const of: {
  *
  * **Gotchas**
  *
- * - Only the HTTP adapters apply it. Under `createCaller` and `localLink` the services of
- *   `context` are missing and the calls needing them die: give those the handlers layer with
- *   `C` provided instead.
+ * - The HTTP adapters and `createCaller` apply it (`HttpContext.request` is `None` under
+ *   `createCaller`). Under `localLink` the services of `context` are missing and the calls
+ *   needing them die: give it the handlers layer with `C` provided instead.
  * - `context` cannot fail with a typed error: reject calls in a middleware instead (its error is
  *   part of the procedure's errors). A defect in it fails the call with `RpcDefect`.
  * - The services of `context` exist only while a call runs: reading them while the handlers
@@ -713,7 +713,7 @@ const withContext = <Out, E, R, C, CR>(
   handlers: Layer.Layer<Out, E, R>,
   context: Effect.Effect<Context.Context<C>, never, CR>,
 ): Layer.Layer<Out, E, Exclude<R, C> | Exclude<CR, Out>> =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion -- removes `C` from the requirements: the hooks middleware of the HTTP adapters reads `RequestContext` and provides `C` per call
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/unsafe-effect-type-assertion -- removes `C` from the requirements: the hooks middleware of the HTTP adapters and `createCaller` reads `RequestContext` and provides `C` per call
   Layer.effect(RequestContext)(
     Effect.map(Effect.context<CR>(), (captured) =>
       // What `context` needs comes from `handlers`, unless the call's own context has it.

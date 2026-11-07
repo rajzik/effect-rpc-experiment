@@ -1,6 +1,6 @@
 /**
- * The hooks middleware: a server-only `RpcMiddleware` that `layerHttp` adds last to the served
- * group, so it wraps every user middleware. It provides the request context of
+ * The hooks middleware: a server-only `RpcMiddleware` that `layerHttp` and `createCaller` add last
+ * to the served group, so it wraps every user middleware. It provides the request context of
  * `Handlers.withContext` (the {@link RequestContext} service, when the handlers layer has it) and
  * calls the `onError` server option.
  *
@@ -34,15 +34,15 @@ class Hooks extends RpcMiddleware.Service<Hooks>()('@effect-trpc/server/Hooks') 
  * @internal
  * @since 0.1.0
  */
-export const withHooks = (
-  group: RpcGroup.RpcGroup<Rpc.Any>,
+export const withHooks = <Rpcs extends Rpc.Any>(
+  group: RpcGroup.RpcGroup<Rpcs>,
   { onError }: Pick<ServerOptions, 'onError'>,
 ): {
-  readonly group: RpcGroup.RpcGroup<Rpc.Any>;
+  readonly group: RpcGroup.RpcGroup<Rpcs>;
   readonly layer: Layer.Layer<never>;
 } => ({
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Rpc.Any` is erased, so adding a middleware to it computes `never`; the rpcs are the same plus `Hooks`, which `layer` implements
-  group: group.middleware(Hooks) as unknown as RpcGroup.RpcGroup<Rpc.Any>,
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the rpcs are the same plus `Hooks`, which `layer` implements (and which no caller of this needs to see)
+  group: group.middleware(Hooks) as unknown as RpcGroup.RpcGroup<Rpcs>,
   layer: Layer.effect(Hooks)(
     Effect.map(Effect.serviceOption(RequestContext), (requestContext) =>
       Hooks.of((effect, { rpc, headers }) => {

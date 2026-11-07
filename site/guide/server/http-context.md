@@ -3,7 +3,8 @@
 tRPC hands every resolver a `ctx` built by `createContext(req, res)`. effect-trpc splits that up.
 `HttpContext` adds no requirement to a handler, so the same handlers still run under
 `createCaller`, `localLink`, Electron and tests. The services of a request context are handler
-requirements: over HTTP `Handlers.withContext` provides them, elsewhere provide them with a layer:
+requirements: over HTTP and under `createCaller` `Handlers.withContext` provides them, elsewhere
+provide them with a layer:
 
 | You want to                                 | Use                                                  |
 | ------------------------------------------- | ---------------------------------------------------- |
@@ -58,9 +59,9 @@ provided to both.
 
 Every HTTP adapter applies it, with the same meaning: `toWebHandler` and `layerHttp` from
 `@effect-trpc/server`, `serve` and `runServer` from `@effect-trpc/server/node`, `createRouteHandler`
-from `@effect-trpc/next` and `createStartHandler` from `@effect-trpc/start`. `createCaller`,
-`localLink` and the test harness do not: give them the handlers layer with the services provided
-directly, since with a `withContext` layer the calls needing them die.
+from `@effect-trpc/next` and `createStartHandler` from `@effect-trpc/start`. `createCaller` applies
+it too, with `HttpContext.request` as `None`. `localLink` does not: give it the handlers layer with
+the services provided directly, since with a `withContext` layer the calls needing them die.
 
 Prefer middleware when the value depends on who is calling and can be refused (the session). Use
 `context` for what every call needs regardless: a request id, a per-request logger, a clock.
