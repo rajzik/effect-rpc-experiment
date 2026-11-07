@@ -395,7 +395,7 @@ export declare namespace RouterService {
    *
    * @since 0.1.0
    */
-  export type MakeError<S> = MakeOf<S, 'error'>;
+  export type MakeError<S> = Effect.Error<Makes<S>>;
 
   /**
    * The union of the services required by `S`'s `make` and by every nested router service's
@@ -403,7 +403,7 @@ export declare namespace RouterService {
    *
    * @since 0.1.0
    */
-  export type MakeServices<S> = MakeOf<S, 'services'>;
+  export type MakeServices<S> = Effect.Services<Makes<S>>;
 
   /**
    * What `Router.withSchemas(source, schemas)` returns for a router service `X`: a service with
@@ -424,22 +424,24 @@ export declare namespace RouterService {
 /** A router record whose entries may be any router service. */
 type AnyServiceShape = Router.ServiceShape<RouterService.Any>;
 
-/** The `E` (`'error'`) or `R` (`'services'`) of a router service's `make`, nested makes included. */
-type MakeOf<S, F extends 'error' | 'services'> = S extends {
-  readonly make: Effect.Effect<infer Rec, infer E, infer R>;
-}
-  ? (F extends 'error' ? E : R) | NestedMakeOf<Rec, F>
+/** `S`'s `make` and the `make` of every router service nested in it, at any depth. */
+type Makes<S> = S extends RouterService.Any
+  ? S['make'] | Makes<Nested<Effect.Success<S['make']>>>
   : never;
 
-type NestedMakeOf<Rec, F extends 'error' | 'services'> = string extends keyof Rec
+/**
+ * The router service classes in a record, at any depth of plain records (procedures and routers
+ * contribute none).
+ */
+type Nested<Rec> = string extends keyof Rec
   ? never
-  : { readonly [K in keyof Rec]-?: EntryMakeOf<Rec[K], F> }[keyof Rec];
-
-type EntryMakeOf<V, F extends 'error' | 'services'> = [V] extends [RouterService.Any]
-  ? MakeOf<V, F>
-  : [V] extends [ProcedureDef.Any | Router.Any]
-    ? never
-    : NestedMakeOf<V, F>;
+  : {
+      readonly [K in keyof Rec]-?: Rec[K] extends RouterService.Any
+        ? Rec[K]
+        : Rec[K] extends ProcedureDef.Any | Router.Any
+          ? never
+          : Nested<Rec[K]>;
+    }[keyof Rec];
 
 /** The record of the router built from a router service (nested services resolved, schemas set). */
 type ServiceRecord<S> = S extends { readonly make: Effect.Effect<infer Rec, infer _E, infer _R> }
@@ -456,25 +458,15 @@ type Resolve<Rec> = string extends keyof Rec
   ? Rec extends Router.Shape
     ? Rec
     : Router.Shape
-  : true extends HasService<Rec>
-    ? { readonly [K in keyof Rec]: ResolveEntry<Rec[K]> }
-    : Rec;
+  : [Nested<Rec>] extends [never]
+    ? Rec
+    : { readonly [K in keyof Rec]: ResolveEntry<Rec[K]> };
 
 type ResolveEntry<V> = [V] extends [RouterService.Any]
   ? Router<ServiceRecord<V>>
   : [V] extends [ProcedureDef.Any | Router.Any]
     ? V
     : Resolve<V>;
-
-type HasService<Rec> = { readonly [K in keyof Rec]-?: EntryHasService<Rec[K]> }[keyof Rec];
-
-type EntryHasService<V> = [V] extends [RouterService.Any]
-  ? true
-  : [V] extends [ProcedureDef.Any | Router.Any]
-    ? false
-    : string extends keyof V
-      ? false
-      : HasService<V>;
 
 type RecordOf<R> = R extends RouterService.Any
   ? ServiceRecord<R>
