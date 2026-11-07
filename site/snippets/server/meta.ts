@@ -54,7 +54,8 @@ const RequireRolesLive = Layer.succeed(RequireRoles)(
 const sessions = new Map([['ada-token', { roles: ['admin'] }]]);
 const AuthenticatedLive = Layer.succeed(Authenticated)(
   Authenticated.of((effect, { headers }) => {
-    const token = headers['authorization']?.replace(/^Bearer /, '') ?? '';
+    const auth = headers['authorization'] ?? '';
+    const token = auth.startsWith('Bearer ') ? auth.slice('Bearer '.length) : '';
     return Effect.provideService(effect, CurrentUser, sessions.get(token) ?? { roles: [] });
   }),
 );

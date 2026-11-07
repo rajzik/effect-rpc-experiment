@@ -73,9 +73,11 @@ Prefer middleware when the value depends on who is calling and can be refused (t
 
 It receives `{ path, cause, headers }`: the procedure path (`"post.byId"`), the full `Cause` (typed
 failures are `Fail` reasons, defects `Die` reasons) and the call's headers, request headers
-included. Rpc message headers, which the client sets, override HTTP request headers of the same
-name: read a header set by a trusted proxy from `HttpContext.request`. It is called once for each call that fails while it runs, whether in the handler or in a
-middleware, and before the failure is sent. A subscription that fails mid-stream is reported too.
+included. It is called once for each call that fails while it runs, whether in the handler or in
+a middleware, and before the failure is sent. A subscription that fails mid-stream is reported too.
+
+Rpc message headers, which the client sets, override HTTP request headers of the same name: read a
+header set by a trusted proxy from `HttpContext.request`.
 
 It is not called for:
 

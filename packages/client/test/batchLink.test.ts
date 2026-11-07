@@ -99,7 +99,12 @@ const withClient = async (
     gated: () => Effect.promise(() => gate.promise).pipe(Effect.as('opened')),
     hang: () => Effect.never.pipe(Effect.onInterrupt(() => Effect.sync(hangInterrupted.resolve))),
     header: (_, { headers }) => Effect.succeed(headers['x-batch'] ?? ''),
-    stamp: () => HttpContext.setHeader('x-stamp', 'one').pipe(Effect.as('stamped')),
+    // Opens the gate once the header is set, so no call of the POST can finish before it.
+    stamp: () =>
+      HttpContext.setHeader('x-stamp', 'one').pipe(
+        Effect.andThen(Effect.sync(gate.resolve)),
+        Effect.as('stamped'),
+      ),
     add: ({ n }) => Effect.succeed(n + 1),
     count: ({ n }) => Stream.range(1, n),
   });
@@ -202,10 +207,11 @@ describe.each(['ndjson', 'json'] as const)('httpBatchLink (%s)', (format) => {
       stamps.push(response.headers.get('x-stamp'));
       return Promise.resolve(response);
     };
-    return withClient({ format, respond }, async ({ client, signals, open }) => {
+    // `gated` waits for `stamp` to set the header, so the header is registered before the first
+    // response chunk, whichever call finishes first.
+    return withClient({ format, respond }, async ({ client, signals }) => {
       const gated = client.gated();
       const stamped = client.stamp();
-      open();
       expect(await Promise.all([gated, stamped])).toEqual(['opened', 'stamped']);
       expect(signals).toHaveLength(1);
       expect(stamps).toEqual(['one']);
