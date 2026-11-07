@@ -58,7 +58,7 @@ through a **contract**, because only the server has the services:
 <<< @/snippets/concepts/router-service-effectful.ts#client [client.ts]
 
 - Passing the class to one of those APIs is a compile error. If you force it with a cast, it throws
-  `Cannot build a router from the router service "AppRouter": make reads services, so this API cannot build the router: give it the contract (router.client.gen.ts) and serve the class with Handlers.fromService`.
+  `Cannot build a router from the router service "AppRouter": make must be synchronous, read no services and not fail: give this API the contract (router.client.gen.ts) and serve the class with Handlers.fromService`.
 - Router services nest inside an effectful service's `make`, pure or effectful, at any depth. Their
   `make` effects run in the same layer, and their errors and requirements join the layer's. An
   effectful service cannot nest in a plain `Router.make({...})` record (a compile error).
@@ -97,9 +97,7 @@ exclude `Scope` and the services a procedure's middleware provides, so a handler
 `CurrentUser` that `Auth` provides without it becoming a requirement.
 
 The layer also provides the class itself: `yield* AppRouter` returns exactly the record `make`
-produced, so a router service nested in it is the class, as its type says. Serving codegen's
-`router.gen.ts` (a `Router.withSchemas` wrapper) is the exception: its value holds the resolved
-record, so a nested router service is a `Router` there, not the class.
+produced, so a router service nested in it is the class, as its type says.
 
 Every adapter takes the class and the layer, exactly as it takes a router and `Handlers.make`:
 
@@ -181,7 +179,7 @@ one to decode it. [`@effect-trpc/codegen`](../advanced/codegen) reads each handl
   `Data.TaggedError`, a raw `Error`) arrives as `RpcDefect`, and the generated client types say
   so: `create` fails with `Forbidden`, not `DbError`.
 - The server module wraps the router module (`Router.withSchemas`): it is imported once, its
-  state is not copied. It is a router service with the same key: serve it with
+  state is not copied. It is a router service with the same key and `make`: serve it with
   `Handlers.fromService`.
 - The client module has no handlers and does not import the router module, so handler code and
   server-only imports stay out of client bundles. A compile-time check in it fails when it no
@@ -220,18 +218,15 @@ The router from the [quick start](../quick-start), written in this style, is in
   and keep `Handlers.make` in a server-only module.
 - A pure `make` runs once per class for the synchronous APIs. A subclass
   (`class B extends AppRouter {}`) gets its own evaluation. A `make` that fails is not cached.
-  `Handlers.fromService` runs a `make` that reads services once per layer build, but reuses the
-  router when a sync API already built the pure class.
-- A pure `make` that reads a `Context.Reference` (a service with a default value) is memoized by the
-  synchronous APIs with the default: a different value provided to the layer later is not seen. Read
-  such a service inside the handlers.
+  `Handlers.fromService` runs `make` once per layer build.
 - A second `.input`, `.output` or `.error` call replaces the earlier schema. `.middleware`
   accumulates.
 - Providing the layer is still required. `Handlers.fromService(AppRouter)` alone is not a complete
   server: provide its requirements (`Layer.provide(DatabaseLive)`) and merge the middleware layers.
 - `Client<typeof AppRouter>` is a type error: write `Client<Router.Of<typeof AppRouter>>`.
-- An async `make` is a runtime error. A `make` that needs services is a compile error for every API
-  but `Handlers.fromService`, and a runtime error naming the contract if forced.
+- An async `make` is a runtime error for the synchronous APIs. A `make` that needs services is a
+  compile error for every API but `Handlers.fromService`, and a runtime error naming the contract if
+  forced.
 
 :::
 
