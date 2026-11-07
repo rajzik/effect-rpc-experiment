@@ -19,8 +19,9 @@ pieces:
 - **`Middleware`** — `effect/rpc`'s `RpcMiddleware` plus `Middleware.make` for auth/context.
 - **`@effect-trpc/server/node`** — `serve` (a Layer) and `runServer` (a Promise) on Node's `http`.
 
-Every function that takes a `router` also takes a router service class (`toWebHandler(AppRouter,
-...)`); it is normalised with `Router.from` once at the call.
+Every function that takes a `router` also takes a pure router service class (`toWebHandler(AppRouter,
+...)`); it is normalised with `Router.from` once at the call. A service whose `make` reads services
+goes to `Handlers.fromService`; the other functions take its contract (`router.client.gen.ts`).
 
 Every HTTP endpoint uses `protocol: "http"` and `disableFatalDefects: true`: typed failures and
 defects are encoded into that call's `Exit` and later calls keep working. `Schema.Class` results
@@ -140,7 +141,8 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - Every function taking a `router` takes a `Router.Input` (a router or a router service class) and calls `Router.from` once; types are computed with `Router.Of<X>`, so a service and the equivalent `Router.make` router infer the same caller / handler types. Type helpers (`Caller<R>`, `Handlers.Requirements<R>`, ...) take a router type: `Router.Of<typeof AppRouter>`.
 - `toWebHandler` / `runServer` build the handler layer eagerly (the promise rejects on failure); `createCaller` builds it on the first call.
 - `$promise`, `$router` and `dispose` are reserved top-level keys on a caller: `createCaller` throws for a router that uses them.
-- `Handlers.fromService` / `Handlers.fromProcedures` produce the same handler layer as `Handlers.make` (same tags) from the procedures' `handler`s; their requirements are the handlers' services minus `Scope` and middleware-provided services. `fromService` also provides the service (`yield* AppRouter` is exactly what `make` produced, `Router.serviceValue(AppRouter)`; nested router services stay classes) and evaluates `make` once per class (memoized `Router.fromService`).
+- `Handlers.fromService` / `Handlers.fromProcedures` produce the same handler layer as `Handlers.make` (same tags) from the procedures' `handler`s; their requirements are the handlers' services minus `Scope` and middleware-provided services. `fromService` also provides the service (`yield* AppRouter` is exactly what that build's `make` produced; nested router services stay classes). It accepts a router service whose `make` reads services and fails: it runs `make` (and nested makes) with `Router.buildService` once per layer build, and adds `RouterService.MakeError` to the layer's error and `RouterService.MakeServices` to its requirements (only `Scope` is excluded from those; middleware-provided services are excluded from the handlers' requirements only).
+- Every other API taking a router (`toWebHandler`, `serve` / `runServer`, `createCaller`, `layerHttp`, `Handlers.make` / `flat` / `of`) needs it synchronously: for a router service whose `make` reads services pass the contract (a schema-only `Router.make` router, normally `router.client.gen.ts`) and serve the class with `Handlers.fromService`.
 
 **Common mistakes**
 
@@ -151,15 +153,15 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - Don't use Effect v3 APIs (`Context.Tag`, `@effect/rpc`, `@effect/platform`) → `Context.Service`, `effect/rpc`, `effect/http`.
 - Don't import `serve` / `runServer` from `@effect-trpc/server` → import from `@effect-trpc/server/node`.
 - Don't forget `dispose()` on `toWebHandler`, `createCaller` and `runServer` results in tests → use `try/finally` or `await using`.
-- Don't pass a router with `query({...})` definitions to `Handlers.fromService` / `fromProcedures` (compile error `procedure '<path>' has no handler ...`; throws if forced) → build them with `Procedure`, or implement the router with `Handlers.make`.
+- Don't pass a router with `query({...})` definitions to `Handlers.fromService` / `fromProcedures` (compile error `procedure '<path>' has no handler ...`; if forced, `fromProcedures` throws and `fromService` dies when its layer is built) → build them with `Procedure`, or implement the router with `Handlers.make`.
 - Don't write `Caller<typeof AppRouter>` for a router service → `Caller<Router.Of<typeof AppRouter>>` (functions take the class directly; type helpers take a router type).
-- Don't read services at the top of a router service's `make` → read them inside the handlers (`make` must be `Effect<Record, never, never>`).
+- Don't pass a router service whose `make` reads services (`yield* AppConfig`) to `toWebHandler`, `serve`, `createCaller` or `Handlers.make` → it is a compile error (a runtime error naming the fix if cast away); pass the contract (`router.client.gen.ts`) and give the class to `Handlers.fromService`.
 - Don't write `ReturnType<typeof Handlers.make>` (uninstantiated: TS2589 "excessively deep", because `Handlers.make` is overloaded for router services) → `Handlers.Provides<R>` / `Handlers.Services<R, H>` / `Handlers.Requirements<R>`, or the instantiated form `ReturnType<typeof Handlers.make<typeof appRouter, Handlers.From<typeof appRouter>>>`.
 - Don't call `RpcServer.layerHttp` directly without `protocol: "http"` and `disableFatalDefects: true` → use `layerHttp` from this package.
 
 **Where to look**
 
-- `test/readme.test.ts` (this README's example), `test/handlers.test.ts` / `test/handlers.test-d.ts` (`Handlers`), `test/routerService.test.ts` / `test/routerService.test-d.ts` (`Handlers.fromService` / `fromProcedures`, fixtures in `test/service-fixtures.ts`), `test/web-handler.test.ts` (`toWebHandler`: errors, defects, NDJSON, path, dispose → 503), `test/node.test.ts` (`runServer`, `layerHttp` in an Effect app), `test/caller.test.ts` / `test/caller.test-d.ts` (`createCaller`, abort, dispose), `test/middlewares.test.ts` (ordering, provided services, middleware errors), `test/procedure-errors.test.ts` (typed errors vs defects), `test/streaming.test.ts`, `test/validation.test.ts`, `test/PARITY.md`.
+- `test/readme.test.ts` (this README's example), `test/handlers.test.ts` / `test/handlers.test-d.ts` (`Handlers`), `test/routerService.test.ts` / `test/routerService.test-d.ts` (`Handlers.fromService` / `fromProcedures`, fixtures in `test/service-fixtures.ts`), `test/routerServiceEffectful.test.ts` / `.test-d.ts` (a `make` that reads services), `test/web-handler.test.ts` (`toWebHandler`: errors, defects, NDJSON, path, dispose → 503), `test/node.test.ts` (`runServer`, `layerHttp` in an Effect app), `test/caller.test.ts` / `test/caller.test-d.ts` (`createCaller`, abort, dispose), `test/middlewares.test.ts` (ordering, provided services, middleware errors), `test/procedure-errors.test.ts` (typed errors vs defects), `test/streaming.test.ts`, `test/validation.test.ts`, `test/PARITY.md`.
 - JSDoc on every export (`src/*.ts`) follows `docs/jsdoc-style.md`.
 
 **Verify**
@@ -310,10 +312,30 @@ there is no handler record to write:
 
 - `Handlers.fromService(AppRouter)` takes a router service (a `Context.Service` class whose `make`
   returns `Procedure` procedures) and returns
-  `Layer<Handlers.Provides<Router.Of<typeof AppRouter>> | AppRouter, never, Handlers.ProcedureServices<...>>`:
+  `Layer<Handlers.Provides<Router.Of<typeof AppRouter>> | AppRouter, RouterService.MakeError<typeof AppRouter>, Exclude<RouterService.MakeServices<typeof AppRouter>, Scope> | Handlers.ProcedureServices<...>>`:
   one handler per procedure plus the service itself, so `yield* AppRouter` returns exactly the
-  record `make` produced (`Router.serviceValue(AppRouter)`). `make` runs once per class (the memoized `Router.fromService`, shared with every other
-  API that uses the class).
+  record that build's `make` produced. `make` runs when the layer is built
+  (`Router.buildService`), with the services you provide, once per build.
+- A `make` that reads services (`yield* AppConfig`) is served the same way, but the sync APIs
+  below cannot run it: pass them the contract, a schema-only `Router.make` router (normally
+  `router.client.gen.ts` from `@effect-trpc/codegen`, which checks at compile time that it still
+  matches the class). A hand-written contract needs the same check
+  (`Router.Rpcs<typeof Contract>` equal to `Router.Rpcs<typeof AppRouter>`): the server serves the
+  contract's procedures, so one missing a `.middleware(Auth)` serves that procedure without `Auth`
+  and no type asks for `AuthLive`. The layer's error and requirements include what every `make`
+  fails with and reads:
+
+  ```ts
+  const HandlersLive = Handlers.fromService(AppRouter); // requires AppConfig | Database
+  const web = await toWebHandler(AppRouterContract, {
+    handlers: HandlersLive.pipe(Layer.provide([AppConfigLive, DatabaseLive])),
+  });
+  ```
+
+  When a procedure's output is inferred (no `.output(...)`), pass the `AppRouter` of
+  `router.gen.ts` (the class with the generated schemas) instead of the original class: the
+  original keeps the inference guard, so such a handler dies when it returns a value.
+
 - `Handlers.fromProcedures(router)` does the same for a plain `Router.make` router of `Procedure`
   procedures (services nested in it included), without providing a service.
 - Requirements are inferred from the handlers (`Effect` and `Stream` alike) minus `Scope` and the
@@ -325,11 +347,12 @@ there is no handler record to write:
   `Layer.mergeAll(Handlers.fromService(AppRouter), AuthLive)`.
 - A procedure defined with `query` / `mutation` / `subscription({...})` has no handler. Both
   functions reject it at compile time (TypeScript reports a missing property named
-  `procedure '<path>' has no handler ...`) and throw, naming every such path, if forced with a
-  cast. Implement routers that mix both styles with `Handlers.make`.
-- Adapters take the class too: `toWebHandler`, `layerHttp`, `createCaller`, `serve` /
-  `runServer` and `Handlers.make` / `flat` / `of` accept `AppRouter` directly (normalised with
-  `Router.from`). Type helpers that take a router type take `Router.Of<typeof AppRouter>`
+  `procedure '<path>' has no handler ...`). If forced with a cast, both name every such path:
+  `fromProcedures` throws, `fromService` dies when its layer is built. Implement routers that mix both styles with `Handlers.make`.
+- Adapters take the class too when its `make` (and every nested service's `make`) is synchronous,
+  reads no services and cannot fail (a `RouterService.Pure`): `toWebHandler`, `layerHttp`,
+  `createCaller`, `serve` / `runServer` and `Handlers.make` / `flat` / `of` accept `AppRouter`
+  directly (normalised with `Router.from`). Type helpers that take a router type take `Router.Of<typeof AppRouter>`
   (`Caller<Router.Of<typeof AppRouter>>`, `Handlers.Requirements<Router.Of<typeof AppRouter>>`).
 
 ```ts

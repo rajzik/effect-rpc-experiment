@@ -6,7 +6,7 @@ import { cpSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vite-plus/test';
-import type { Router } from '@effect-trpc/core';
+import type { Router, RouterService } from '@effect-trpc/core';
 import { createClient, httpLink } from '@effect-trpc/client';
 import { Handlers, toWebHandler } from '@effect-trpc/server';
 import { generate } from '../src/index.js';
@@ -64,10 +64,10 @@ describe('schemas from other packages', () => {
     const models = await load<Mod<'User'>>('node_modules/@fx/models/src/index.ts');
     const errors = await load<Mod<'UserNotFound'>>('node_modules/@fx/models/src/errors.ts');
     const vendor = await load<Mod<'Money'>>('node_modules/vendor-lib/lib/index.js');
-    const server = await load<{ readonly AppRouter: Router.Any }>('router.gen.ts');
+    const server = await load<{ readonly AppRouter: RouterService.Pure }>('router.gen.ts');
     const contract = await load<{ readonly AppRouter: Router.Any }>('router.client.gen.ts');
     const web = await toWebHandler(server.AppRouter, {
-      handlers: Handlers.fromProcedures(server.AppRouter),
+      handlers: Handlers.fromService(server.AppRouter),
     });
     const client = createClient(contract.AppRouter, {
       link: httpLink({

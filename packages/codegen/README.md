@@ -32,7 +32,7 @@ effect-trpc-codegen --check src/router.ts    # CI: exit 1 when a generated modul
 ```ts
 // server.ts
 import { AppRouter } from './router.gen.js';
-const web = await toWebHandler(AppRouter, { handlers: Handlers.fromProcedures(AppRouter) });
+const web = await toWebHandler(AppRouter, { handlers: Handlers.fromService(AppRouter) });
 
 // client.ts (browser bundle: no handler code, no server imports)
 import { AppRouter } from './router.client.gen.js';
@@ -135,18 +135,25 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
 2. `effect-trpc-codegen src/router.ts`, or the bundler plugin of your bundler
    (`@effect-trpc/codegen/<bundler>`; Turbopack: `@effect-trpc/codegen/loader`).
 3. Server: `import { AppRouter } from './router.gen.js'`, serve with
-   `Handlers.fromProcedures(AppRouter)` plus the middleware layers.
+   `Handlers.fromService(AppRouter)` (a router service) or `Handlers.fromProcedures(AppRouter)`
+   (a `Router.make` router) plus the middleware layers.
 4. Clients: `import { AppRouter } from './router.client.gen.js'` for `createClient`,
    `createRpcContext`, framework adapters.
 5. CI: `effect-trpc-codegen --check src/router.ts`.
 
 **Invariants**
 
+- A router service whose `make` reads services (`Effect.gen` with `yield* AppConfig`) is supported:
+  `router.client.gen.ts` is the contract every sync API takes (`createClient`, `toWebHandler`,
+  `serve`, `createCaller`, adapters, the test harness) because those cannot run such a `make`; the
+  class (from `router.gen.ts`) is served only with `Handlers.fromService`.
 - Only chains without `.output(...)` / `.inferred(...)` are inferred; a user `.error(...)` is kept
   (and stays checked). Explicit chains and `query({...})` entries are copied to the client module
   as written.
 - The server module imports the router module once (`Router.withSchemas`): no duplicated module
-  state. It is a plain router: serve it with `Handlers.fromProcedures`, not `Handlers.fromService`.
+  state. For a router service it exports a router service with the same key whose `make` runs only
+  when it is built: serve it with `Handlers.fromService`. For a `Router.make` router it exports a
+  router: serve it with `Handlers.fromProcedures`.
 - The client module imports only what its copied schema expressions reference (resolved through
   the router module's imports; top-level `const` schemas of the router module are copied).
 - `__contract_<Router>` in the client module is a compile error (`router.client.gen.ts is out of
@@ -163,6 +170,11 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
 - Declaring a schema class or middleware tag **in the router module**: fine for the server, an
   error for the client module (`move it to a module the client can import`).
 - Serving `router.ts` instead of `router.gen.ts`: inferred procedures have no output schema there.
+- Passing a router service whose `make` reads services to `createClient` / `toWebHandler` /
+  `createCaller` (compile error; a runtime error naming the fix if cast away): pass
+  `router.client.gen.ts` there and serve the class from `router.gen.ts` with `Handlers.fromService`.
+- Using a value declared in `make` (`const cfg = yield* AppConfig`, or a local schema) inside a
+  schema: reported as `<name> is declared in make`; declare the schema at module level.
 - A recursive type that is not an exported interface / type alias: the hoisted declaration needs
   its name (`declare it as an exported interface or type`).
 - Building router records dynamically (spreads, function calls): the generator reads the router
@@ -198,8 +210,15 @@ A class its package does not export from any import path is reported
 ## Limits
 
 - Routers are read statically: an exported router service class whose `make` is
-  `Effect.succeed({...})` / `Effect.sync(() => ({...}))`, or `Router.make({...})` (with
-  `.middleware(...)`), with nested records, routers and router services.
+  `Effect.succeed({...})` / `Effect.sync(() => ({...}))` / `Effect.gen(function* () { …; return {...} })`,
+  or `Router.make({...})` (with `.middleware(...)`), with nested records, routers and router
+  services. For `Effect.gen` the object of the generator's last top-level `return` is read; a
+  router `make` that returns anything else (`return routes`) is reported as `make must return an
+  object literal`. An exported service whose `make` yields no procedure, router or router service
+  (an ordinary service next to the routers) is skipped.
+- A schema expression (`.input` / `.output` / `.error` / middleware) that uses a value declared
+  inside the `Effect.gen` generator (`const cfg = yield* AppConfig`) stops the generator with
+  `<name> is declared in make: …` and its location: the client cannot have that value.
 - No code transform: the plugins only write the generated modules. The client stays
   handler-free because it imports the generated client module, which works with every bundler
   and without one.

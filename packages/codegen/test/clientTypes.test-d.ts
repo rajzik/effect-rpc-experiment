@@ -5,6 +5,10 @@ import type { Client } from '@effect-trpc/client';
 import type { AppRouter as ClientRouter } from './fixtures/app/router.client.gen.js';
 import type { AppRouter as ServerRouter } from './fixtures/app/router.gen.js';
 import type {
+  __contract_AppRouter,
+  __contract_PostRouter,
+} from './fixtures/effectful/router.client.gen.js';
+import type {
   Forbidden,
   Post,
   PostNotFound,
@@ -46,5 +50,10 @@ describe('generated client contract types', () => {
     expectTypeOf<Router.Paths<typeof ClientRouter>>().toEqualTypeOf<
       Router.Paths<typeof ServerRouter>
     >();
+  });
+
+  it('the contract check of an Effect.gen router service is up to date', () => {
+    expectTypeOf<typeof __contract_PostRouter>().toEqualTypeOf<'up to date'>();
+    expectTypeOf<typeof __contract_AppRouter>().toEqualTypeOf<'up to date'>();
   });
 });

@@ -1,4 +1,4 @@
-import { Context, Effect, Exit, Layer, Schema, Stream } from 'effect';
+import { Cause, Context, Effect, Exit, Layer, Schema, Stream } from 'effect';
 import { FetchHttpClient, HttpRouter, HttpServer } from 'effect/http';
 import { RpcClient, RpcSerialization } from 'effect/rpc';
 import { NodeHttpServer } from '@effect/platform-node';
@@ -19,6 +19,14 @@ import {
 } from './service-fixtures.js';
 
 const appRouter = Router.from(AppRouter);
+
+/** Builds `layer` and returns the message of the defect it dies with. */
+const buildDefect = async <A, E>(layer: Layer.Layer<A, E>): Promise<string> => {
+  const exit = await Effect.runPromiseExit(Effect.scoped(Layer.build(layer)));
+  if (!Exit.isFailure(exit) || !Cause.hasDies(exit.cause)) throw new Error('expected a defect');
+  const defect = Cause.squash(exit.cause);
+  return defect instanceof Error ? defect.message : String(defect);
+};
 
 const ServerLive = Layer.mergeAll(Handlers.fromService(AppRouter), AuthLive()).pipe(
   Layer.provide(DatabaseLive),
@@ -85,8 +93,9 @@ describe('Handlers.fromService', () => {
     const procedures = await Effect.runPromise(
       Effect.provide(AppRouter, Handlers.fromService(AppRouter).pipe(Layer.provide(DatabaseLive))),
     );
-    expect(procedures).toBe(appRouter.record);
-    expect(procedures.post.byId).toBe(appRouter.record.post.byId);
+    // The record this build's `make` run produced (make runs per layer build).
+    expect(Object.keys(procedures)).toEqual(Object.keys(appRouter.record));
+    expect(procedures).not.toBe(appRouter.record);
     expect(Procedure.hasHandler(procedures.post.byId)).toBe(true);
   });
 
@@ -107,43 +116,45 @@ describe('Handlers.fromService', () => {
     // Exactly what `make` produced, as `Context.Service.Shape<typeof OuterRouter>` types it.
     expect(procedures.admin).toBe(AdminRouter);
     expect(Effect.isEffect(procedures.admin.make)).toBe(true);
-    expect(procedures.ping).toBe(Router.from(OuterRouter).record.ping);
+    expect(Procedure.hasHandler(procedures.ping)).toBe(true);
     // The router still resolves the nested service.
     expect(Router.from(OuterRouter).record.admin).toBe(Router.from(AdminRouter));
-    expect(
-      await Effect.runPromise(Effect.provide(OuterRouter, Handlers.fromService(OuterRouter))),
-    ).toBe(procedures);
-    expect(runs).toBe(1);
+    expect(runs).toBe(2); // one layer build + the memoized Router.from
   });
 
-  it('evaluates make once per class, whichever APIs use it', () => {
-    Handlers.fromService(AppRouter);
+  it('runs make per layer build; the synchronous APIs evaluate it once per class', async () => {
+    Router.from(AppRouter);
+    const before = makeRuns.count;
+    const layer = Handlers.fromService(AppRouter).pipe(Layer.provide(DatabaseLive));
     Handlers.fromProcedures(Router.from(AppRouter));
     Router.make({ nested: AppRouter });
-    expect(makeRuns.count).toBe(1);
+    expect(makeRuns.count).toBe(before);
+    await Effect.runPromise(Effect.provide(AppRouter, layer));
+    await Effect.runPromise(Effect.provide(AppRouter, layer));
+    expect(makeRuns.count).toBe(before + 2);
   });
 
-  it('fromService rejects procedures without handlers', () => {
+  it('fromService rejects procedures without handlers', async () => {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- forces the compile error away to prove the runtime check
     const forced = LegacyRouter as unknown as typeof AppRouter;
-    expect(() => Handlers.fromService(forced)).toThrow(
+    expect(await buildDefect(Handlers.fromService(forced).pipe(Layer.provide(DatabaseLive)))).toBe(
       'Handlers.fromService: the router service "LegacyRouter" has procedures without a handler: "user.byId", "health" (defined with query/mutation/subscription({...})). Build them with Procedure (e.g. Procedure.input(...).query(handler)), or implement the router with Handlers.make',
     );
   });
 
-  it('throws the clear make error of Router.fromService for an async make', () => {
-    // An async make is invisible to types: Router.fromService reports it by name.
+  it('serves a service whose make is asynchronous', async () => {
     class AsyncRouter extends Context.Service<AsyncRouter>()('AsyncRouter', {
       make: Effect.sleep('1 millis').pipe(Effect.as({ ok: Procedure.query(() => Effect.void) })),
     }) {}
-    expect(() => Handlers.fromService(AsyncRouter)).toThrow(
-      'Cannot build a router from the router service "AsyncRouter": make must not require services or be asynchronous',
+    const procedures = await Effect.runPromise(
+      Effect.provide(AsyncRouter, Handlers.fromService(AsyncRouter)),
     );
+    expect(Procedure.hasHandler(procedures.ok)).toBe(true);
   });
 });
 
 describe('router-level middleware in a router service', () => {
-  it('a make returning a router is a clear runtime error', () => {
+  it('a make returning a router is a clear runtime error', async () => {
     class Wrapped extends Context.Service<Wrapped>()('WrappedRouter', {
       make: Effect.succeed(
         Router.make({ ok: Procedure.query(() => Effect.void) }).middleware(Trace),
@@ -151,7 +162,7 @@ describe('router-level middleware in a router service', () => {
     }) {}
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- forces the compile error away to prove the runtime check
     const forced = Wrapped as unknown as typeof AppRouter;
-    expect(() => Handlers.fromService(forced)).toThrow(
+    expect(await buildDefect(Handlers.fromService(forced).pipe(Layer.provide(DatabaseLive)))).toBe(
       'Cannot build a router from the router service "WrappedRouter": make must succeed with a record of procedures, not a router (return the record, or nest the router under a key)',
     );
   });

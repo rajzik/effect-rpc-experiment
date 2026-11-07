@@ -119,14 +119,14 @@ describe('router services (types)', () => {
 
   it('services and routers are Router.Input', () => {
     expectTypeOf<typeof AppRouter>().toExtend<Router.Input>();
-    expectTypeOf<typeof AppRouter>().toExtend<RouterService.Any>();
+    expectTypeOf<typeof AppRouter>().toExtend<RouterService.Pure>();
     expectTypeOf<typeof plain>().toExtend<Router.Input>();
     expectTypeOf<typeof plain>().not.toExtend<RouterService.Any>();
   });
 
   it('a make that requires a service is rejected by Router.from', () => {
     expectTypeOf<typeof NeedsDb>().not.toExtend<Router.Input>();
-    expectTypeOf<typeof NeedsDb>().not.toExtend<RouterService.Any>();
+    expectTypeOf<typeof NeedsDb>().not.toExtend<RouterService.Pure>();
     expectTypeOf<typeof MayFail>().not.toExtend<Router.Input>();
     // @ts-expect-error -- make requires Database
     // oxlint-disable-next-line effecttsgo/missing-effect-context -- deliberately wrong: `make` requires Database (the @ts-expect-error case)
@@ -195,22 +195,11 @@ describe('router services (types)', () => {
     expectTypeOf(Router.make(record)).toEqualTypeOf(makeGeneric(record));
   });
 
-  it('serviceValue is typed as the service shape (nested services stay classes)', () => {
-    class Outer extends Context.Service<Outer>()('Outer', {
-      make: Effect.succeed({ admin: AdminRouter, ping: query({ success: Schema.String }) }),
-    }) {}
-    expectTypeOf(Router.serviceValue(Outer)).toEqualTypeOf<Context.Service.Shape<typeof Outer>>();
-    expectTypeOf(Router.serviceValue(Outer).admin).toEqualTypeOf<typeof AdminRouter>();
-    // @ts-expect-error -- make requires Database
-    // oxlint-disable-next-line effecttsgo/missing-effect-context -- deliberately wrong: `make` requires Database (the @ts-expect-error case)
-    Router.serviceValue(NeedsDb);
-  });
-
   it('isService narrows to RouterService.Any', () => {
     const u: unknown = AppRouter;
     if (Router.isService(u)) {
       expectTypeOf(u).toEqualTypeOf<RouterService.Any>();
-      expectTypeOf(Router.from(u)).toExtend<Router.Any>();
+      expectTypeOf<Router.Of<typeof u>>().toExtend<Router.Any>();
     }
   });
 
