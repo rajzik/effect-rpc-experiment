@@ -4,7 +4,14 @@ What effect-trpc does not do (yet), and what to do instead.
 
 | Limit                                                               | Instead                                                              |
 | ------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| No HTTP batching: each call is one request                          | `wsLink` for many small calls; or a procedure that returns more      |
+| `httpBatchLink` batches queries, not mutations or subscriptions     | one POST each, as `httpLink`                                         |
+| Headers a batched query sets apply to its whole batch               | `httpLink`, or set them from a mutation (never batched)              |
+| Aborting a batched query does not stop it on the server             | `httpLink` for long queries you abort; `client.dispose()` stops all  |
+| Headers and cookies are written with the first response chunk       | set them once, before the first stream element                       |
+| A handler cannot set the HTTP status                                | typed errors; non-2xx is a transport failure on the client           |
+| `withContext` does not apply under `localLink`                      | provide its services to the handlers of `localLink`                  |
+| `onError` applies on the HTTP adapters only                         | log in a middleware for `createCaller` / `localLink`                 |
+| `onError` skips invalid payloads, unknown procedures, encode errors | they reach the client as `RpcDefect` (tRPC reports `BAD_REQUEST`)    |
 | Links don't reconnect subscriptions; no `tracked()` / `lastEventId` | `sub.reset()` on error; resume from your own cursor in the input     |
 | Streamed (async-iterable) query results                             | a subscription                                                       |
 | The router value (schemas) ships to the browser                     | keep the router module free of server code                           |
@@ -19,6 +26,8 @@ What effect-trpc does not do (yet), and what to do instead.
 - Serialization is `ndjson` everywhere (HTTP and WebSocket, server and client). A client using
   `json` against a default server fails.
 - Middleware added later runs first.
+- `HttpContext` setters do nothing outside HTTP (and over a WebSocket); invalid input dies
+  everywhere.
 - Servers always run with `disableFatalDefects: true`.
 - Clients connect lazily, on the first call.
 

@@ -38,7 +38,8 @@ export const defaultStartPath = '/api/rpc' as const;
 
 /**
  * Options of {@link createStartHandler}: the `toWebHandler` options (`handlers` required,
- * `serialization`, `disableTracing`, `spanPrefix`, `concurrency`) plus the mount `path`.
+ * `serialization`, `disableTracing`, `spanPrefix`, `concurrency`, `onError`) plus the mount
+ * `path`.
  *
  * **Gotchas**
  *
@@ -126,14 +127,7 @@ const createStartHandlerFor = <R extends Router.Any, LE = never>(
   let disposed: Promise<void> | undefined;
 
   const build = (): Promise<WebHandler> => {
-    web ??= toWebHandler(router, {
-      handlers: options.handlers,
-      path,
-      serialization: options.serialization,
-      disableTracing: options.disableTracing,
-      spanPrefix: options.spanPrefix,
-      concurrency: options.concurrency,
-    }).catch((error: unknown) => {
+    web ??= toWebHandler(router, { ...options, path }).catch((error: unknown) => {
       web = undefined;
       throw error;
     });

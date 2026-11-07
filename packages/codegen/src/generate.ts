@@ -11,7 +11,8 @@
  * - `router.client.gen.ts` (client): the same contract as a schema-only router (`query({...})`
  *   definitions, no handlers, no import of the router module). Give this router to clients, so
  *   handler code and server-only imports stay out of client bundles. A compile-time check in it
- *   fails when it no longer matches the server router.
+ *   fails when it no longer matches the server router. Procedure annotations (`.annotate(key,
+ *   value)`) are not copied: they are server-side metadata, kept by `router.gen.ts`.
  *
  * A router service's `make` may be `Effect.succeed({...})`, `Effect.sync(() => ({...}))` or
  * `Effect.gen(function* () { ...; return {...} })` (it may read services); a schema must not
@@ -158,6 +159,8 @@ export interface Generator {
 const S = '__Schema';
 const TERMINALS = new Set(['query', 'mutation', 'subscription']);
 const LEGACY = new Set(['query', 'mutation', 'subscription']);
+/** Steps accepted after a procedure: middleware (copied to the client) and annotations (not). */
+const TRAILING = new Set(['middleware', 'annotate']);
 
 class Unmappable extends Error {}
 
@@ -184,7 +187,8 @@ interface ProcNode {
 }
 interface LegacyNode {
   readonly kind: 'legacy';
-  readonly expression: Expression;
+  readonly call: CallExpression;
+  readonly middlewares: ReadonlyArray<Expression>;
 }
 type EntryNode = RecordNode | RouterNode | ProcNode | LegacyNode;
 
@@ -760,15 +764,23 @@ const inferProcedure = (
 
 // --- Reading the router structure ---------------------------------------------------------
 
-/** Parses a builder chain ending at `node` (with `.middleware(...)` after the terminal). */
-const asProcedure = (node: Expression): ProcNode | undefined => {
-  const after: Array<Expression> = [];
+/** Strips the trailing `.middleware(...)` / `.annotate(...)` steps of a procedure. */
+const trailingSteps = (
+  node: Expression,
+): { readonly top: Expression; readonly middlewares: Array<Expression> } => {
+  const middlewares: Array<Expression> = [];
   let top = unwrap(node);
-  for (let m = asMethodCall(top); m?.name === 'middleware'; m = asMethodCall(top)) {
+  for (let m = asMethodCall(top); m !== undefined && TRAILING.has(m.name); m = asMethodCall(top)) {
     const [arg] = m.call.arguments;
-    if (arg !== undefined) after.unshift(arg);
+    if (m.name === 'middleware' && arg !== undefined) middlewares.unshift(arg);
     top = unwrap(m.receiver);
   }
+  return { top, middlewares };
+};
+
+/** Parses a builder chain ending at `node` (with `.middleware` / `.annotate` after the terminal). */
+const asProcedure = (node: Expression): ProcNode | undefined => {
+  const { top, middlewares: after } = trailingSteps(node);
   const terminal = asMethodCall(top);
   if (terminal === undefined || !TERMINALS.has(terminal.name)) return undefined;
   const steps: Array<{ readonly name: string; readonly arg: Expression | undefined }> = [];
@@ -798,12 +810,12 @@ const asProcedure = (node: Expression): ProcNode | undefined => {
   };
 };
 
-/** `query({...})` / `mutation(...)` / `subscription(...)` (optionally with `.middleware(...)`). */
-const isLegacy = (node: Expression): boolean => {
-  let top = unwrap(node);
-  for (let m = asMethodCall(top); m?.name === 'middleware'; m = asMethodCall(top))
-    top = unwrap(m.receiver);
-  return isCallExpression(top) && isIdentifier(top.expression) && LEGACY.has(top.expression.text);
+/** `query({...})` / `mutation(...)` / `subscription(...)` (with trailing steps). */
+const asLegacy = (node: Expression): LegacyNode | undefined => {
+  const { top, middlewares } = trailingSteps(node);
+  return isCallExpression(top) && isIdentifier(top.expression) && LEGACY.has(top.expression.text)
+    ? { kind: 'legacy', call: top, middlewares }
+    : undefined;
 };
 
 const readRecord = (
@@ -916,7 +928,8 @@ const readEntry = (ctx: Ctx, value: Expression, errors: Array<string>): EntryNod
   if (isObjectLiteralExpression(node)) return readRecord(ctx, node, errors);
   const proc = asProcedure(node);
   if (proc !== undefined) return proc;
-  if (isLegacy(node)) return { kind: 'legacy', expression: node };
+  const legacy = asLegacy(node);
+  if (legacy !== undefined) return legacy;
   const router = asRouter(ctx, node, errors);
   if (router !== undefined) return router;
   if (isIdentifier(node)) {
@@ -1126,10 +1139,7 @@ const emitModules = (
       try {
         parts.push(`${indent(depth)}${k}: ${clientEntry(entry, routerMiddlewares, depth)},`);
       } catch (error) {
-        fail(
-          entry.kind === 'proc' ? entry.call : entry.kind === 'legacy' ? entry.expression : sf,
-          error,
-        );
+        fail(entry.kind === 'proc' || entry.kind === 'legacy' ? entry.call : sf, error);
       }
     }
     return `{\n${parts.join('\n')}\n${indent(depth - 1)}}`;
@@ -1142,7 +1152,10 @@ const emitModules = (
   ): string => {
     switch (entry.kind) {
       case 'legacy':
-        return copyExpression(client, entry.expression, copied);
+        return (
+          copyExpression(client, entry.call, copied) +
+          entry.middlewares.map((m) => `.middleware(${copyExpression(client, m, copied)})`).join('')
+        );
       case 'record':
         return clientRecord(entry, routerMiddlewares, depth + 1);
       case 'router': {
@@ -1392,6 +1405,8 @@ export const createGenerator = (options: GenerateOptions): Generator => {
  *   procedure's middleware declares are not repeated.
  * - Explicit chains (`.output(...)`) and `query({...})` definitions are not inferred; the client
  *   module copies their schema expressions.
+ * - The client module copies middleware but not annotations (`.annotate(key, value)`): they are
+ *   server-side metadata, kept by the server module.
  *
  * **Gotchas**
  *

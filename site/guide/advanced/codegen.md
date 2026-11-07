@@ -81,7 +81,9 @@ For `router.ts`, two modules next to it:
   tags, middleware and schemas, and no handlers. It never imports the router module, so handler
   code and server-only imports (database clients, secrets) stay out of client bundles, with any
   bundler or none. A compile-time check in it fails with `router.client.gen.ts is out of date:
-  run effect-trpc-codegen` when it no longer matches the server router.
+  run effect-trpc-codegen` when it no longer matches the server router. Procedure annotations
+  ([`.annotate`](../server/middleware#metadata-with-annotate)) are server-side metadata: this module
+  omits them and `router.gen.ts` keeps them.
 
 Commit both (and run `--check` in CI), or ignore `*.gen.ts` and generate them before building.
 

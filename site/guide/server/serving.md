@@ -45,6 +45,7 @@ Clients connect with [`wsLink`](../client/links#websocket).
 | `concurrency`             | `"unbounded"` | all                   | maximum requests handled at once                                                          |
 | `disableTracing`          | `false`       | all                   | turns off the spans `RpcServer` creates per request                                       |
 | `spanPrefix`              | —             | all                   | prefix of those span names                                                                |
+| `onError`                 | —             | all                   | failed-call hook: [report failures](./http-context#report-failures)                       |
 | `protocol`                | `"http"`      | `layerHttp`           | `"websocket"` for `wsLink`                                                                |
 | `port`, `host`            | —             | `serve`, `runServer`  | port `0` picks a free port                                                                |
 | `gracefulShutdownTimeout` | 20s / 1s      | `serve` / `runServer` | how long shutdown waits before interrupting requests                                      |

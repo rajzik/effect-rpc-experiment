@@ -1,5 +1,8 @@
 // Type tests: Next.js route handler compatibility, server action input/output/error types.
+import { Procedure, Router } from '@effect-trpc/core';
 import type { ClientError, RpcDefect, RpcInterrupted, RpcTransportError } from '@effect-trpc/core';
+import { Handlers } from '@effect-trpc/server';
+import { Context, Effect, Schema } from 'effect';
 import type { Exit } from 'effect';
 import type { NextRequest } from 'next/server.js'; // NodeNext ESM: next has no `exports` map
 import { describe, expectTypeOf, test } from 'vite-plus/test';
@@ -16,6 +19,7 @@ import {
   type inferActionClientError,
   type inferActionError,
   type inferActionOutput,
+  type RouteHandler,
   type ServerAction,
   type ServerActionStatus,
 } from '../src/index.js';
@@ -50,6 +54,20 @@ describe('createRouteHandler', () => {
     createRouteHandler(appRouter, { handlers: 'nope' });
     // @ts-expect-error - path must start with a slash
     createRouteHandler(appRouter, { handlers, path: 'api/rpc' });
+  });
+
+  test('handlers may require the services of a Handlers.withContext context', () => {
+    class RequestId extends Context.Service<RequestId, string>()('RequestId') {}
+    const router = Router.make({ echo: Procedure.output(Schema.String).query(() => RequestId) });
+    const handlersNeedingRequestId = Handlers.fromProcedures(router);
+    const context = Effect.succeed(Context.make(RequestId, 'r-1'));
+    expectTypeOf(
+      createRouteHandler(router, {
+        handlers: Handlers.withContext(handlersNeedingRequestId, context),
+      }),
+    ).toEqualTypeOf<RouteHandler>();
+    // @ts-expect-error - without `withContext`, RequestId is an unmet requirement of the handlers
+    createRouteHandler(router, { handlers: handlersNeedingRequestId });
   });
 });
 

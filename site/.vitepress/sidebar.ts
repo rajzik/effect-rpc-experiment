@@ -25,6 +25,7 @@ const guide: DefaultTheme.SidebarItem[] = [
     items: [
       { text: 'Handlers', link: '/guide/server/handlers' },
       { text: 'Middleware and context', link: '/guide/server/middleware' },
+      { text: 'Request, response, context', link: '/guide/server/http-context' },
       { text: 'Serving over HTTP', link: '/guide/server/serving' },
       { text: 'Serialization formats', link: '/guide/server/serialization' },
       { text: 'Streams and subscriptions', link: '/guide/server/streams' },
@@ -37,6 +38,7 @@ const guide: DefaultTheme.SidebarItem[] = [
       { text: 'Promise client', link: '/guide/client/create-client' },
       { text: 'Effect client', link: '/guide/client/effect-client' },
       { text: 'Links', link: '/guide/client/links' },
+      { text: 'Batching', link: '/guide/client/batching' },
       { text: 'Headers, cancellation, options', link: '/guide/client/call-options' },
       { text: 'Client middleware', link: '/guide/client/middleware' },
     ],

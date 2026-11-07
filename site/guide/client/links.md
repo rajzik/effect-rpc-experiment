@@ -7,6 +7,7 @@ types stay the same.
 | Link                                                                 | Transport                                             | Server side                                       |
 | -------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------- |
 | `httpLink({ url, headers?, fetch?, serialization? })`                | one POST per call; streams are NDJSON                 | `toWebHandler`, `serve`, `layerHttp`              |
+| `httpBatchLink({ …httpLink options, maxItems? })`                    | same-tick queries in one POST: [batching](./batching) | as `httpLink`                                     |
 | `wsLink({ url, serialization?, retryTransientErrors?, WebSocket? })` | one multiplexed WebSocket                             | `layerHttp(..., { protocol: 'websocket' })`       |
 | `localLink({ handlers })`                                            | in-process, no serialization                          | none: runs the handler layer                      |
 | `messagePortLink`, `rendererLink`                                    | Electron `MessagePort`                                | [`@effect-trpc/electron`](../frameworks/electron) |
@@ -46,7 +47,8 @@ does serialize, so it is the closest you get to the network without a port.
 - `serialization` must match the server. The default (`"ndjson"`) matches the default server.
 - A `localLink` whose layer does not implement every procedure (and middleware) of the router is a
   compile error at `createClient`.
-- There is no HTTP batching: each call is its own request. Use `wsLink` to share one connection.
+- `httpLink` sends each call as its own request. Use [`httpBatchLink`](./batching) to batch the
+  queries of one tick, or `wsLink` to share one connection.
 
 :::
 

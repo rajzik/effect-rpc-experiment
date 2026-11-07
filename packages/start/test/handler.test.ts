@@ -1,7 +1,8 @@
 // `createStartHandler`: a TanStack Start server route handler (`server.handlers.POST`).
 import { createClient, httpLink } from '@effect-trpc/client';
-import { causeToClientError, Codecs, Router } from '@effect-trpc/core';
-import { Effect, Exit, Layer } from 'effect';
+import { causeToClientError, Codecs, Procedure, Router } from '@effect-trpc/core';
+import { Handlers } from '@effect-trpc/server';
+import { Context, Effect, Exit, Layer, Schema } from 'effect';
 import { afterEach, describe, expect, test } from 'vite-plus/test';
 import { createStartHandler, type StartHandler } from '../src/index.js';
 import {
@@ -61,6 +62,30 @@ describe('createStartHandler', () => {
     expect(Exit.isFailure(decoded) && causeToClientError(decoded.cause)).toBeInstanceOf(
       PostNotFound,
     );
+  });
+
+  test('onError is passed through to the server', async () => {
+    const paths: Array<string> = [];
+    const handler = createStartHandler(appRouter, {
+      handlers: makeFixture().handlers,
+      onError: ({ path }) => Effect.sync(() => paths.push(path)),
+    });
+    handlers.push(handler);
+    await handler({ request: rpcRequest('http://x/api/rpc', 'post.byId', { id: 404 }) });
+    expect(paths).toEqual(['post.byId']);
+  });
+
+  test('a Handlers.withContext context is applied by the server', async () => {
+    class RequestId extends Context.Service<RequestId, string>()('RequestId') {}
+    const router = Router.make({ echo: Procedure.output(Schema.String).query(() => RequestId) });
+    await using handler = createStartHandler(router, {
+      handlers: Handlers.withContext(
+        Handlers.fromProcedures(router),
+        Effect.succeed(Context.make(RequestId, 'r-1')),
+      ),
+    });
+    const response = await handler({ request: rpcRequest('http://x/api/rpc', 'echo') });
+    expect(exitOf(await readFrames(response))).toEqual({ _tag: 'Success', value: 'r-1' });
   });
 
   test('encodes defects as Die and keeps serving', async () => {

@@ -10,10 +10,10 @@
  *
  * @since 0.1.0
  */
-import { Effect, Predicate, Schema, Stream } from 'effect';
+import { Context, Effect, Predicate, Schema, Stream } from 'effect';
 import type { Headers } from 'effect/http';
 import type { Rpc, RpcMessage, RpcMiddleware } from 'effect/rpc';
-import { addDefMiddleware, define, isProcedureDef } from './Procedure.js';
+import { define, isProcedureDef } from './Procedure.js';
 import type { NormalizePayload, PayloadInput, ProcedureDef } from './Procedure.js';
 import type { ProcedureKind } from './ProcedureKind.js';
 
@@ -34,7 +34,8 @@ import type { ProcedureKind } from './ProcedureKind.js';
  *   `query` / `mutation` / `subscription` definition, and `inferInput` & co. give the same types.
  * - `HandlerR` is the handler's requirements (the services it reads with `yield*`), as written:
  *   services provided by middleware are still listed; the server removes them.
- * - `.middleware(M)` and `router.middleware(M)` keep the handler (value and type).
+ * - `.middleware(M)`, `.annotate(key, value)` and `router.middleware(M)` keep the handler (value
+ *   and type).
  *
  * **Example** (Reading the parts of a builder procedure)
  *
@@ -93,6 +94,11 @@ export interface ProcedureWithHandler<
     RpcMiddleware.ApplyServices<M['Identifier'], Requires>,
     HandlerR
   >;
+  /** Returns a new procedure annotated with `key` = `value`; the handler and type are kept. */
+  annotate<I, S>(
+    key: Context.Key<I, S>,
+    value: NoInfer<S>,
+  ): ProcedureWithHandler<Kind, Payload, Success, Error, Middleware, Requires, HandlerR>;
 }
 
 /**
@@ -362,6 +368,14 @@ export declare namespace Procedure {
       RpcMiddleware.ApplyServices<M['Identifier'], Requires>,
       Infer_
     >;
+    /**
+     * Annotates the procedure with `key` = `value` (tRPC's `.meta()`), read by middleware from
+     * `rpc.annotations`. The builder type is unchanged; a later value of the same key wins.
+     */
+    readonly annotate: <I, S>(
+      key: Context.Key<I, S>,
+      value: NoInfer<S>,
+    ) => Builder<Payload, Success, Error, Middleware, Requires, Infer_>;
     /** Finishes a query whose handler returns an `Effect`. */
     readonly query: Terminal<'query', Payload, Success, Error, Middleware, Requires, Infer_>;
     /** Finishes a mutation whose handler returns an `Effect`. */
@@ -384,6 +398,7 @@ interface BuilderState {
   readonly success: Schema.Top;
   readonly error: Schema.Top;
   readonly middlewares: ReadonlyArray<RpcMiddleware.AnyService>;
+  readonly annotations: Context.Context<never>;
   /** No output schema yet: the success type is inferred and the runtime schema is `Void`. */
   readonly inferOutput: boolean;
 }
@@ -408,6 +423,7 @@ interface DefFields {
   readonly successSchema: Schema.Top;
   readonly errorSchema: Schema.Top;
   readonly middlewares: ReadonlyArray<RpcMiddleware.AnyService>;
+  readonly annotations: Context.Context<never>;
 }
 
 /** Guarded handler -> the handler as written (for `withInferredSchemas`). */
@@ -431,7 +447,7 @@ const guardInferredOutput = (kind: ProcedureKind.Value, handler: AnyHandler): Ru
 /**
  * @internal Re-creates a builder procedure with the given schemas, as `.inferred(schemas)` before its
  * terminal would have: the handler as written (without the inference guard once an output is
- * given) and the same kind, payload and middleware. Used by `Router.withSchemas`.
+ * given) and the same kind, payload, middleware and annotations. Used by `Router.withSchemas`.
  */
 export const withInferredSchemas = (
   procedure: ProcedureWithHandler.Any,
@@ -443,28 +459,26 @@ export const withInferredSchemas = (
   const current = procedure.handler as unknown as RuntimeHandler;
   const handler =
     schemas.output === undefined ? current : (originalHandlers.get(current) ?? current);
-  let def: ProcedureDef.Any = define(procedure.kind, {
+  // `define` with a handler creates a procedure with a handler.
+  return define(procedure.kind, {
     payload: fields.payloadSchema,
     success: schemas.output ?? fields.successSchema,
     error: schemas.error ?? fields.errorSchema,
+    middlewares: fields.middlewares,
+    annotations: fields.annotations,
     handler,
   });
-  for (const middleware of fields.middlewares) def = addDefMiddleware(def, middleware);
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `define` with a handler creates a procedure with a handler
-  return def as ProcedureWithHandler.Any;
 };
 
-const finish = (kind: ProcedureKind.Value, state: BuilderState, handler: AnyHandler): any => {
-  // Same path as `query({...}).middleware(...)`: `define`, then one `middleware` per step.
-  let def: ProcedureDef.Any = define(kind, {
+const finish = (kind: ProcedureKind.Value, state: BuilderState, handler: AnyHandler): any =>
+  define(kind, {
     payload: state.payload,
     success: state.success,
     error: state.error,
+    middlewares: state.middlewares,
+    annotations: state.annotations,
     handler: state.inferOutput ? guardInferredOutput(kind, handler) : handler,
   });
-  for (const middleware of state.middlewares) def = addDefMiddleware(def, middleware);
-  return def;
-};
 
 // Returns `any`: `Procedure` below assigns the precise `Procedure.Builder<...>` type.
 const makeBuilder = (state: BuilderState): any =>
@@ -480,6 +494,8 @@ const makeBuilder = (state: BuilderState): any =>
       }),
     middleware: (middleware: RpcMiddleware.AnyService) =>
       makeBuilder({ ...state, middlewares: [...state.middlewares, middleware] }),
+    annotate: <I, S>(key: Context.Key<I, S>, value: S) =>
+      makeBuilder({ ...state, annotations: Context.add(state.annotations, key, value) }),
     query: (handler: AnyHandler) => finish('query', state, handler),
     mutation: (handler: AnyHandler) => finish('mutation', state, handler),
     subscription: (handler: AnyHandler) => finish('subscription', state, handler),
@@ -497,6 +513,7 @@ const empty: Procedure.Builder<
   success: Schema.Void,
   error: Schema.Never,
   middlewares: [],
+  annotations: Context.empty(),
   inferOutput: true,
 });
 
@@ -521,8 +538,8 @@ const hasHandler = (u: unknown): u is ProcedureWithHandler.Any =>
   isProcedureDef(u) && Predicate.hasProperty(u, 'handler') && typeof u.handler === 'function';
 
 /**
- * The tRPC-style procedure builder: declare `input`, `output`, `error` and `middleware` in any
- * order, then finish with `query`, `mutation` or `subscription` and the handler.
+ * The tRPC-style procedure builder: declare `input`, `output`, `error`, `middleware` and
+ * `annotate` in any order, then finish with `query`, `mutation` or `subscription` and the handler.
  *
  * **When to use**
  *
@@ -550,6 +567,8 @@ const hasHandler = (u: unknown): u is ProcedureWithHandler.Any =>
  * - Subscription handlers return a `Stream` of output elements.
  * - The result compiles to the same rpc as the equivalent `query({...})`; `.middleware(M)` on it
  *   (or `router.middleware(M)`) keeps the handler.
+ * - `.annotate(key, value)` is tRPC's `.meta()`: metadata on the compiled rpc, read by middleware
+ *   with `Context.get(rpc.annotations, key)` (see `ProcedureDef`). It never changes the types.
  * - Builders are immutable and frozen; `Procedure.hasHandler(u)` is the runtime guard.
  *
  * **Gotchas**
@@ -635,6 +654,42 @@ const hasHandler = (u: unknown): u is ProcedureWithHandler.Any =>
  * type Failure = inferError<typeof generated>; // PostNotFound
  * ```
  *
+ * **Example** (Meta for middleware)
+ *
+ * ```ts
+ * import { Context, Effect, Layer, Schema } from 'effect';
+ * import { RpcMiddleware } from 'effect/rpc';
+ * import { Procedure, Router } from '@effect-trpc/core';
+ *
+ * class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {}) {}
+ * class CurrentUser extends Context.Service<CurrentUser, { readonly roles: ReadonlyArray<string> }>()(
+ *   'CurrentUser',
+ * ) {}
+ * class RequireRoles extends RpcMiddleware.Service<RequireRoles, { requires: CurrentUser }>()(
+ *   'RequireRoles',
+ *   { error: Forbidden },
+ * ) {}
+ * const Roles = Context.Reference<ReadonlyArray<string>>('Roles', { defaultValue: () => [] });
+ *
+ * export const appRouter = Router.make({
+ *   stats: Procedure.annotate(Roles, ['admin'])
+ *     .output(Schema.Finite)
+ *     .query(() => Effect.succeed(42)),
+ * }).middleware(RequireRoles);
+ *
+ * // `CurrentUser` comes from a trusted source: an auth middleware added after this one (it runs
+ * // first) or `Handlers.withContext`. Never take roles from a client-sent header.
+ * export const RequireRolesLive = Layer.succeed(RequireRoles)(
+ *   RequireRoles.of((effect, { rpc }) =>
+ *     Effect.flatMap(CurrentUser, (user) =>
+ *       Context.get(rpc.annotations, Roles).every((role) => user.roles.includes(role))
+ *         ? effect
+ *         : Effect.fail(new Forbidden()),
+ *     ),
+ *   ),
+ * );
+ * ```
+ *
  * @see {@link ProcedureWithHandler}
  * @category constructors
  * @since 0.1.0
@@ -645,6 +700,7 @@ export const Procedure = {
   error: empty.error,
   inferred: empty.inferred,
   middleware: empty.middleware,
+  annotate: empty.annotate,
   query: empty.query,
   mutation: empty.mutation,
   subscription: empty.subscription,

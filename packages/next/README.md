@@ -36,7 +36,7 @@ that read the cache, and server actions that keep typed errors.
 
 | export                                                          | side   | what                                                        | source                                 |
 | --------------------------------------------------------------- | ------ | ----------------------------------------------------------- | -------------------------------------- |
-| `createRouteHandler`                                            | server | `{ GET, POST, dispose }` for `route.ts`                     | `src/routeHandler.ts`                  |
+| `createRouteHandler`                                            | server | `{ GET, POST, dispose }` for `route.ts` (`onError` option)  | `src/routeHandler.ts`                  |
 | `createRscHelpers`                                              | server | `{ getQueryClient, rpc, prefetch, HydrateClient, caller? }` | `src/rsc.tsx`                          |
 | `createServerActionCaller`                                      | server | `actions(path)` → server action resolving an encoded `Exit` | `src/serverActions.ts`                 |
 | `createNextRpcClient`                                           | client | `{ RpcProvider, useRpc, useRpcClient, HydrationBoundary }`  | `src/client.tsx`                       |
@@ -66,6 +66,14 @@ that read the cache, and server actions that keep typed errors.
   your handlers). Client-only: `createNextRpcClient`'s module, `useServerAction`.
 - `createRouteHandler` requires `handlers`; `path` defaults to `/api/rpc`; `serialization`
   (default `"ndjson"`) must match `createNextRpcClient`.
+- `createRouteHandler` takes the `onError` option of `toWebHandler` unchanged
+  (`@effect-trpc/server`): `onError({ path, cause, headers })` reports failed calls. It applies the
+  per-call context of a `Handlers.withContext(handlers, context)` layer, and so does
+  `createServerActionCaller` (built on `createCaller`). `onError` works on the HTTP route only, and
+  `createRscHelpers({ handlers })` runs the handlers through `localLink` without the context, so
+  give it handlers with the services of `context` provided directly. Handlers
+  can read the request and set response headers and cookies with `HttpContext`
+  (`@effect-trpc/core`) over HTTP.
 - `GET` always answers `405`; every call (subscriptions included) is a `POST`.
 - Server actions never reject with a procedure error: they resolve with an encoded `Exit`
   (`EncodedActionResult`), decoded on the client with the router's schemas.
@@ -84,6 +92,9 @@ that read the cache, and server actions that keep typed errors.
   `createRscHelpers` (per request) or `makeQueryClient()` per request.
 - Don't import `trpc/server.tsx` or `server/handlers.ts` from a `'use client'` file → client code
   imports only the router (schemas), `trpc/client.tsx` and action functions.
+- Don't give a `Handlers.withContext` layer to `createRscHelpers` → it runs in-process through
+  `localLink` without its context (calls needing its services die); provide the service to the
+  layer you give it.
 - Don't leave `createRscHelpers` on its default `HydrationBoundary` in a real app → pass the one
   exported by your `'use client'` module.
 - Don't `throw` procedure errors from a server action or export `actions` from a `'use server'`
@@ -104,7 +115,8 @@ that read the cache, and server actions that keep typed errors.
 
 **Where to look**
 
-- Route handler (POST/GET/404/basePath/lazy build/dispose): `test/routeHandler.test.ts`.
+- Route handler (POST/GET/404/basePath/lazy build/dispose, `Handlers.withContext` and `onError`):
+  `test/routeHandler.test.ts`; the `withContext` types: `test/types.test-d.tsx`.
 - RSC helpers (per-request client, in-process prefetch, Schema dehydration, `caller`, headers,
   `keyPrefix`, remote client): `test/rsc.test.tsx`.
 - Server actions (encoding, typed errors, defects, invalid input, headers, `dispose`):
@@ -208,6 +220,10 @@ export const { GET, POST } = createRouteHandler(appRouter, { handlers: HandlersL
 - The handler layer is built **lazily on the first request**, then shared. If it fails to build,
   that request rejects (Next answers 500) and the next request retries. `dispose()` releases it.
 - `serialization` (`"ndjson"` default, or `"json"`) must match the client.
+- `Handlers.withContext(handlers, context)` (tRPC's `createContext`: an `Effect` of services
+  evaluated per call, before middleware and the handler) and `onError({ path, cause, headers })`, an
+  option of `toWebHandler`, work as in `@effect-trpc/server`; see
+  [Request context, response headers and `onError`](../server/README.md#request-context-response-headers-and-onerror).
 - Both exports are `(request: Request) => Promise<Response>`, so they are valid Next route
   handlers (`NextRequest` extends `Request`). The package never imports `next` at runtime.
 

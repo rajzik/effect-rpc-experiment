@@ -2,6 +2,7 @@ import { Effect, Fiber, Stream } from 'effect';
 import { describe, expect, it } from 'vite-plus/test';
 import {
   createClient,
+  httpBatchLink,
   httpLink,
   localLink,
   RpcInterrupted,
@@ -15,6 +16,8 @@ import { startServer } from './servers.js';
 type Setup = (handlers: ReturnType<typeof makeHandlers>) => Promise<{
   readonly link: CreateClientOptions<AppRouter>['link'];
   readonly dispose: () => Promise<void>;
+  /** An aborted query keeps running on the server (until `dispose`). */
+  readonly abortedQueryRunsOn?: boolean;
 }>;
 
 const setups: ReadonlyArray<readonly [string, Setup]> = [
@@ -27,6 +30,18 @@ const setups: ReadonlyArray<readonly [string, Setup]> = [
     async (handlers) => {
       const server = await startServer({ protocol: 'http', handlers });
       return { link: httpLink({ url: server.url }), dispose: server.dispose };
+    },
+  ],
+  [
+    'httpBatchLink',
+    async (handlers) => {
+      const server = await startServer({ protocol: 'http', handlers });
+      // A batch POST is never aborted for its callers.
+      return {
+        link: httpBatchLink({ url: server.url }),
+        dispose: server.dispose,
+        abortedQueryRunsOn: true,
+      };
     },
   ],
   [
@@ -43,13 +58,14 @@ describe.each(setups)('abort over %s', (_name, setup) => {
     test: (
       client: ReturnType<typeof createClient<typeof appRouter>>,
       probe: ReturnType<typeof makeProbe>,
+      abortedQueryRunsOn: boolean,
     ) => Promise<void>,
   ): Promise<void> => {
     const probe = makeProbe();
-    const { link, dispose } = await setup(makeHandlers(probe));
+    const { link, dispose, abortedQueryRunsOn = false } = await setup(makeHandlers(probe));
     const client = createClient(appRouter, { link });
     try {
-      await test(client, probe);
+      await test(client, probe, abortedQueryRunsOn);
     } finally {
       await client.dispose();
       await dispose();
@@ -57,14 +73,14 @@ describe.each(setups)('abort over %s', (_name, setup) => {
   };
 
   it('rejects with RpcInterrupted and interrupts the server handler', () =>
-    withClient(async (client, probe) => {
+    withClient(async (client, probe, abortedQueryRunsOn) => {
       const controller = new AbortController();
       const pending = rejectionOf(client.slow(undefined, { signal: controller.signal }));
       await within(probe.started);
       controller.abort();
       expect(await within(pending)).toBeInstanceOf(RpcInterrupted);
-      await within(probe.interrupted);
-      expect(probe.state.interrupted).toBe(1);
+      if (!abortedQueryRunsOn) await within(probe.interrupted);
+      expect(probe.state.interrupted).toBe(abortedQueryRunsOn ? 0 : 1);
       // the link is still usable
       await expect(client.health()).resolves.toBe('ok');
     }));
@@ -76,12 +92,12 @@ describe.each(setups)('abort over %s', (_name, setup) => {
     }));
 
   it('interrupting an Effect-client fiber interrupts the server handler', () =>
-    withClient(async (client, probe) => {
+    withClient(async (client, probe, abortedQueryRunsOn) => {
       const fiber = Effect.runFork(client.$effect.slow());
       await within(probe.started);
       await Effect.runPromise(Fiber.interrupt(fiber));
-      await within(probe.interrupted);
-      expect(probe.state.interrupted).toBe(1);
+      if (!abortedQueryRunsOn) await within(probe.interrupted);
+      expect(probe.state.interrupted).toBe(abortedQueryRunsOn ? 0 : 1);
     }));
 
   it('aborting an async iterable throws RpcInterrupted and closes the server stream', () =>

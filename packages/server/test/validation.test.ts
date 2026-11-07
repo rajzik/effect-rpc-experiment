@@ -59,7 +59,13 @@ describe('output validation (outputParser.test.ts)', () => {
     const frames = await call(web, { tag: 'debug.badOutput' });
     expect(exitFrame(frames)).toEqual({
       _tag: 'Failure',
-      cause: [{ _tag: 'Die', defect: 'Expected an integer\n  at ["value"]' }],
+      cause: [
+        {
+          _tag: 'Die',
+          defect:
+            'Failed to encode response for RPC "debug.badOutput": Expected an integer\n  at ["value"]',
+        },
+      ],
     });
     expect(exitFrame(await call(web, { tag: 'health' }))).toEqual({
       _tag: 'Success',

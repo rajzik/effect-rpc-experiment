@@ -10,4 +10,5 @@ on a transformer (e.g. superjson) for non-JSON values. This package has no porte
 | drift detection                      | `generate.test.ts` (contract check, committed fixture) |
 | unmappable types                     | `generate.test.ts` (`fixtures/bad`)                    |
 | schemas from other packages          | `monorepo.test.ts` (`fixtures/mono`)                   |
+| annotated procedures (`.annotate`)   | `generate.test.ts` (`fixtures/annotated`)              |
 | CLI, watch mode, Vite plugin         | `tooling.test.ts`                                      |
