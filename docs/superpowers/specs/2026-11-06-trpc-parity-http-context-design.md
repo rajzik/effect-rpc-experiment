@@ -16,6 +16,11 @@ pieces are missing, plus several server/client features. The user asked to do, i
 
 ## Facts verified against effect@4.0.1 (drive the design)
 
+> Revised after review (2026-11-07): the lockfile now pins effect@4.0.7. Since 4.0.6
+> `RpcClient.makeProtocolHttp(client, { batch })` batches HTTP requests, and pre-response handlers
+> live in the request state of the fiber context (`appendPreResponseHandlerUnsafe(context, …)`).
+> The request context became `Handlers.withContext` instead of a `context` option (goal 2 below).
+
 - `RpcServer` runs `write` in the HTTP request fiber and forks each handler with
   `Context.merge(handlerLayerContext, requestFiberContext)`. So a handler (and its middleware) served
   over HTTP already sees Effect's `HttpServerRequest` (probe: `toWebHandler` handler read
@@ -39,11 +44,11 @@ pieces are missing, plus several server/client features. The user asked to do, i
    - `HttpContext.setHeader(name, value)`, `appendHeader(name, value)`,
      `setCookie(name, value, options?)`: `Effect<void>`, register a pre-response handler on the
      current HTTP request; no-ops when there is none.
-2. `context` option on the HTTP server options (`ServerOptions`, hence `layerHttp`, `toWebHandler`,
-   `serve` / `runServer`, Next `createRouteHandler`, Start `createStartHandler`):
-   `context?: Effect<Context<C>, never, CR>` evaluated per call before middleware and handler; its
-   services are provided to the call. Services in `C` are not requirements of the adapter's handler
-   layer (handlers may `yield*` them); `CR` must be provided by the handlers layer (its output).
+2. `Handlers.withContext(handlers, context)` in `@effect-trpc/server`, applied by every HTTP adapter
+   (`layerHttp`, `toWebHandler`, `serve` / `runServer`, Next `createRouteHandler`, Start
+   `createStartHandler`): `context: Effect<Context<C>, never, CR>` is evaluated per call before
+   middleware and handler; its services are provided to the call. The returned layer no longer
+   requires `C` (handlers may `yield*` it); `CR` comes from the output of `handlers`.
 3. `meta`: `.annotate(key, value)` on the `Procedure` builder and on `query/mutation/subscription`
    definitions, carried into the compiled rpc (`rpc.annotate`). Middleware reads it with
    `Context.get(rpc.annotations, Key)` (or `getOption`). Keys are ordinary `Context.Key`s /
@@ -55,16 +60,18 @@ pieces are missing, plus several server/client features. The user asked to do, i
 5. `httpBatchLink(options)` in `@effect-trpc/client`: options of `httpLink` plus
    `maxItems?: number` (default unlimited). Queries issued in the same tick go in one POST;
    mutations and subscriptions are sent alone (one POST each, as `httpLink`). Responses are
-   dispatched per request id as they stream back.
+   dispatched per request id as they stream back. Built on effect/rpc's batching HTTP protocol (a
+   1 ms window, `maxSize = maxItems`) for queries and its unbatched one for the rest.
 
 ## Non-goals
 
 - Setting the HTTP status from a handler (non-2xx breaks the rpc protocol on the client).
-- `context` / `onError` for `createCaller`, `localLink`, Electron or the test harness (their handler
+- `withContext` / `onError` for `createCaller`, `localLink`, Electron or the test harness (their handler
   layers can be provided directly; revisit if asked).
 - Router-level `.annotate` (procedure level only); a typed `initTRPC.meta<M>()` equivalent.
 - GET queries / HTTP caching (item 4 alternative not chosen, see Approaches).
-- Cancelling one call of a batch on the server (only the whole batch request can be aborted).
+- Cancelling the calls of a batch on the server: a batch POST is never aborted for its callers
+  (`client.dispose()` aborts the open ones).
 
 ## Anti-goals
 
@@ -87,17 +94,16 @@ pieces are missing, plus several server/client features. The user asked to do, i
 
 ## Design notes
 
-- Internal middleware: a `RpcMiddleware` service private to `@effect-trpc/server`, added with
-  `group.middleware(Hooks)` to the group passed to `RpcServer` inside `layerHttp` only when
-  `context` or `onError` is given (no behaviour change otherwise). Its implementation layer is
-  provided by `layerHttp`; it captures the handlers-layer context for `CR`. Order: added last, so it
-  wraps every user middleware (user middleware sees the `context` services; `onError` sees their
-  failures). Over WebSocket it runs per call too.
-- Typing of `context`: `layerHttp` / `toWebHandler` / node / Next / Start options gain the context
-  services `C` so that `handlers: Layer<Provides, LE, C | …>` type-checks and `C` is excluded from the
-  remaining requirements. Exact generic plumbing is the builder's call; requirement: a handler that
-  `yield*`s a `context` service compiles with `toWebHandler(router, { handlers, context })` and
-  fails to compile without `context`.
+- Internal middleware: a `RpcMiddleware` service private to `@effect-trpc/server`, always added with
+  `group.middleware(Hooks)` to the group passed to `RpcServer` inside `layerHttp`. Its layer reads
+  the internal `RequestContext` service that `Handlers.withContext` adds to the handlers layer
+  (`Effect.serviceOption`); that service already carries what `context` needs (`CR`). Order: added
+  last, so it wraps every user middleware (user middleware sees the `context` services; `onError`
+  sees their failures). Over WebSocket it runs per call too.
+- Typing: `Handlers.withContext` returns `Layer<Out, E, Exclude<R, C> | Exclude<CR, Out>>` (its one
+  cast); the adapters have no context generics. A handler that `yield*`s a `context` service
+  compiles with `toWebHandler(router, { handlers: Handlers.withContext(handlers, context) })` and
+  fails to compile without it.
 - `HttpContext.setCookie` uses `HttpServerResponse.setCookie` (check its v4 signature; an invalid
   cookie is a defect).
 - Batching and headers: one batch shares one HTTP response. Headers/cookies set by any call in the
@@ -105,8 +111,8 @@ pieces are missing, plus several server/client features. The user asked to do, i
   finishing). Mutations are not batched, so a `login` mutation's cookie is always applied. Documented
   as a gotcha on `HttpContext` and `httpBatchLink`.
 - Batching and abort: aborting one call completes it on the client as interrupted; the server keeps
-  running it until the batch request ends. If every call of a batch is aborted, the request is
-  aborted.
+  running it until the batch request ends. The batch request is not aborted even when every call of
+  it is (effect/rpc runs batches in the client's scope); `client.dispose()` aborts it.
 - Docs: new guide sections (server: request & response; context option; meta; onError; client:
   batching), update `limits.md`, `migrating-from-trpc.md`, `docs/trpc-test-parity*.md`
   (batching row → ported; meta/responseMeta rows point at the new APIs), READMEs incl. `## For AI agents`,
@@ -114,6 +120,5 @@ pieces are missing, plus several server/client features. The user asked to do, i
 
 ## Left to the builder
 
-- Exact generic plumbing for `C` / `CR` through the adapters' option types.
 - Internal names (the hooks middleware, the batch protocol).
 - Batch protocol internals (tick scheduling, response routing), within the semantics above.

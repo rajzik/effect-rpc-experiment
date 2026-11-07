@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Handlers can read the HTTP request and set response headers/cookies; HTTP adapters take a per-call `context` and an `onError` hook; procedures carry `meta` annotations; clients can batch queries with `httpBatchLink`.
+**Goal:** Handlers can read the HTTP request and set response headers/cookies; `Handlers.withContext` gives handlers a per-call context and HTTP adapters take an `onError` hook; procedures carry `meta` annotations; clients can batch queries with `httpBatchLink`.
 
-**Architecture:** `HttpContext` (core) wraps Effect's `HttpServerRequest` service (reached through the request fiber context RpcServer merges into handler fibers) and `HttpEffect.appendPreResponseHandler`, with no requirements. `layerHttp` adds an internal server-only middleware (outermost) to the served group to implement `context` and `onError`. `.annotate` stores Effect annotations on the compiled rpc. `httpBatchLink` is a client `RpcClient.Protocol` that groups same-tick queries into one POST.
+**Architecture:** `HttpContext` (core) wraps Effect's `HttpServerRequest` service (reached through the request fiber context RpcServer merges into handler fibers) and `HttpEffect.appendPreResponseHandler`, with no requirements. `layerHttp` adds an internal server-only middleware (outermost) to the served group to apply `Handlers.withContext` and `onError`. `.annotate` stores Effect annotations on the compiled rpc. `httpBatchLink` routes queries to effect/rpc's batching HTTP protocol and the rest to its unbatched one.
+
+> Revised after review (2026-11-07): effect bumped to 4.0.7 for `RpcClient.makeProtocolHttp({ batch })`; the `context` option of Task 4 became `Handlers.withContext(handlers, context)`; the hooks middleware is always installed; aborting every call of a batch no longer aborts its POST (Task 5: `client.dispose()` does).
 
 **Tech Stack:** TypeScript 7 (tsgo), Effect v4 (`effect@4.0.1`: `effect/rpc`, `effect/http`), Vite+ (`vp test`, Vitest 5).
 
@@ -16,7 +18,7 @@
 - Verify every Effect API in `packages/core/node_modules/effect/dist/**/*.d.ts` (effect@4.0.1); do not trust v3 memory.
 - No new dependencies; do not edit package `package.json` / `tsconfig.json` / `vite.config.ts`.
 - `HttpContext` helpers have no requirements (`R = never`); they are no-ops / `None` outside HTTP.
-- With neither `context` nor `onError` given, the served group and wire behaviour are unchanged.
+- Without `Handlers.withContext` or `onError`, the wire behaviour is unchanged (the hooks middleware only runs the call).
 - Every new public export: Effect-style JSDoc (`docs/jsdoc-style.md`) with a compiling example; README `## For AI agents` updated in each touched package; `node scripts/verify-jsdoc.mjs <pkg>` passes.
 - Lint warnings fail; single-line disables only, with a reason.
 

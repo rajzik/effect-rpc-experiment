@@ -45,7 +45,8 @@ const request: Effect.Effect<Option.Option<HttpServerRequest.HttpServerRequest>>
   Effect.serviceOption(HttpServerRequest.HttpServerRequest);
 
 // Over WebSocket every call shares the upgrade request, whose response is long gone: registering
-// would only grow its pre-response handler chain for the lifetime of the connection.
+// would only grow its pre-response handler chain for the lifetime of the connection. The server's
+// `protocol` is the authority on the transport; this header sniff is only a guard.
 const isWebSocketUpgrade = (req: HttpServerRequest.HttpServerRequest): boolean =>
   req.headers.upgrade?.toLowerCase() === 'websocket';
 
