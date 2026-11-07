@@ -107,9 +107,13 @@ export type NormalizePayload<P> = P extends Schema.Struct.Fields ? Schema.Struct
  * import { query, Router } from '@effect-trpc/core';
  *
  * class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {}) {}
- * class RequireRoles extends RpcMiddleware.Service<RequireRoles>()('RequireRoles', {
- *   error: Forbidden,
- * }) {}
+ * class CurrentUser extends Context.Service<CurrentUser, { readonly roles: ReadonlyArray<string> }>()(
+ *   'CurrentUser',
+ * ) {}
+ * class RequireRoles extends RpcMiddleware.Service<RequireRoles, { requires: CurrentUser }>()(
+ *   'RequireRoles',
+ *   { error: Forbidden },
+ * ) {}
  * // A `Context.Reference` gives the default for procedures that do not set it.
  * const Roles = Context.Reference<ReadonlyArray<string>>('Roles', { defaultValue: () => [] });
  *
@@ -118,13 +122,16 @@ export type NormalizePayload<P> = P extends Schema.Struct.Fields ? Schema.Struct
  *   stats: query({ success: Schema.Number }).annotate(Roles, ['admin']),
  * }).middleware(RequireRoles);
  *
+ * // `CurrentUser` comes from a trusted source: an auth middleware added after this one (it runs
+ * // first) or the `context` server option. Never take roles from a client-sent header.
  * export const RequireRolesLive = Layer.succeed(RequireRoles)(
- *   RequireRoles.of((effect, { rpc, headers }) => {
- *     const granted = headers['x-roles']?.split(',') ?? [];
- *     return Context.get(rpc.annotations, Roles).every((role) => granted.includes(role))
- *       ? effect
- *       : Effect.fail(new Forbidden());
- *   }),
+ *   RequireRoles.of((effect, { rpc }) =>
+ *     Effect.flatMap(CurrentUser, (user) =>
+ *       Context.get(rpc.annotations, Roles).every((role) => user.roles.includes(role))
+ *         ? effect
+ *         : Effect.fail(new Forbidden()),
+ *     ),
+ *   ),
  * );
  * ```
  *

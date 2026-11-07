@@ -1,8 +1,9 @@
 # Request, response and context
 
-tRPC hands every resolver a `ctx` built by `createContext(req, res)`. effect-trpc splits that up,
-and none of the pieces adds a requirement to a handler, so the same handlers still run under
-`createCaller`, `localLink`, Electron and tests:
+tRPC hands every resolver a `ctx` built by `createContext(req, res)`. effect-trpc splits that up.
+`HttpContext` adds no requirement to a handler, so the same handlers still run under
+`createCaller`, `localLink`, Electron and tests. The services of `context` are handler
+requirements: over HTTP the `context` option provides them, elsewhere provide them with a layer:
 
 | You want to                                 | Use                                                  |
 | ------------------------------------------- | ---------------------------------------------------- |
@@ -53,11 +54,13 @@ every middleware and the handler, and its services are provided to both.
 - It runs per call over a WebSocket too, where `HttpContext.request` is the upgrade request.
 - It cannot fail with a typed error. To reject a call, use a middleware, whose error is part of the
   procedure's errors. A defect in `context` fails the call with `RpcDefect`.
+- A `context` typed `Effect | undefined` (`enabled ? context : undefined`) still lets handlers
+  require its services; when it is `undefined`, those calls die. Pass it unconditionally.
 
-It is an option of every HTTP adapter, with the same meaning: `toWebHandler`, `layerHttp`, `serve`
-and `runServer` from `@effect-trpc/server`, `createRouteHandler` from `@effect-trpc/next` and
-`createStartHandler` from `@effect-trpc/start`. `createCaller`, `localLink` and the test harness
-have none: provide the services to their handlers layer directly.
+It is an option of every HTTP adapter, with the same meaning: `toWebHandler` and `layerHttp` from
+`@effect-trpc/server`, `serve` and `runServer` from `@effect-trpc/server/node`, `createRouteHandler`
+from `@effect-trpc/next` and `createStartHandler` from `@effect-trpc/start`. `createCaller`,
+`localLink` and the test harness have none: provide the services to their handlers layer directly.
 
 Prefer middleware when the value depends on who is calling and can be refused (the session). Use
 `context` for what every call needs regardless: a request id, a per-request logger, a clock.
@@ -70,7 +73,8 @@ Prefer middleware when the value depends on who is calling and can be refused (t
 
 It receives `{ path, cause, headers }`: the procedure path (`"post.byId"`), the full `Cause` (typed
 failures are `Fail` reasons, defects `Die` reasons) and the call's headers, request headers
-included. It is called once for each call that fails while it runs, whether in the handler or in a
+included. Rpc message headers, which the client sets, override HTTP request headers of the same
+name: read a header set by a trusted proxy from `HttpContext.request`. It is called once for each call that fails while it runs, whether in the handler or in a
 middleware, and before the failure is sent. A subscription that fails mid-stream is reported too.
 
 It is not called for:

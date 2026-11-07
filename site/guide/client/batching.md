@@ -18,7 +18,7 @@ several requests in one body and streams the responses back by request id. With 
 - Mutations and subscriptions are not batched: each gets its own POST, as with `httpLink`.
 - Rpc headers (`createClient({ headers })`, `withHeaders`, per-call `headers`) travel with each
   call, so calls with different headers still share a POST.
-- The `headers` option of the link is a function evaluated once per POST.
+- The `headers` option of the link may be static; a `headers` function runs once per POST.
 
 ## Errors and cancellation
 

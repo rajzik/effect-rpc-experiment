@@ -1,4 +1,4 @@
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
+import { HttpContext, mutation, query, Router, subscription } from '@effect-trpc/core';
 import { Effect, Layer, Schema, Stream } from 'effect';
 import { HttpRouter } from 'effect/http';
 import { RpcSerialization, RpcServer } from 'effect/rpc';
@@ -29,6 +29,8 @@ const router = Router.make({
   hang: query({ success: Schema.String }),
   /** Returns the `x-batch` request header. */
   header: query({ success: Schema.String }),
+  /** Sets the `x-stamp` response header. */
+  stamp: query({ success: Schema.String }),
   add: mutation({ payload: { n: Schema.Finite }, success: Schema.Finite }),
   count: subscription({ payload: { n: Schema.Finite }, success: Schema.Finite }),
 });
@@ -97,6 +99,7 @@ const withClient = async (
     gated: () => Effect.promise(() => gate.promise).pipe(Effect.as('opened')),
     hang: () => Effect.never.pipe(Effect.onInterrupt(() => Effect.sync(hangInterrupted.resolve))),
     header: (_, { headers }) => Effect.succeed(headers['x-batch'] ?? ''),
+    stamp: () => HttpContext.setHeader('x-stamp', 'one').pipe(Effect.as('stamped')),
     add: ({ n }) => Effect.succeed(n + 1),
     count: ({ n }) => Stream.range(1, n),
   });
@@ -190,6 +193,22 @@ describe.each(['ndjson', 'json'] as const)('httpBatchLink (%s)', (format) => {
       expect(values).toEqual(['1', '1', '1']);
       expect(calls).toBe(1);
       expect(signals).toHaveLength(1);
+    });
+  });
+
+  it('applies a response header set by one call to the shared response of the POST', () => {
+    const stamps: Array<string | null> = [];
+    const respond = (_request: Request, response: Response) => {
+      stamps.push(response.headers.get('x-stamp'));
+      return Promise.resolve(response);
+    };
+    return withClient({ format, respond }, async ({ client, signals, open }) => {
+      const gated = client.gated();
+      const stamped = client.stamp();
+      open();
+      expect(await Promise.all([gated, stamped])).toEqual(['opened', 'stamped']);
+      expect(signals).toHaveLength(1);
+      expect(stamps).toEqual(['one']);
     });
   });
 
