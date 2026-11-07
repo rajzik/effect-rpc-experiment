@@ -1,5 +1,6 @@
 /**
- * Transports for `createClient`: `httpLink`, `wsLink`, `localLink` and custom `Link`s.
+ * Transports for `createClient`: `httpLink`, `httpBatchLink`, `wsLink`, `localLink` and custom
+ * `Link`s.
  *
  * A link turns the router's `RpcGroup` into a connected `effect/rpc` `RpcClient`. Network links
  * wrap an `RpcClient.Protocol` (`layerProtocolHttp`, `layerProtocolSocket`) and must match the
@@ -8,8 +9,9 @@
  *
  * @since 0.1.0
  */
-import { Effect, Layer } from 'effect';
-import type { Context, Scope } from 'effect';
+import { ProcedureKind } from '@effect-trpc/core';
+import { Context, Effect, Layer } from 'effect';
+import type { Scope } from 'effect';
 import {
   FetchHttpClient,
   Headers,
@@ -91,13 +93,7 @@ export type SerializationOption =
  */
 export type HeadersOption = Headers.Input | (() => Headers.Input | PromiseLike<Headers.Input>);
 
-/**
- * The `RpcSerialization` layer of a {@link SerializationOption} (default NDJSON).
- *
- * @internal
- * @since 0.1.0
- */
-export const serializationLayer = (
+const serializationLayer = (
   option: SerializationOption | undefined,
 ): Layer.Layer<RpcSerialization.RpcSerialization> =>
   option === undefined || option === 'ndjson'
@@ -171,17 +167,7 @@ export const Link = {
   fromProtocol,
 } as const;
 
-/**
- * Throws when `url` is not an absolute URL with one of `schemes` (checked when a link is created).
- *
- * @internal
- * @since 0.1.0
- */
-export const assertAbsoluteUrl = (
-  link: string,
-  url: string,
-  schemes: ReadonlyArray<string>,
-): void => {
+const assertAbsoluteUrl = (link: string, url: string, schemes: ReadonlyArray<string>): void => {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -220,11 +206,8 @@ const resolveHeaders = (
 /**
  * The `HttpClient` of the HTTP links: the global or custom `fetch`, non-2xx responses as errors
  * and the `headers` option resolved once per request.
- *
- * @internal
- * @since 0.1.0
  */
-export const httpClientLayer = (
+const httpClientLayer = (
   link: string,
   options: HttpLinkOptions,
 ): Layer.Layer<HttpClient.HttpClient> => {
@@ -329,6 +312,131 @@ export const httpLink = (options: HttpLinkOptions): Link => {
       ]),
     ),
   );
+};
+
+/**
+ * Options of {@link httpBatchLink}: the {@link HttpLinkOptions} plus `maxItems`.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export type HttpBatchLinkOptions = HttpLinkOptions & {
+  /** Maximum number of calls in one POST (a positive integer); default: no limit. */
+  readonly maxItems?: number | undefined;
+};
+
+const queryTags = <Rpcs extends Rpc.Any>(group: RpcGroup.RpcGroup<Rpcs>): ReadonlySet<string> =>
+  new Set(
+    Array.from(group.requests.values())
+      .filter((rpc) => Context.get(rpc.annotations, ProcedureKind) === 'query')
+      .map((rpc) => rpc._tag),
+  );
+
+/**
+ * A link over HTTP (`fetch`) that sends the queries called in the same tick in one POST (tRPC's
+ * `httpBatchLink`). Responses stream back per call with NDJSON, so each call settles as soon as
+ * its own result arrives.
+ *
+ * **When to use**
+ *
+ * Use instead of {@link httpLink} when a page fires many queries at once (e.g. several
+ * `useQuery` hooks) and one request per query is too many. Prefer {@link httpLink} when calls
+ * set response headers or cookies, and {@link wsLink} for many concurrent subscriptions.
+ *
+ * **Details**
+ *
+ * - Built on `effect/rpc`'s batching HTTP protocol (`RpcClient.makeProtocolHttp` with `batch`).
+ *   The first query opens a batch that is sent 1 ms later (`setTimeout(1)`, which is what Node
+ *   makes of `setTimeout(0)`), so the queries called in the same tick share its POST. A batch
+ *   holding `maxItems` calls is sent at once and the next query opens a new one.
+ * - Mutations and subscriptions are not batched: each gets its own POST, like {@link httpLink}.
+ * - The options of {@link httpLink} apply per POST: a `headers` function runs once per POST,
+ *   and a non-2xx response or a network error fails every call of the POST with
+ *   `RpcTransportError`. A typed failure or defect only fails its own call.
+ * - Rpc headers (`createClient({ headers })`, `withHeaders`, per-call `headers`) travel with
+ *   each call, so calls with different headers still share a POST.
+ * - Aborting a call (`signal`, fiber interruption) rejects it at once with `RpcInterrupted`;
+ *   the POST goes on for the other calls.
+ * - Works with every `@effect-trpc/server` HTTP adapter; no server option is needed.
+ *
+ * **Gotchas**
+ *
+ * - The calls of a batch share one HTTP response: headers and cookies a handler sets apply to
+ *   all of them and only if set before the first response chunk is written. Keep a `login`
+ *   mutation (never batched) for cookies.
+ * - A batch POST is never aborted for its callers, not even when every call of it is aborted:
+ *   the server runs aborted calls to the end. `client.dispose()` aborts the POSTs still open.
+ * - With `serialization: 'json'` the server answers only when every call of the POST has
+ *   finished, so one slow (or aborted but still running) query holds back the others. Keep the
+ *   default `"ndjson"`.
+ * - `url` must be absolute `http:` / `https:` and `maxItems` a positive integer; otherwise the
+ *   link throws when it is created.
+ *
+ * **Example** (Two queries in one request)
+ *
+ * ```ts
+ * import { Schema } from 'effect';
+ * import { query, Router } from '@effect-trpc/core';
+ * import { createClient, httpBatchLink } from '@effect-trpc/client';
+ *
+ * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
+ * const appRouter = Router.make({
+ *   post: { byId: query({ payload: { id: Schema.Number }, success: Post }) },
+ * });
+ *
+ * const client = createClient(appRouter, {
+ *   link: httpBatchLink({ url: 'http://localhost:3000/rpc', maxItems: 10 }),
+ * });
+ *
+ * // Called in the same tick: one POST carries both queries.
+ * const [first, second] = await Promise.all([
+ *   client.post.byId({ id: 1 }),
+ *   client.post.byId({ id: 2 }),
+ * ]);
+ * ```
+ *
+ * @see {@link HttpBatchLinkOptions}
+ * @see {@link httpLink}
+ * @category links
+ * @since 0.1.0
+ */
+export const httpBatchLink = (options: HttpBatchLinkOptions): Link => {
+  const url = String(options.url);
+  assertAbsoluteUrl('httpBatchLink', url, ['http', 'https']);
+  const { maxItems } = options;
+  if (maxItems !== undefined && !(Number.isInteger(maxItems) && maxItems > 0)) {
+    throw new Error(`httpBatchLink: maxItems must be a positive integer, got ${maxItems}`);
+  }
+  const transport = Layer.mergeAll(
+    httpClientLayer('httpBatchLink', options),
+    serializationLayer(options.serialization),
+  );
+  return make((group) => {
+    const queries = queryTags(group);
+    // Two upstream protocols over one HTTP client: queries go to the batching one.
+    const protocol = Layer.effect(RpcClient.Protocol)(
+      Effect.gen(function* () {
+        const client = HttpClient.mapRequest(
+          yield* HttpClient.HttpClient,
+          HttpClientRequest.prependUrl(url),
+        );
+        // A timer, not 0: a 0 window only yields to the fiber scheduler.
+        const batch = { window: '1 millis', maxSize: maxItems } as const;
+        const batched = yield* RpcClient.makeProtocolHttp(client, { batch });
+        const single = yield* RpcClient.makeProtocolHttp(client);
+        return RpcClient.Protocol.of({
+          ...single,
+          // Each protocol writes the responses of its own requests, so both run (until disposed).
+          run: (clientId, f) => Effect.raceFirst(batched.run(clientId, f), single.run(clientId, f)),
+          send: (clientId, message) =>
+            message._tag === 'Request' && queries.has(message.tag)
+              ? batched.send(clientId, message)
+              : single.send(clientId, message),
+        });
+      }),
+    ).pipe(Layer.provide(transport));
+    return fromProtocol(protocol).makeClient(group);
+  });
 };
 
 /**

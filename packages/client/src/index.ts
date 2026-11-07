@@ -11,16 +11,17 @@
  */
 export {
   Link,
+  httpBatchLink,
   httpLink,
   localLink,
   wsLink,
   type HeadersOption,
+  type HttpBatchLinkOptions,
   type HttpLinkOptions,
   type LocalLinkOptions,
   type SerializationOption,
   type WsLinkOptions,
 } from './Link.js';
-export { httpBatchLink, type HttpBatchLinkOptions } from './BatchLink.js';
 export {
   createClient,
   type CallArgs,

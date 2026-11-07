@@ -6,6 +6,7 @@ What effect-trpc does not do (yet), and what to do instead.
 | ------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `httpBatchLink` batches queries, not mutations or subscriptions     | one POST each, as `httpLink`                                         |
 | Headers a batched query sets apply to its whole batch               | `httpLink`, or set them from a mutation (never batched)              |
+| Aborting a batched query does not stop it on the server             | `httpLink` for long queries you abort; `client.dispose()` stops all  |
 | Headers and cookies are written with the first response chunk       | set them once, before the first stream element                       |
 | A handler cannot set the HTTP status                                | typed errors; non-2xx is a transport failure on the client           |
 | `context` and `onError` exist on the HTTP adapters only             | provide services to the handlers of `createCaller` / `localLink`     |

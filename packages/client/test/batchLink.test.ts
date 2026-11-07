@@ -311,7 +311,7 @@ describe('httpBatchLink limits, errors and abort', () => {
     }));
 
   it('interrupts an aborted query and keeps the POST running for the others', () =>
-    withClient({}, async ({ client, signals, open, hangInterrupted }) => {
+    withClient({}, async ({ client, signals, open }) => {
       const controller = new AbortController();
       const hung = rejectionOf(client.hang(undefined, { signal: controller.signal }));
       const gated = client.gated();
@@ -323,12 +323,10 @@ describe('httpBatchLink limits, errors and abort', () => {
       expect(signals[0]?.aborted).toBe(false);
       open();
       expect(await within(gated)).toBe('opened');
-      // Every call is settled: the POST is aborted, which ends the aborted call on the server.
-      await within(abortOf(signals[0]));
-      await within(hangInterrupted);
+      expect(signals[0]?.aborted).toBe(false);
     }));
 
-  it('aborts the POST when every call in it is aborted', () =>
+  it('keeps the POST open when every call in it is aborted, until dispose', () =>
     withClient({}, async ({ client, signals, hangInterrupted }) => {
       const first = new AbortController();
       const second = new AbortController();
@@ -344,6 +342,9 @@ describe('httpBatchLink limits, errors and abort', () => {
       expect(signals[0]?.aborted).toBe(false);
       second.abort();
       expect(await within(gated)).toBeInstanceOf(RpcInterrupted);
+      expect(signals[0]?.aborted).toBe(false);
+      // Disposing the client aborts the POST, which ends the aborted calls on the server.
+      await client.dispose();
       await within(abortOf(signals[0]));
       await within(hangInterrupted);
       expect(signals).toHaveLength(1);

@@ -13,8 +13,9 @@ several requests in one body and streams the responses back by request id. With 
 
 ## What is batched
 
-- Queries called before a `setTimeout(0)` scheduled by the first queued query share a POST. With
-  `maxItems` the batch is split into POSTs of at most that many calls.
+- The first query opens a batch that is sent 1 ms later, so the queries called in the same tick
+  share its POST. A batch that holds `maxItems` calls is sent at once and the next query opens a
+  new one. This is `effect/rpc`'s own batching (`RpcClient.makeProtocolHttp` with `batch`).
 - Mutations and subscriptions are not batched: each gets its own POST, as with `httpLink`.
 - Rpc headers (`createClient({ headers })`, `withHeaders`, per-call `headers`) travel with each
   call, so calls with different headers still share a POST.
@@ -25,9 +26,10 @@ several requests in one body and streams the responses back by request id. With 
 - A typed failure or a defect fails only its own call, as always.
 - A non-2xx response or a network error fails every call of the POST with `RpcTransportError`.
 - Aborting a call (`signal`, fiber interruption) rejects it at once with `RpcInterrupted`; the POST
-  goes on for the other calls. Once no call of the POST is left waiting, a POST that had an aborted
-  call is aborted, so aborting every call aborts it at once. The server keeps running an aborted
-  call until then: its handler is interrupted when the POST is, not at the abort.
+  goes on for the other calls.
+- A batch POST is never aborted for its callers, not even when every call of it is aborted. The
+  server runs an aborted query to the end; `client.dispose()` aborts the POSTs still open, which
+  interrupts their handlers.
 
 ::: warning Gotchas
 
