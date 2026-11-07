@@ -564,6 +564,7 @@ export const define = (
     readonly payload?: PayloadInput;
     readonly success?: Schema.Top;
     readonly error?: Schema.Top;
+    readonly middlewares?: ReadonlyArray<RpcMiddleware.AnyService>;
     readonly annotations?: Context.Context<never>;
     readonly handler?: AnyHandler;
   },
@@ -573,7 +574,7 @@ export const define = (
     payloadSchema: normalizePayload(options.payload),
     successSchema: options.success ?? Schema.Void,
     errorSchema: options.error ?? Schema.Never,
-    middlewares: [],
+    middlewares: options.middlewares ?? [],
     annotations: options.annotations ?? Context.empty(),
   };
   return new ProcedureDefImpl(

@@ -13,7 +13,7 @@
 import { Context, Effect, Predicate, Schema, Stream } from 'effect';
 import type { Headers } from 'effect/http';
 import type { Rpc, RpcMessage, RpcMiddleware } from 'effect/rpc';
-import { addDefMiddleware, define, isProcedureDef } from './Procedure.js';
+import { define, isProcedureDef } from './Procedure.js';
 import type { NormalizePayload, PayloadInput, ProcedureDef } from './Procedure.js';
 import type { ProcedureKind } from './ProcedureKind.js';
 
@@ -459,30 +459,26 @@ export const withInferredSchemas = (
   const current = procedure.handler as unknown as RuntimeHandler;
   const handler =
     schemas.output === undefined ? current : (originalHandlers.get(current) ?? current);
-  let def: ProcedureDef.Any = define(procedure.kind, {
+  // `define` with a handler creates a procedure with a handler.
+  return define(procedure.kind, {
     payload: fields.payloadSchema,
     success: schemas.output ?? fields.successSchema,
     error: schemas.error ?? fields.errorSchema,
+    middlewares: fields.middlewares,
     annotations: fields.annotations,
     handler,
   });
-  for (const middleware of fields.middlewares) def = addDefMiddleware(def, middleware);
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `define` with a handler creates a procedure with a handler
-  return def as ProcedureWithHandler.Any;
 };
 
-const finish = (kind: ProcedureKind.Value, state: BuilderState, handler: AnyHandler): any => {
-  // Same path as `query({...}).middleware(...)`: `define`, then one `middleware` per step.
-  let def: ProcedureDef.Any = define(kind, {
+const finish = (kind: ProcedureKind.Value, state: BuilderState, handler: AnyHandler): any =>
+  define(kind, {
     payload: state.payload,
     success: state.success,
     error: state.error,
+    middlewares: state.middlewares,
     annotations: state.annotations,
     handler: state.inferOutput ? guardInferredOutput(kind, handler) : handler,
   });
-  for (const middleware of state.middlewares) def = addDefMiddleware(def, middleware);
-  return def;
-};
 
 // Returns `any`: `Procedure` below assigns the precise `Procedure.Builder<...>` type.
 const makeBuilder = (state: BuilderState): any =>
