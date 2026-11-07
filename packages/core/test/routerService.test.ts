@@ -123,7 +123,7 @@ describe('Router.fromService', () => {
     }) {}
     const run = () => Router.fromService(Slow);
     expect(run).toThrow(/SlowRouter/);
-    expect(run).toThrow(/make must be synchronous and must not fail/);
+    expect(run).toThrow(/make must be synchronous, read no services and not fail/);
     expect(run).not.toThrow(/AsyncFiber/);
     await new Promise((resolve) => setTimeout(resolve, 50));
     // the fibers started by the failed synchronous runs were interrupted
@@ -143,11 +143,11 @@ describe('Router.fromService', () => {
     }) {}
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a cast that hides the failure from the types
     expect(() => Router.fromService(Failing as unknown as RouterService.Any)).toThrow(
-      /FailingRouter.*make must be synchronous and must not fail/,
+      /FailingRouter.*make must be synchronous, read no services and not fail/,
     );
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a cast that hides the requirement from the types
     expect(() => Router.fromService(NeedsDb as unknown as RouterService.Any)).toThrow(
-      /NeedsDbRouter.*make reads services, so this API cannot build the router/,
+      /NeedsDbRouter.*make must be synchronous, read no services and not fail/,
     );
   });
 
@@ -158,28 +158,6 @@ describe('Router.fromService', () => {
       ),
     }) {}
     expect(() => Router.fromService(Loop)).toThrow(/LoopRouter.*nests the service itself/);
-  });
-
-  it('serviceValue is the record make produced, from the same evaluation', () => {
-    let runs = 0;
-    class Inner extends Context.Service<Inner>()('ValueInnerRouter', {
-      make: Effect.succeed({ x: query({ success: Schema.String }) }),
-    }) {}
-    class Outer extends Context.Service<Outer>()('ValueOuterRouter', {
-      make: Effect.sync(() => {
-        runs++;
-        return { inner: Inner, ns: { inner: Inner }, ping: query({ success: Schema.String }) };
-      }),
-    }) {}
-    const value = Router.serviceValue(Outer);
-    expect(value.inner).toBe(Inner);
-    expect(value.ns.inner).toBe(Inner);
-    expect(Router.fromService(Outer).record.inner).toBe(Router.fromService(Inner));
-    expect(value.ping).toBe(Router.fromService(Outer).record.ping);
-    expect(Router.serviceValue(Outer)).toBe(value);
-    expect(runs).toBe(1);
-    // Without nested services the value is the router's record itself.
-    expect(Router.serviceValue(Inner)).toBe(Router.fromService(Inner).record);
   });
 
   it('a failed make is not memoized', () => {

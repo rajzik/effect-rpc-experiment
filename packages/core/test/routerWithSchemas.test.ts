@@ -125,6 +125,13 @@ describe('Router.withSchemas', () => {
     expect(makeRuns).toBe(before);
   });
 
+  it('over a service, keeps its make (the value is the raw record) and memoizes its router', async () => {
+    expect(wrapped.make).toBe(App.make);
+    const { value } = await Effect.runPromise(Router.buildService(wrapped));
+    expect(value.admin).toBe(Admin); // the class, as `Context.Service.Shape<typeof App>` types it
+    expect(Router.from(wrapped)).toBe(patched);
+  });
+
   it('withSchemas over an effectful service runs no make at import', async () => {
     const out = Router.withSchemas(DbRouter, { latest: { output: Post } });
     expect(effectfulRuns).toBe(0);
@@ -164,9 +171,9 @@ describe('Router.withSchemas', () => {
     );
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- simulates a generated file older than the router
     const forced = Router.withSchemas(App, { missing: { output: Post } } as never);
-    // `Router.from` builds it synchronously: the error names the service and the stale path
+    // `Router.from` builds it synchronously: the error names the stale path
     expect(() => Router.from(forced)).toThrow(
-      'Cannot build a router from the router service "App": Router.withSchemas: no procedure "missing" in the router (is the generated file out of date?)',
+      'Router.withSchemas: no procedure "missing" in the router (is the generated file out of date?)',
     );
   });
 

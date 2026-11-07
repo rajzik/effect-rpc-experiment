@@ -147,7 +147,7 @@ describe('Router.buildService', () => {
     ]);
   });
 
-  it('reuses a router service already built by Router.fromService', async () => {
+  it('runs make again for a router service already built by Router.fromService', async () => {
     let runs = 0;
     class Memo extends Context.Service<Memo>()('MemoRouter', {
       make: Effect.sync(() => {
@@ -160,11 +160,12 @@ describe('Router.buildService', () => {
     }) {}
     const router = Router.fromService(Memo);
     const built = await Effect.runPromise(Router.buildService(Memo));
-    expect(built.router).toBe(router);
-    expect(built.value).toBe(Router.serviceValue(Memo));
-    // Nested resolution reuses it too.
+    expect(built.router).not.toBe(router);
+    expect(runs).toBe(2);
+    // Nested resolution runs it again too.
     const outer = await Effect.runPromise(Router.buildService(Outer));
-    expect(outer.router.record.a).toBe(router);
-    expect(runs).toBe(1);
+    expect(outer.router.record.a).not.toBe(router);
+    expect(runs).toBe(3);
+    expect(Router.fromService(Memo)).toBe(router); // the synchronous APIs keep their own build
   });
 });

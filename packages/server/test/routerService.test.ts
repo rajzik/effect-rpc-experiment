@@ -93,11 +93,10 @@ describe('Handlers.fromService', () => {
     const procedures = await Effect.runPromise(
       Effect.provide(AppRouter, Handlers.fromService(AppRouter).pipe(Layer.provide(DatabaseLive))),
     );
-    // `appRouter` built AppRouter synchronously: the layer reuses that router and record.
-    expect(procedures).toBe(appRouter.record);
-    expect(procedures.post.byId).toBe(appRouter.record.post.byId);
+    // The record this build's `make` run produced (make runs per layer build).
+    expect(Object.keys(procedures)).toEqual(Object.keys(appRouter.record));
+    expect(procedures).not.toBe(appRouter.record);
     expect(Procedure.hasHandler(procedures.post.byId)).toBe(true);
-    expect(makeRuns.count).toBe(1); // every layer build in this file reused it
   });
 
   it('provides the raw make record: a nested router service stays the class', async () => {
@@ -111,42 +110,28 @@ describe('Handlers.fromService', () => {
         return { ping: Procedure.query(() => Effect.void), admin: AdminRouter };
       }),
     }) {}
-    const router = Router.from(OuterRouter);
     const procedures = await Effect.runPromise(
       Effect.provide(OuterRouter, Handlers.fromService(OuterRouter)),
     );
     // Exactly what `make` produced, as `Context.Service.Shape<typeof OuterRouter>` types it.
-    expect(procedures).toBe(Router.serviceValue(OuterRouter));
     expect(procedures.admin).toBe(AdminRouter);
     expect(Effect.isEffect(procedures.admin.make)).toBe(true);
-    expect(procedures.ping).toBe(router.record.ping);
+    expect(Procedure.hasHandler(procedures.ping)).toBe(true);
     // The router still resolves the nested service.
-    expect(router.record.admin).toBe(Router.from(AdminRouter));
-    expect(runs).toBe(1);
+    expect(Router.from(OuterRouter).record.admin).toBe(Router.from(AdminRouter));
+    expect(runs).toBe(2); // one layer build + the memoized Router.from
   });
 
-  it('reuses a router service built synchronously; otherwise runs make per layer build', async () => {
-    let runs = 0;
-    class Counted extends Context.Service<Counted>()('CountedRouter', {
-      make: Effect.sync(() => {
-        const run = ++runs;
-        return { run: Procedure.output(Schema.Finite).query(() => Effect.succeed(run)) };
-      }),
-    }) {}
-    const layer = Handlers.fromService(Counted);
-    expect(runs).toBe(0);
-    // Not built synchronously yet: the layer build runs make.
-    await Effect.runPromise(Effect.provide(Counted, layer));
-    expect(runs).toBe(1);
-    // A sync API builds (and memoizes) it; later layer builds reuse that router and record.
-    const router = Router.from(Counted);
-    expect(runs).toBe(2);
-    const procedures = await Effect.runPromise(Effect.provide(Counted, layer));
-    expect(procedures).toBe(Router.serviceValue(Counted));
-    expect(procedures.run).toBe(router.record.run);
-    await using caller = createCaller(Counted, { handlers: layer });
-    expect(await caller.$promise.run()).toBe(2); // the handler of the memoized make run
-    expect(runs).toBe(2);
+  it('runs make per layer build; the synchronous APIs evaluate it once per class', async () => {
+    Router.from(AppRouter);
+    const before = makeRuns.count;
+    const layer = Handlers.fromService(AppRouter).pipe(Layer.provide(DatabaseLive));
+    Handlers.fromProcedures(Router.from(AppRouter));
+    Router.make({ nested: AppRouter });
+    expect(makeRuns.count).toBe(before);
+    await Effect.runPromise(Effect.provide(AppRouter, layer));
+    await Effect.runPromise(Effect.provide(AppRouter, layer));
+    expect(makeRuns.count).toBe(before + 2);
   });
 
   it('fromService rejects procedures without handlers', async () => {

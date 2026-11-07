@@ -521,16 +521,12 @@ const fromProcedures = <R extends Router.Any>(
  *
  * **Gotchas**
  *
- * - `make` runs once per layer build, unless the class was already built synchronously (a pure
- *   service passed to a sync API such as `toWebHandler(AppRouter, ...)` or `Router.from`): then
- *   that memoized router and record are reused and `make` does not run again.
+ * - `make` runs once per layer build. A synchronous API given the class (`Router.from`,
+ *   `toWebHandler(AppRouter, ...)`) builds it separately, once per process.
  * - The synchronous APIs (`toWebHandler`, `createCaller`, `createClient`, ...) cannot run a `make`
  *   that reads services: give them the contract (a schema-only `Router.make` router, normally
  *   `router.client.gen.ts`) and serve the class with this layer. A `make` that needs nothing can
  *   be passed to them directly.
- * - A pure `make` that reads a `Context.Reference` (a service with a default) is memoized by the
- *   synchronous APIs with the default value: a different value provided to this layer is not seen
- *   once the class was built that way. Read such a service inside the handlers.
  * - A procedure defined with `query` / `mutation` / `subscription({...})` inside the service
  *   is a compile error naming its path; if forced with a cast, building the layer dies with an
  *   error naming the paths. Use `Handlers.make` for routers mixing both styles.
