@@ -349,12 +349,7 @@ const toWebHandlerFor = async <R extends Router.Any, LE = never>(
     throw error;
   }
   const app = layerHttp(router, {
-    path: options.path,
-    serialization: options.serialization,
-    disableTracing: options.disableTracing,
-    spanPrefix: options.spanPrefix,
-    concurrency: options.concurrency,
-    onError: options.onError,
+    ...options,
     protocol: 'http',
     handlers: Layer.succeedContext(context),
   }) as Layer.Layer<never, never, HttpRouter.HttpRouter>;

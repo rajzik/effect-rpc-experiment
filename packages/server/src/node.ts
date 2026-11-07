@@ -81,16 +81,7 @@ const appLayer = <R extends Router.Any, LE, LR>(
   router: R,
   options: NodeServeOptions<R, LE, LR>,
 ): Layer.Layer<never, LE, HttpRouter.HttpRouter | LR> =>
-  layerHttp(router, {
-    handlers: options.handlers,
-    path: options.path,
-    serialization: options.serialization,
-    disableTracing: options.disableTracing,
-    spanPrefix: options.spanPrefix,
-    concurrency: options.concurrency,
-    onError: options.onError,
-    protocol: 'http',
-  });
+  layerHttp(router, { ...options, protocol: 'http' });
 
 /** `serve` for a router. */
 const serveFor = <R extends Router.Any, LE = never, LR = never>(

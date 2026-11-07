@@ -10,28 +10,25 @@
  */
 import { Router } from '@effect-trpc/core';
 import { toWebHandler } from '@effect-trpc/server';
-import type { Handlers, Serialization, ServerOptions, WebHandler } from '@effect-trpc/server';
-import type { Layer } from 'effect';
+import type { WebHandler, WebHandlerOptions } from '@effect-trpc/server';
 
 /**
- * Options of {@link createRouteHandler}.
+ * Options of {@link createRouteHandler}: `handlers`, `serialization` and `onError` of
+ * `toWebHandler`, plus the mount `path` and `basePath`.
  *
  * **Details**
  *
- * - `handlers` is required; `path` defaults to `"/api/rpc"`; `serialization` defaults to
- *   `"ndjson"` and must match the client.
+ * - `handlers` is required and built once, on the first request; `path` defaults to
+ *   `"/api/rpc"`; `serialization` defaults to `"ndjson"` and must match the client.
  *
  * @see {@link createRouteHandler}
  * @category options
  * @since 0.1.0
  */
-export interface RouteHandlerOptions<R extends Router.Any, LE = never> {
-  /**
-   * Layer providing every handler of the router and the server implementation of every
-   * middleware it uses (`Layer.mergeAll(HandlersLive, AuthLive)`), with no remaining requirements.
-   * It is built once, on the first request.
-   */
-  readonly handlers: Layer.Layer<Handlers.Requirements<R>, LE>;
+export interface RouteHandlerOptions<R extends Router.Any, LE = never> extends Pick<
+  WebHandlerOptions<R, LE>,
+  'handlers' | 'serialization' | 'onError'
+> {
   /**
    * Path of the route handler, i.e. the folder of `route.ts` below `app/`. Defaults to
    * `"/api/rpc"` (`app/api/rpc/[[...rpc]]/route.ts` or `app/api/rpc/route.ts`). Requests below
@@ -43,13 +40,6 @@ export interface RouteHandlerOptions<R extends Router.Any, LE = never> {
    * accepted with and without it.
    */
   readonly basePath?: `/${string}` | undefined;
-  /** Wire format, must match the client's `httpLink`. Defaults to `"ndjson"`. */
-  readonly serialization?: Serialization | undefined;
-  /**
-   * Called for every call that fails while running (handler or middleware), before the failure
-   * is sent (see `OnErrorInfo` in `@effect-trpc/server`).
-   */
-  readonly onError?: ServerOptions['onError'];
 }
 
 /**
@@ -136,12 +126,7 @@ const createRouteHandlerFor = <R extends Router.Any, LE = never>(
   let disposed: Promise<void> | undefined;
 
   const getServer = (): Promise<WebHandler> => {
-    server ??= toWebHandler(router, {
-      handlers: options.handlers,
-      path,
-      serialization: options.serialization,
-      onError: options.onError,
-    }).catch((error: unknown) => {
+    server ??= toWebHandler(router, { ...options, path }).catch((error: unknown) => {
       // Let the next request retry instead of caching the failure forever.
       server = undefined;
       throw error;

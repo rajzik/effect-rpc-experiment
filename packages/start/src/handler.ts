@@ -127,15 +127,7 @@ const createStartHandlerFor = <R extends Router.Any, LE = never>(
   let disposed: Promise<void> | undefined;
 
   const build = (): Promise<WebHandler> => {
-    web ??= toWebHandler(router, {
-      handlers: options.handlers,
-      path,
-      serialization: options.serialization,
-      disableTracing: options.disableTracing,
-      spanPrefix: options.spanPrefix,
-      concurrency: options.concurrency,
-      onError: options.onError,
-    }).catch((error: unknown) => {
+    web ??= toWebHandler(router, { ...options, path }).catch((error: unknown) => {
       web = undefined;
       throw error;
     });
