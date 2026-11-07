@@ -11,13 +11,13 @@ catalogs:
       version: 0.87.3
     '@effect/platform-node':
       specifier: ^4.0.1
-      version: 4.0.1
+      version: 4.0.7
     '@effect/tsgo':
       specifier: 0.67.1
       version: 0.67.1
     '@effect/vitest':
       specifier: ^4.0.1
-      version: 4.0.1
+      version: 4.0.7
     '@fontsource/inter':
       specifier: ^5.3.0
       version: 5.3.0
@@ -56,7 +56,7 @@ catalogs:
       version: 7.0.0-dev.20260707.2
     effect:
       specifier: ^4.0.1
-      version: 4.0.1
+      version: 4.0.7
     electron:
       specifier: ^44.5.1
       version: 44.5.1
@@ -147,7 +147,7 @@ importers:
         version: 5.104.1(react@19.3.0)
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
       react:
         specifier: 'catalog:'
         version: 19.3.0
@@ -196,7 +196,7 @@ importers:
         version: 5.104.1(react@19.3.0)
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
       next:
         specifier: 'catalog:'
         version: 16.3.8(@babel/core@7.29.7)(@playwright/test@1.64.1)(@types/node@24.19.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -239,7 +239,7 @@ importers:
         version: 5.104.1(react@19.3.0)
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
       react:
         specifier: 'catalog:'
         version: 19.3.0
@@ -288,7 +288,7 @@ importers:
         version: 1.168.60(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(esbuild@0.21.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rollup@4.67.5)
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
       react:
         specifier: 'catalog:'
         version: 19.3.0
@@ -316,11 +316,11 @@ importers:
         version: link:../core
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
     devDependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.0.1(effect@4.0.1)(redis@6.3.0)
+        version: 4.0.7(effect@4.0.7)(redis@6.3.0)
 
   packages/codegen:
     dependencies:
@@ -342,7 +342,7 @@ importers:
         version: 24.19.1
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
       esbuild:
         specifier: 'catalog:'
         version: 0.21.5
@@ -360,7 +360,7 @@ importers:
     dependencies:
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
 
   packages/e2e:
     devDependencies:
@@ -390,7 +390,7 @@ importers:
         version: link:../test-utils
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.0.1(effect@4.0.1)(redis@6.3.0)
+        version: 4.0.7(effect@4.0.7)(redis@6.3.0)
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.104.1(react@19.3.0)
@@ -408,7 +408,7 @@ importers:
         version: 19.3.0(@types/react@19.3.0)
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
       jsdom:
         specifier: 'catalog:'
         version: 30.1.2
@@ -432,14 +432,14 @@ importers:
         version: link:../server
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
     devDependencies:
       '@effect-trpc/test-utils':
         specifier: workspace:*
         version: link:../test-utils
       '@effect/vitest':
         specifier: 'catalog:'
-        version: 4.0.1(effect@4.0.1)(vitest@5.0.5)
+        version: 4.0.7(effect@4.0.7)(vitest@5.0.5)
       electron:
         specifier: 'catalog:'
         version: 44.5.1
@@ -460,14 +460,14 @@ importers:
         version: link:../tanstack-react-query
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
     devDependencies:
       '@effect-trpc/test-utils':
         specifier: workspace:*
         version: link:../test-utils
       '@effect/vitest':
         specifier: 'catalog:'
-        version: 4.0.1(effect@4.0.1)(vitest@5.0.5)
+        version: 4.0.7(effect@4.0.7)(vitest@5.0.5)
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.104.1(react@19.3.0)
@@ -497,11 +497,11 @@ importers:
         version: link:../core
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
     devDependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.0.1(effect@4.0.1)(redis@6.3.0)
+        version: 4.0.7(effect@4.0.7)(redis@6.3.0)
 
   packages/start:
     dependencies:
@@ -519,14 +519,14 @@ importers:
         version: link:../tanstack-react-query
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
     devDependencies:
       '@effect-trpc/test-utils':
         specifier: workspace:*
         version: link:../test-utils
       '@effect/vitest':
         specifier: 'catalog:'
-        version: 4.0.1(effect@4.0.1)(vitest@5.0.5)
+        version: 4.0.7(effect@4.0.7)(vitest@5.0.5)
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.104.1(react@19.3.0)
@@ -556,7 +556,7 @@ importers:
         version: link:../core
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
     devDependencies:
       '@effect-trpc/server':
         specifier: workspace:*
@@ -566,7 +566,7 @@ importers:
         version: link:../test-utils
       '@effect/vitest':
         specifier: 'catalog:'
-        version: 4.0.1(effect@4.0.1)(vitest@5.0.5)
+        version: 4.0.7(effect@4.0.7)(vitest@5.0.5)
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.104.1(react@19.3.0)
@@ -605,13 +605,13 @@ importers:
         version: link:../server
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.0.1(effect@4.0.1)(redis@6.3.0)
+        version: 4.0.7(effect@4.0.7)(redis@6.3.0)
       '@effect/vitest':
         specifier: 'catalog:'
-        version: 4.0.1(effect@4.0.1)(vitest@5.0.5)
+        version: 4.0.7(effect@4.0.7)(vitest@5.0.5)
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
 
   site:
     devDependencies:
@@ -641,10 +641,10 @@ importers:
         version: link:../packages/test-utils
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.0.1(effect@4.0.1)(redis@6.3.0)
+        version: 4.0.7(effect@4.0.7)(redis@6.3.0)
       '@effect/vitest':
         specifier: 'catalog:'
-        version: 4.0.1(effect@4.0.1)(vitest@5.0.5)
+        version: 4.0.7(effect@4.0.7)(vitest@5.0.5)
       '@fontsource/inter':
         specifier: 'catalog:'
         version: 5.3.0
@@ -671,7 +671,7 @@ importers:
         version: 19.3.0(@types/react@19.3.0)
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.7
       electron:
         specifier: 'catalog:'
         version: 44.5.1
@@ -921,17 +921,17 @@ packages:
     resolution: {integrity: sha512-g1OmRBZF5chbW9QMNoirPo5Bb4zzU2HfP88tR7/VSZEUxHJ1/qVb8AQ0kUh2ggctLH1I715yCwP4gkw56PTjpQ==}
     hasBin: true
 
-  '@effect/platform-node-shared@4.0.1':
-    resolution: {integrity: sha512-VanaejudEhKJ4mpmqnEzdncVUhN6sGSO9ZDND54mRxAlZxj+4dYAWjDTYAy9o4tJo9aALeP2U8cVcOFzEdSeLg==}
+  '@effect/platform-node-shared@4.0.7':
+    resolution: {integrity: sha512-uCeBJ00hliKQsb7gMfvyEXUL1XmUKQcRzKi1X8ISG0UxTDMAdPRigOyKDnKxUTxE5PoT4kxLHQvOxo6U405FGg==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: ^4.0.1
+      effect: ^4.0.7
 
-  '@effect/platform-node@4.0.1':
-    resolution: {integrity: sha512-FT0Fu5LO0/XP9zBpj0HqrtJNLluK4StNKqf6TSulUsjp8FPBsDVXGJiDuyoN5J2yVMT7tgvhxSwaDcObWVRIaQ==}
+  '@effect/platform-node@4.0.7':
+    resolution: {integrity: sha512-YXUh0A4ZjuPAONt/yXb5zBM7zPR6eUPYUBtyj1374zq0P5SUpdcz8Lf54JSavXb8mdrc1glsXWHFVINpJyrlWA==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: ^4.0.1
+      effect: ^4.0.7
       redis: '>=5.0.0 <7.0.0'
 
   '@effect/tsgo-darwin-arm64@0.67.1':
@@ -973,10 +973,10 @@ packages:
     resolution: {integrity: sha512-rQLQ3vAStYEPQX3+gCv4AM9ehhmJjWYwY9itqFKVs9NEtRQg6msKH6qo9VYebikDPUDiKOaJJwQAeRcYeybCug==}
     hasBin: true
 
-  '@effect/vitest@4.0.1':
-    resolution: {integrity: sha512-DbY9kf/018zBxRIX7rJwBnPVPzSarnUpcshm0vfYPFiDkSa7AFrXTh2BlDNUbrdrmqcIOBhVZ7GkEtxf8WiQrg==}
+  '@effect/vitest@4.0.7':
+    resolution: {integrity: sha512-WdF1w9K65ZyjeDAUfUxDOCBSEgVjUtJfM+G83KAE3mKoZcO6aGgrRoKgwiDKsACAmVWT3zG5hDhwNH3GQg++FQ==}
     peerDependencies:
-      effect: ^4.0.1
+      effect: ^4.0.7
       vitest: 5.0.5
 
   '@electron-internal/extract-zip@1.0.5':
@@ -2723,8 +2723,8 @@ packages:
   dom-accessibility-api@0.5.16:
     resolution: {integrity: sha512-X7BJ2yElsnOJ30pZF4uIIDfBEVgF4XEBxL9Bxhy6dnrm5hkzqmsWHGTiHqRiITNhMyFLyAiWndIJP7Z1NTteDg==}
 
-  effect@4.0.1:
-    resolution: {integrity: sha512-b1VlQG9g8fwxE5QnIZuPoOP/0MsqHJSRKxUijjoM80E5q95FXrX5yWtY5XI8G+GJsBQAVSDbLS458z9a++uVvw==}
+  effect@4.0.7:
+    resolution: {integrity: sha512-47CiUzNAmeLr40pDT9vKMxxtB8o3bdpZEKU4IUM3fVxsK2GYzPsV7fQoZP0I41A308BZd71nMxqJ0KRh3s9u2g==}
 
   electron-to-chromium@1.5.444:
     resolution: {integrity: sha512-5ss/uJfoDYDHT0lfJzT6FbcskIzROIOPf0BbbFkGcvDzoJU7i//9GDrwwIHQVmIsrAGiF3ihpADBRIsrEFt1rQ==}
@@ -3337,6 +3337,10 @@ packages:
     resolution: {integrity: sha512-u4UB2/IrKdU6lFxumHmmo1a3fCQO5tzQllRorfoRS63txhrB7xTpSn1PftwC4qEHkOaqP95fCWW4lJzwErwzhQ==}
     engines: {node: '>=22.19.0'}
 
+  undici@8.12.4:
+    resolution: {integrity: sha512-8Mx+uNKKER2bA4AdtedkqRbwUCIJFr2nJckXRe5yrDqzePqwLP7VNcctN8/XdmDSbF7mS+jJKIszlL+vbam1VA==}
+    engines: {node: '>=22.19.0'}
+
   unist-util-is@6.0.1:
     resolution: {integrity: sha512-LsiILbtBETkDz8I9p1dQ0uyRUWuaQzd/cuEeS1hoRSyW5E5XGmTzlwY1OrNzzakGowI9Dr/I8HVaw4hTtnxy8g==}
 
@@ -3876,21 +3880,21 @@ snapshots:
 
   '@effect/language-service@0.87.3': {}
 
-  '@effect/platform-node-shared@4.0.1(effect@4.0.1)':
+  '@effect/platform-node-shared@4.0.7(effect@4.0.7)':
     dependencies:
       '@types/ws': 8.18.2
-      effect: 4.0.1
+      effect: 4.0.7
       ws: 8.22.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.0.1(effect@4.0.1)(redis@6.3.0)':
+  '@effect/platform-node@4.0.7(effect@4.0.7)(redis@6.3.0)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.1(effect@4.0.1)
-      effect: 4.0.1
+      '@effect/platform-node-shared': 4.0.7(effect@4.0.7)
+      effect: 4.0.7
       redis: 6.3.0
-      undici: 8.11.2
+      undici: 8.12.4
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -3926,9 +3930,9 @@ snapshots:
       '@effect/tsgo-win32-arm64': 0.67.1
       '@effect/tsgo-win32-x64': 0.67.1
 
-  '@effect/vitest@4.0.1(effect@4.0.1)(vitest@5.0.5)':
+  '@effect/vitest@4.0.7(effect@4.0.7)(vitest@5.0.5)':
     dependencies:
-      effect: 4.0.1
+      effect: 4.0.7
       vitest: 5.0.5(@types/node@24.19.1)(@vitest/browser-preview@5.0.5)(@vitest/ui@5.0.5)(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.19.1)(@typescript/native-preview@7.0.0-dev.20260707.2)(jiti@2.7.0)(typescript@7.0.2))(jsdom@30.1.2)
 
   '@electron-internal/extract-zip@1.0.5': {}
@@ -5314,7 +5318,7 @@ snapshots:
 
   dom-accessibility-api@0.5.16: {}
 
-  effect@4.0.1: {}
+  effect@4.0.7: {}
 
   electron-to-chromium@1.5.444: {}
 
@@ -6007,6 +6011,8 @@ snapshots:
     optional: true
 
   undici@8.11.2: {}
+
+  undici@8.12.4: {}
 
   unist-util-is@6.0.1:
     dependencies:

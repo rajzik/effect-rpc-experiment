@@ -57,10 +57,10 @@ const onResponse = (
   Effect.flatMap(request, (option) =>
     Option.isNone(option) || isWebSocketUpgrade(option.value)
       ? Effect.void
-      : Effect.sync(() =>
-          HttpEffect.appendPreResponseHandlerUnsafe(option.value, (_, response) =>
-            Effect.succeed(update(response)),
-          ),
+      : Effect.provideService(
+          HttpEffect.appendPreResponseHandler((_, response) => Effect.succeed(update(response))),
+          HttpServerRequest.HttpServerRequest,
+          option.value,
         ),
   );
 
