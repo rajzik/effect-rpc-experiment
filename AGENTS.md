@@ -1,22 +1,29 @@
 # Agent guide for effect-trpc
 
 This monorepo is a tRPC-style typed RPC layer for Effect v4 plus a TanStack React Query bridge and
-framework adapters. Read `README.md` for the package map and `.unlazy/effect-trpc/PLAN.md` (when
-present) for the active contract.
+framework adapters. Read `README.md` for bootstrap and the package map, then the `## For AI agents`
+section of each package you touch. For a task with an approved design or plan in
+`docs/superpowers/`, read the relevant document; keep shared contracts in tracked files.
+
+Before choosing tests or handing back code changes, read
+[the verification skill](.agents/skills/verify-effect-trpc/SKILL.md).
 
 ## Toolchain (Vite+, tsgo, Oxlint)
 
 Always run commands through the project-local Vite+ CLI from the repository root
 (`pnpm exec vp ...`, or `node_modules/.bin/vp ...`). Never install node/pnpm/tooling via Homebrew.
 
-| Task                                                | Command                                          |
-| --------------------------------------------------- | ------------------------------------------------ |
-| format + lint (incl. Effect rules) + type-check     | `pnpm check` (`pnpm check --fix` to autofix)     |
-| type-check only (TypeScript 7 / tsgo project build) | `vp run typecheck`                               |
-| test one package (runtime + type tests)             | `vp -C packages/<name> test`                     |
-| test everything                                     | `vp run -r test`                                 |
-| build one package / all                             | `vp -C packages/<name> pack` / `vp run -r build` |
-| JSDoc contract + type-check examples (after build)  | `node scripts/verify-jsdoc.mjs [<name>...]`      |
+| Task                                                | Command                                      |
+| --------------------------------------------------- | -------------------------------------------- |
+| format + lint (incl. Effect rules) + type-check     | `pnpm check` (`pnpm check --fix` to autofix) |
+| type-check only (TypeScript 7 / tsgo project build) | `pnpm exec vp run typecheck`                 |
+| test one package (runtime + type tests)             | `pnpm exec vp -C packages/<name> test`       |
+| test everything                                     | `pnpm exec vp run -r test`                   |
+| build all packages                                  | `pnpm exec vp run -r build`                  |
+| JSDoc contract + type-check examples (after build)  | `node scripts/verify-jsdoc.mjs [<name>...]`  |
+
+Build the workspace before checks on a fresh checkout: package exports resolve through `dist/`.
+`pnpm ready` runs the full CI sequence with the build first.
 
 `vp test` is a built-in (Vitest 5). Import test APIs from `vite-plus/test` (or `@effect/vitest` for
 `it.effect`). React tests need `// @vitest-environment jsdom` at the top of the file. Type tests
@@ -72,9 +79,7 @@ When unsure, grep `node_modules/effect/dist/**/*.d.ts` — do not trust memory o
 
 ## Review checklist
 
-- [ ] `pnpm check` passes (format, lint incl. Effect rules, type-check)
-- [ ] `vp run typecheck` passes
-- [ ] `vp -C packages/<name> test` passes with no type errors
-- [ ] `vp -C packages/<name> pack` builds
-- [ ] `node scripts/verify-jsdoc.mjs <name>` passes (after `pack`)
-- [ ] README (incl. `## For AI agents`) and `test/PARITY.md` updated
+- [ ] Verification scope selected and commands passed per the verification skill.
+- [ ] Changed API documented in JSDoc and the package README, including `## For AI agents`.
+- [ ] `test/PARITY.md` updated when adding or changing ported tRPC coverage.
+- [ ] Handback states what changed, commands run, and any failures or checks not run.
