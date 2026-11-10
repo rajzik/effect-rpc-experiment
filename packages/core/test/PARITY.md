@@ -1,4 +1,4 @@
-# @effect-trpc/core — tRPC test parity
+# @rpc-effect/core — tRPC test parity
 
 Core-level tRPC tests (see `docs/trpc-test-inventory.txt`) and where their behaviour is covered.
 

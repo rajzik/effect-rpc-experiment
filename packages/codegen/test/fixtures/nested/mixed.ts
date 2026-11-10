@@ -1,6 +1,6 @@
 // A nested-records-only router service next to another router.
 import { Context, Effect, Schema } from 'effect';
-import { Procedure, Router } from '@effect-trpc/core';
+import { Procedure, Router } from '@rpc-effect/core';
 
 export class NestedRouter extends Context.Service<NestedRouter>()('NestedRouter', {
   make: Effect.gen(function* () {

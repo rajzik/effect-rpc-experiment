@@ -5,7 +5,7 @@
  * A procedure definition is a plain description: payload/success/error schemas, a kind,
  * optional `RpcMiddleware` and optional annotations (tRPC's `meta`). `Router.make` compiles
  * definitions into `effect/rpc` rpcs whose tags are the dot-joined router paths;
- * `@effect-trpc/server` implements them and `@effect-trpc/client` calls them.
+ * `@rpc-effect/server` implements them and `@rpc-effect/client` calls them.
  *
  * @since 0.1.0
  */
@@ -15,7 +15,7 @@ import type { RpcMiddleware, RpcSchema } from 'effect/rpc';
 import type { ProcedureWithHandler } from './ProcedureBuilder.js';
 import { ProcedureKind } from './ProcedureKind.js';
 
-const TypeId = '~@effect-trpc/core/ProcedureDef' as const;
+const TypeId = '~@rpc-effect/core/ProcedureDef' as const;
 
 /**
  * What a builder accepts as `payload`: a schema, or `Schema.Struct` fields.
@@ -29,7 +29,7 @@ const TypeId = '~@effect-trpc/core/ProcedureDef' as const;
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query } from '@effect-trpc/core';
+ * import { query } from '@rpc-effect/core';
  *
  * const a = query({ payload: { id: Schema.Number } });
  * const b = query({ payload: Schema.Struct({ id: Schema.Number }) });
@@ -48,7 +48,7 @@ export type PayloadInput = Schema.Top | Schema.Struct.Fields;
  *
  * ```ts
  * import { Schema } from 'effect';
- * import type { NormalizePayload } from '@effect-trpc/core';
+ * import type { NormalizePayload } from '@rpc-effect/core';
  *
  * type Payload = NormalizePayload<{ readonly id: typeof Schema.Number }>;
  * // Schema.Struct<{ readonly id: typeof Schema.Number }>
@@ -88,8 +88,8 @@ export type NormalizePayload<P> = P extends Schema.Struct.Fields ? Schema.Struct
  * ```ts
  * import { Schema } from 'effect';
  * import { RpcMiddleware } from 'effect/rpc';
- * import { mutation } from '@effect-trpc/core';
- * import type { inferError } from '@effect-trpc/core';
+ * import { mutation } from '@rpc-effect/core';
+ * import type { inferError } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class Unauthorized extends Schema.TaggedError<Unauthorized>()('Unauthorized', {}) {}
@@ -104,7 +104,7 @@ export type NormalizePayload<P> = P extends Schema.Struct.Fields ? Schema.Struct
  * ```ts
  * import { Context, Effect, Layer, Schema } from 'effect';
  * import { RpcMiddleware } from 'effect/rpc';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  *
  * class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {}) {}
  * class CurrentUser extends Context.Service<CurrentUser, { readonly roles: ReadonlyArray<string> }>()(
@@ -309,8 +309,8 @@ type DefOf<D> =
  * ```ts
  * import { Schema } from 'effect';
  * import { RpcMiddleware } from 'effect/rpc';
- * import { query, subscription } from '@effect-trpc/core';
- * import type { inferError, inferInput, inferKind, inferOutput } from '@effect-trpc/core';
+ * import { query, subscription } from '@rpc-effect/core';
+ * import type { inferError, inferInput, inferKind, inferOutput } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -339,8 +339,8 @@ export type inferInput<D extends ProcedureDef.Any> = TypesOf<D>['input'];
  * ```ts
  * import { Schema } from 'effect';
  * import { RpcMiddleware } from 'effect/rpc';
- * import { query, subscription } from '@effect-trpc/core';
- * import type { inferError, inferInput, inferKind, inferOutput } from '@effect-trpc/core';
+ * import { query, subscription } from '@rpc-effect/core';
+ * import type { inferError, inferInput, inferKind, inferOutput } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -373,8 +373,8 @@ export type inferOutput<D extends ProcedureDef.Any> = TypesOf<D>['output'];
  * ```ts
  * import { Schema } from 'effect';
  * import { RpcMiddleware } from 'effect/rpc';
- * import { query, subscription } from '@effect-trpc/core';
- * import type { inferError, inferInput, inferKind, inferOutput } from '@effect-trpc/core';
+ * import { query, subscription } from '@rpc-effect/core';
+ * import type { inferError, inferInput, inferKind, inferOutput } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -403,8 +403,8 @@ export type inferError<D extends ProcedureDef.Any> = TypesOf<D>['error'];
  * ```ts
  * import { Schema } from 'effect';
  * import { RpcMiddleware } from 'effect/rpc';
- * import { query, subscription } from '@effect-trpc/core';
- * import type { inferError, inferInput, inferKind, inferOutput } from '@effect-trpc/core';
+ * import { query, subscription } from '@rpc-effect/core';
+ * import type { inferError, inferInput, inferKind, inferOutput } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -445,7 +445,7 @@ type TypesOf<D> = D extends unknown
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { isProcedureDef, query } from '@effect-trpc/core';
+ * import { isProcedureDef, query } from '@rpc-effect/core';
  *
  * const record: Record<string, unknown> = {
  *   health: query({ success: Schema.Literal('ok') }),
@@ -603,7 +603,7 @@ export const define = (
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -662,7 +662,7 @@ export const query = <
  * ```ts
  * import { Schema } from 'effect';
  * import { RpcMiddleware } from 'effect/rpc';
- * import { mutation, Router } from '@effect-trpc/core';
+ * import { mutation, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', { reason: Schema.String }) {}
@@ -720,7 +720,7 @@ export const mutation = <
  *
  * ```ts
  * import { Schema, Stream } from 'effect';
- * import { Router, subscription } from '@effect-trpc/core';
+ * import { Router, subscription } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  *

@@ -3,7 +3,7 @@
  * `'use client'` directive and no hooks, so server components, loaders and route modules can import
  * it to prefetch exactly the queries the components read.
  */
-import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
 
 import type { AppRouter } from '../domain';
 

@@ -29,7 +29,7 @@ export default defineConfig({
       'site/api/**',
       // Written by the TanStack Router plugin on every build; it asks to be left unlinted.
       'examples/*/src/routeTree.gen.ts',
-      // Written by @effect-trpc/codegen (its test fixtures): one-line chains, `Schema.Number` for
+      // Written by @rpc-effect/codegen (its test fixtures): one-line chains, `Schema.Number` for
       // TS `number`. `test/generate.test.ts` type-checks them (contract check included).
       'packages/codegen/test/fixtures/**/*.gen.ts',
       'packages/codegen/test/.tmp/**',

@@ -1,7 +1,7 @@
 import type { Effect, Layer, Stream } from 'effect';
-import type { RpcTransportError } from '@effect-trpc/core';
-import type { Client } from '@effect-trpc/client';
-import type { Caller } from '@effect-trpc/server';
+import type { RpcTransportError } from '@rpc-effect/core';
+import type { Client } from '@rpc-effect/client';
+import type { Caller } from '@rpc-effect/server';
 import { describe, expectTypeOf, it } from 'vite-plus/test';
 import {
   assertInstance,

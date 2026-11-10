@@ -1,6 +1,6 @@
 // src/routes/api/rpc.$.ts
 import { createFileRoute } from '@tanstack/react-router';
-import { createStartHandler } from '@effect-trpc/start';
+import { createStartHandler } from '@rpc-effect/start';
 
 import { appRouter } from '@/router';
 import { ServerLive } from '@/server';

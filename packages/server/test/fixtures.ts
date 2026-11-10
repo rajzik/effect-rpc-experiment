@@ -1,5 +1,5 @@
 import { Cause, Context, Effect, Exit, Layer, Schema, Stream } from 'effect';
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
 import { Handlers, Middleware } from '../src/index.js';
 
 export class User extends Schema.Class<User>('User')({

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 // Port of trpc/packages/tanstack-react-query/test/polymorphism.test.tsx: a router factory mounted
 // several times, and components written once against the abstract options proxy of the factory.
-import { createClient, localLink } from '@effect-trpc/client';
-import { mutation, query, Router } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { createClient, localLink } from '@rpc-effect/client';
+import { mutation, query, Router } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import {
   QueryClient,
   QueryClientProvider,

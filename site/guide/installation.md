@@ -1,45 +1,45 @@
 # Installation
 
 Install `effect` and the packages for the parts of your app that need them. Every package depends
-on `@effect-trpc/core`, which depends on `effect`.
+on `@rpc-effect/core`, which depends on `effect`.
 
 ## By job
 
 ::: code-group
 
 ```sh [Server]
-pnpm add effect @effect-trpc/core @effect-trpc/server
-# a standalone Node server (optional peer of @effect-trpc/server/node):
+pnpm add effect @rpc-effect/core @rpc-effect/server
+# a standalone Node server (optional peer of @rpc-effect/server/node):
 pnpm add @effect/platform-node
 ```
 
 ```sh [Client]
-pnpm add effect @effect-trpc/core @effect-trpc/client
+pnpm add effect @rpc-effect/core @rpc-effect/client
 ```
 
 ```sh [React]
-pnpm add effect @effect-trpc/core @effect-trpc/client @effect-trpc/tanstack-react-query \
+pnpm add effect @rpc-effect/core @rpc-effect/client @rpc-effect/tanstack-react-query \
   @tanstack/react-query react
 ```
 
 ```sh [Next.js]
-pnpm add effect @effect-trpc/core @effect-trpc/server @effect-trpc/client \
-  @effect-trpc/tanstack-react-query @effect-trpc/next @tanstack/react-query next react
+pnpm add effect @rpc-effect/core @rpc-effect/server @rpc-effect/client \
+  @rpc-effect/tanstack-react-query @rpc-effect/next @tanstack/react-query next react
 ```
 
 ```sh [TanStack Start]
-pnpm add effect @effect-trpc/core @effect-trpc/server @effect-trpc/client \
-  @effect-trpc/tanstack-react-query @effect-trpc/start \
+pnpm add effect @rpc-effect/core @rpc-effect/server @rpc-effect/client \
+  @rpc-effect/tanstack-react-query @rpc-effect/start \
   @tanstack/react-query @tanstack/react-start @tanstack/react-router react
 ```
 
 ```sh [Electron]
-pnpm add effect @effect-trpc/core @effect-trpc/server @effect-trpc/client @effect-trpc/electron
+pnpm add effect @rpc-effect/core @rpc-effect/server @rpc-effect/client @rpc-effect/electron
 pnpm add -D electron
 ```
 
 ```sh [Testing]
-pnpm add -D @effect-trpc/test-utils @effect/vitest vitest
+pnpm add -D @rpc-effect/test-utils @effect/vitest vitest
 ```
 
 :::
@@ -48,13 +48,13 @@ npm, yarn and bun work the same way.
 
 ## Peer dependencies
 
-| Package                             | Peers                                                                               |
-| ----------------------------------- | ----------------------------------------------------------------------------------- |
-| `@effect-trpc/server`               | `@effect/platform-node` `^4.0.1`, optional: only `@effect-trpc/server/node` uses it |
-| `@effect-trpc/tanstack-react-query` | `@tanstack/react-query` `^5.100.0`, `react` `>=18.2.0`                              |
-| `@effect-trpc/next`                 | the above plus `next` `>=15.0.0`                                                    |
-| `@effect-trpc/start`                | the above plus `@tanstack/react-start` and `@tanstack/react-router` `>=1.150.0`     |
-| `@effect-trpc/electron`             | `electron` `>=30.0.0`                                                               |
+| Package                            | Peers                                                                              |
+| ---------------------------------- | ---------------------------------------------------------------------------------- |
+| `@rpc-effect/server`               | `@effect/platform-node` `^4.0.1`, optional: only `@rpc-effect/server/node` uses it |
+| `@rpc-effect/tanstack-react-query` | `@tanstack/react-query` `^5.100.0`, `react` `>=18.2.0`                             |
+| `@rpc-effect/next`                 | the above plus `next` `>=15.0.0`                                                   |
+| `@rpc-effect/start`                | the above plus `@tanstack/react-start` and `@tanstack/react-router` `>=1.150.0`    |
+| `@rpc-effect/electron`             | `electron` `>=30.0.0`                                                              |
 
 ## TypeScript
 

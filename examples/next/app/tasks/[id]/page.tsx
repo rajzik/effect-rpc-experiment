@@ -1,4 +1,4 @@
-import { taskDetailOptions } from '@effect-trpc-examples/shared/ui';
+import { taskDetailOptions } from '@rpc-effect-examples/shared/ui';
 
 import { getQueryClient, HydrateClient, rpc } from '@/trpc/server';
 

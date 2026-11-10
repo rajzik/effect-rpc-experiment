@@ -1,6 +1,6 @@
 import { Context, Effect, Layer } from 'effect';
-import { Procedure } from '@effect-trpc/core';
-import type { Router } from '@effect-trpc/core';
+import { Procedure } from '@rpc-effect/core';
+import type { Router } from '@rpc-effect/core';
 import { describe, expectTypeOf, it } from 'vite-plus/test';
 import { createClient, localLink } from '../src/index.js';
 import type { Client, CreateClientOptions } from '../src/index.js';

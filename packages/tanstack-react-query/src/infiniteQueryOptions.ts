@@ -254,8 +254,8 @@ export interface UnusedSkipTokenRpcInfiniteQueryOptionsOut<
  * **Example** (A "load more" list)
  *
  * ```tsx
- * import { query, Router } from '@effect-trpc/core';
- * import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import { query, Router } from '@rpc-effect/core';
+ * import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
  * import { useInfiniteQuery } from '@tanstack/react-query';
  * import { Schema } from 'effect';
  *
@@ -295,9 +295,9 @@ export interface UnusedSkipTokenRpcInfiniteQueryOptionsOut<
  * **Example** (Prefetching two pages outside React)
  *
  * ```ts
- * import type { Client } from '@effect-trpc/client';
- * import { query, Router } from '@effect-trpc/core';
- * import { createRpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import type { Client } from '@rpc-effect/client';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createRpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
  * import { QueryClient } from '@tanstack/react-query';
  * import { Schema } from 'effect';
  *

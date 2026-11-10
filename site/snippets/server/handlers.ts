@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, Stream } from 'effect';
-import { Handlers } from '@effect-trpc/server';
+import { Handlers } from '@rpc-effect/server';
 
 import { appRouter, Forbidden, Post, PostNotFound, PostPage } from '@/router';
 

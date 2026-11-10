@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Port of trpc/packages/tanstack-react-query/test/queryKeyable.test.tsx
-import { createClient, localLink } from '@effect-trpc/client';
-import type { ClientError } from '@effect-trpc/core';
+import { createClient, localLink } from '@rpc-effect/client';
+import type { ClientError } from '@rpc-effect/core';
 import { QueryClient, type QueryFilters } from '@tanstack/react-query';
 import * as React from 'react';
 import { describe, expect, expectTypeOf, test } from 'vite-plus/test';

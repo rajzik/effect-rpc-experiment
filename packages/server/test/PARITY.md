@@ -1,4 +1,4 @@
-# @effect-trpc/server — tRPC test parity
+# @rpc-effect/server — tRPC test parity
 
 Server-level tRPC tests (paths as listed in `docs/trpc-test-inventory.txt`) and the local test
 file that ports their behaviour. One row per (tRPC file, local file) pair.

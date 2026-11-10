@@ -1,4 +1,4 @@
-import { createClient, httpLink } from '@effect-trpc/client';
+import { createClient, httpLink } from '@rpc-effect/client';
 
 import { appRouter } from '@/router';
 

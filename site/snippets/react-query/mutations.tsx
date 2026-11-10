@@ -1,6 +1,6 @@
 import { QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createClient, httpLink } from '@effect-trpc/client';
-import { createRpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import { createClient, httpLink } from '@rpc-effect/client';
+import { createRpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
 
 import { appRouter } from '@/router';
 

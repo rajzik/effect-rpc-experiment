@@ -1,5 +1,5 @@
 /**
- * The schema generator as a Vite plugin (see `@effect-trpc/codegen/unplugin`).
+ * The schema generator as a Vite plugin (see `@rpc-effect/codegen/unplugin`).
  *
  * @since 0.1.0
  */
@@ -26,7 +26,7 @@ import { unplugin } from './unplugin.js';
  *
  * ```ts
  * // vite.config.ts
- * import { effectTrpcCodegen } from '@effect-trpc/codegen/vite';
+ * import { effectTrpcCodegen } from '@rpc-effect/codegen/vite';
  *
  * export default {
  *   plugins: [effectTrpcCodegen({ routers: ['src/router.ts'] })],

@@ -1,7 +1,7 @@
 // `createClient` accepts a router service class directly: results are decoded to class instances
 // and typed errors, over the Promise client and `$effect`.
 import { Effect, Stream } from 'effect';
-import { Router } from '@effect-trpc/core';
+import { Router } from '@rpc-effect/core';
 import { describe, expect, it } from 'vite-plus/test';
 import { createClient, localLink } from '../src/index.js';
 import { drain, rejectionOf } from './helpers.js';

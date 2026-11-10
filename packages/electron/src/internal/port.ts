@@ -12,10 +12,10 @@ import type { AnyPort, Frame, PortLike } from '../types.js';
  * closes its port, so the peer learns about the shutdown even where the platform does not emit
  * a `close` event (e.g. a renderer `MessagePort` whose peer was closed in the main process).
  */
-export const closeFrame = '"@effect-trpc/electron/close"';
+export const closeFrame = '"@rpc-effect/electron/close"';
 
 /** Frame the server sends when it attaches a port, so the client knows it is connected. */
-export const readyFrame = '"@effect-trpc/electron/ready"';
+export const readyFrame = '"@rpc-effect/electron/ready"';
 
 const isWebPort = (port: AnyPort): port is PortLike =>
   typeof (port as Partial<PortLike>).addEventListener === 'function';

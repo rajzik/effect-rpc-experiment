@@ -2,7 +2,7 @@
  * Typed errors in the UI: one place that turns a client error into the text users see, and the
  * alert that shows it.
  */
-import type { ClientError } from '@effect-trpc/core';
+import type { ClientError } from '@rpc-effect/core';
 
 import type { Forbidden, TaskNotFound, Unauthorized, ValidationFailed } from '../domain';
 

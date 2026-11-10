@@ -2,7 +2,7 @@ import { MessageChannel } from 'node:worker_threads';
 import { Effect, Exit, Scope } from 'effect';
 import { RpcSerialization } from 'effect/rpc';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
-import { createClient, RpcDefect, RpcTransportError } from '@effect-trpc/client';
+import { createClient, RpcDefect, RpcTransportError } from '@rpc-effect/client';
 import {
   messagePortLink,
   MessagePortServer,
@@ -103,7 +103,7 @@ describe('messagePortLink ⇄ MessagePortServer (no Electron)', () => {
     await tick(30);
     // the first frame is the server's connection acknowledgement
     const [ready, ...defects] = received;
-    expect(ready).toBe('"@effect-trpc/electron/ready"');
+    expect(ready).toBe('"@rpc-effect/electron/ready"');
     expect(defects).toHaveLength(3);
     for (const frame of defects) {
       expect(JSON.parse(String(frame))).toMatchObject({ _tag: 'Defect' });
@@ -150,7 +150,7 @@ describe('messagePortLink ⇄ MessagePortServer (no Electron)', () => {
     expect(received).toContain(
       '{"_tag":"Exit","requestId":99,"exit":{"_tag":"Success","value":null}}',
     );
-    expect(received).not.toContain('"@effect-trpc/electron/close"');
+    expect(received).not.toContain('"@rpc-effect/electron/close"');
     raw.port1.close();
 
     await expect(client.whoami()).resolves.toBeNull();

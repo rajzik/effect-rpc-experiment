@@ -1,6 +1,6 @@
 // client.ts — call the server from any TypeScript code.
 import { Effect } from 'effect';
-import { createClient, httpLink } from '@effect-trpc/client';
+import { createClient, httpLink } from '@rpc-effect/client';
 
 import { appRouter, Post, PostNotFound } from '@/router';
 

@@ -1,8 +1,8 @@
 // App.tsx — the same procedures as TanStack Query options.
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { createClient, httpLink } from '@effect-trpc/client';
-import { createRpcContext } from '@effect-trpc/tanstack-react-query';
+import { createClient, httpLink } from '@rpc-effect/client';
+import { createRpcContext } from '@rpc-effect/tanstack-react-query';
 
 import { appRouter, type AppRouter } from '@/router';
 

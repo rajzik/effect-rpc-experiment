@@ -1,4 +1,4 @@
-import { HttpContext, mutation, query, Router, subscription } from '@effect-trpc/core';
+import { HttpContext, mutation, query, Router, subscription } from '@rpc-effect/core';
 import { Effect, Layer, Schema, Stream } from 'effect';
 import { HttpRouter } from 'effect/http';
 import { RpcSerialization, RpcServer } from 'effect/rpc';

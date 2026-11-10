@@ -1,5 +1,5 @@
 {
-  "name": "@effect-trpc/electron",
+  "name": "@rpc-effect/electron",
   "version": "0.0.0",
   "files": [
     "dist"
@@ -35,14 +35,14 @@
     "test": "vp test"
   },
   "dependencies": {
-    "@effect-trpc/client": "workspace:*",
-    "@effect-trpc/core": "workspace:*",
-    "@effect-trpc/server": "workspace:*",
+    "@rpc-effect/client": "workspace:*",
+    "@rpc-effect/core": "workspace:*",
+    "@rpc-effect/server": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@effect-trpc/test-utils": "workspace:*",
     "@effect/vitest": "catalog:",
+    "@rpc-effect/test-utils": "workspace:*",
     "electron": "catalog:"
   },
   "peerDependencies": {

@@ -1,7 +1,7 @@
 // `createStartHandler`: a TanStack Start server route handler (`server.handlers.POST`).
-import { createClient, httpLink } from '@effect-trpc/client';
-import { causeToClientError, Codecs, Procedure, Router } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { createClient, httpLink } from '@rpc-effect/client';
+import { causeToClientError, Codecs, Procedure, Router } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import { Context, Effect, Exit, Layer, Schema } from 'effect';
 import { afterEach, describe, expect, test } from 'vite-plus/test';
 import { createStartHandler, type StartHandler } from '../src/index.js';

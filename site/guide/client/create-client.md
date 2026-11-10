@@ -27,7 +27,7 @@ A call rejects with `ClientError<E>`: the procedure's errors, or `RpcDefect`, `R
 `RpcInterrupted`. Narrow on `_tag`. The full model is in [the error model](../concepts/errors).
 
 ```ts
-import type { Client } from '@effect-trpc/client';
+import type { Client } from '@rpc-effect/client';
 
 type ByIdError = Client.Error<typeof appRouter.record.post.byId>; // ClientError<PostNotFound>
 ```

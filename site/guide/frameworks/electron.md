@@ -1,14 +1,14 @@
 # Electron
 
-`@effect-trpc/electron` runs the server in the main process and the client in a renderer, over a
+`@rpc-effect/electron` runs the server in the main process and the client in a renderer, over a
 `MessagePort` per client. Nothing is exposed on `window`: the preload script only forwards ports.
 
-| Entry point                      | Process  | Use                                   |
-| -------------------------------- | -------- | ------------------------------------- |
-| `@effect-trpc/electron/main`     | main     | `MainRpcServer`                       |
-| `@effect-trpc/electron/preload`  | preload  | `installPreloadBridge`                |
-| `@effect-trpc/electron/renderer` | renderer | `rendererLink`                        |
-| `@effect-trpc/electron`          | any      | everything, plus generic port helpers |
+| Entry point                     | Process  | Use                                   |
+| ------------------------------- | -------- | ------------------------------------- |
+| `@rpc-effect/electron/main`     | main     | `MainRpcServer`                       |
+| `@rpc-effect/electron/preload`  | preload  | `installPreloadBridge`                |
+| `@rpc-effect/electron/renderer` | renderer | `rendererLink`                        |
+| `@rpc-effect/electron`          | any      | everything, plus generic port helpers |
 
 ## Three files
 

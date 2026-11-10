@@ -1,5 +1,5 @@
 // `createIsomorphicClient`: in-process on the server, `httpLink` in the browser.
-import type { Client } from '@effect-trpc/client';
+import type { Client } from '@rpc-effect/client';
 import { afterEach, assert, describe, expect, test, vi } from 'vite-plus/test';
 import {
   createBrowserClient,

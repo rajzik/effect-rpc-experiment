@@ -1,6 +1,6 @@
-# @effect-trpc/test-utils
+# @rpc-effect/test-utils
 
-Shared test harness for [`@effect-trpc`](../../README.md) routers. One call starts a real Node
+Shared test harness for [`@rpc-effect`](../../README.md) routers. One call starts a real Node
 HTTP server on an ephemeral port and hands you everything needed to exercise a router end to end,
 all bound to the same handler layer:
 
@@ -28,17 +28,17 @@ normalised with `Router.from`.
   wire format without a port (`testWebHandler`) or in-process calls (`testCaller`);
 - you want `@effect/vitest` (`effectIt`) and `assertInstance` for values that crossed the wire.
 
-Use a sibling instead in production code: serve with `@effect-trpc/server` (`toWebHandler`,
-`runServer` from `@effect-trpc/server/node`), call with `@effect-trpc/client` (`createClient` +
-`httpLink`). Define routers with `@effect-trpc/core`.
+Use a sibling instead in production code: serve with `@rpc-effect/server` (`toWebHandler`,
+`runServer` from `@rpc-effect/server/node`), call with `@rpc-effect/client` (`createClient` +
+`httpLink`). Define routers with `@rpc-effect/core`.
 
 **Entry points**
 
-| Import path               | Exports                                                                                                                                                        | Source            |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| `@effect-trpc/test-utils` | `testServerAndClient`, `withTestServer`, `testWebHandler`, `testCaller`, `TestServerAndClient`, `TestWebHandler`, `TestServerOptions`, `TestWebHandlerOptions` | `src/harness.ts`  |
-| `@effect-trpc/test-utils` | `TestFetch` (and the shared options shape `TestHarnessOptions`)                                                                                                | `src/internal.ts` |
-| `@effect-trpc/test-utils` | `effectIt`, `effectExpect` (`@effect/vitest` re-exports), `assertInstance`                                                                                     | `src/vitest.ts`   |
+| Import path              | Exports                                                                                                                                                        | Source            |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| `@rpc-effect/test-utils` | `testServerAndClient`, `withTestServer`, `testWebHandler`, `testCaller`, `TestServerAndClient`, `TestWebHandler`, `TestServerOptions`, `TestWebHandlerOptions` | `src/harness.ts`  |
+| `@rpc-effect/test-utils` | `TestFetch` (and the shared options shape `TestHarnessOptions`)                                                                                                | `src/internal.ts` |
+| `@rpc-effect/test-utils` | `effectIt`, `effectExpect` (`@effect/vitest` re-exports), `assertInstance`                                                                                     | `src/vitest.ts`   |
 
 The barrel is `src/index.ts`; there are no subpath exports.
 
@@ -46,9 +46,9 @@ The barrel is `src/index.ts`; there are no subpath exports.
 
 ```ts
 import { Effect, Schema } from 'effect';
-import { query, Router, RpcDefect } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
-import { assertInstance, testServerAndClient } from '@effect-trpc/test-utils';
+import { query, Router, RpcDefect } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
+import { assertInstance, testServerAndClient } from '@rpc-effect/test-utils';
 import { describe, expect, it } from '@effect/vitest';
 
 class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}
@@ -129,17 +129,17 @@ node scripts/verify-jsdoc.mjs test-utils
 ## Install
 
 ```bash
-pnpm add -D @effect-trpc/test-utils
+pnpm add -D @rpc-effect/test-utils
 ```
 
 ## Example (vitest)
 
 ```ts
 import { Effect, Schema, Stream } from 'effect';
-import { query, Router, subscription } from '@effect-trpc/core';
-import { RpcDefect } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
-import { assertInstance, testServerAndClient } from '@effect-trpc/test-utils';
+import { query, Router, subscription } from '@rpc-effect/core';
+import { RpcDefect } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
+import { assertInstance, testServerAndClient } from '@rpc-effect/test-utils';
 import { describe, expect, it } from 'vitest';
 
 class User extends Schema.Class<User>('User')({

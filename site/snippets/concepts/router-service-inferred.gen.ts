@@ -1,4 +1,4 @@
-import { Router } from '@effect-trpc/core';
+import { Router } from '@rpc-effect/core';
 
 import { Forbidden, Post, PostNotFound } from '@/router';
 import { AppRouter as SourceAppRouter } from './router-service-inferred';

@@ -11,8 +11,8 @@
 import { Effect, Layer, Queue, Schema, Scope } from 'effect';
 import { RpcMessage, RpcSerialization, RpcServer } from 'effect/rpc';
 import type { Rpc, RpcGroup } from 'effect/rpc';
-import { Router } from '@effect-trpc/core';
-import type { Handlers } from '@effect-trpc/server';
+import { Router } from '@rpc-effect/core';
+import type { Handlers } from '@rpc-effect/server';
 import { closePort, listen, post, readyFrame } from './internal/port.js';
 import type { AnyPort } from './types.js';
 
@@ -93,7 +93,7 @@ type ClientState = {
   readonly parser: RpcSerialization.Parser;
 };
 
-const closed: unique symbol = Symbol('@effect-trpc/electron/closed');
+const closed: unique symbol = Symbol('@rpc-effect/electron/closed');
 
 /** A decoded client frame: tagged, with the (still unvalidated) headers of a `Request`. */
 interface TaggedMessage {
@@ -155,9 +155,9 @@ const withTrustedHeaders = (
  * // any Node or Electron main process
  * import { Effect, Schema } from 'effect';
  * import { RpcServer } from 'effect/rpc';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { MessagePortServer } from '@effect-trpc/electron/main';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { MessagePortServer } from '@rpc-effect/electron/main';
  *
  * const appRouter = Router.make({ ping: query({ success: Schema.String }) });
  * const HandlersLive = Handlers.make(appRouter, { ping: () => Effect.succeed('pong') });
@@ -374,9 +374,9 @@ const serveFromInput = (
  * // main.ts (Electron main process or any Node process)
  * import { MessageChannel, Worker } from 'node:worker_threads';
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { MessagePortServer } from '@effect-trpc/electron/main';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { MessagePortServer } from '@rpc-effect/electron/main';
  *
  * const appRouter = Router.make({ ping: query({ success: Schema.String }) });
  * const HandlersLive = Handlers.make(appRouter, { ping: () => Effect.succeed('pong') });
@@ -443,10 +443,10 @@ const serve: {
  * // any Node or Electron main process
  * import { MessageChannel } from 'node:worker_threads';
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { createClient } from '@effect-trpc/client';
- * import { Handlers } from '@effect-trpc/server';
- * import { messagePortLink, MessagePortServer } from '@effect-trpc/electron';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createClient } from '@rpc-effect/client';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { messagePortLink, MessagePortServer } from '@rpc-effect/electron';
  *
  * const appRouter = Router.make({ ping: query({ success: Schema.String }) });
  * const HandlersLive = Handlers.make(appRouter, { ping: () => Effect.succeed('pong') });

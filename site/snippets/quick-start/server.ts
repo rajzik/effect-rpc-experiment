@@ -1,7 +1,7 @@
 // server.ts — serve the router over HTTP on Node.
 import { Layer } from 'effect';
 import { NodeRuntime } from '@effect/platform-node';
-import { serve } from '@effect-trpc/server/node';
+import { serve } from '@rpc-effect/server/node';
 
 import { appRouter } from '@/router';
 import { ServerLive } from '@/server';

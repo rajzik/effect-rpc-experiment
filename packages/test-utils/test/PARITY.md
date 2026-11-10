@@ -1,4 +1,4 @@
-# tRPC parity — @effect-trpc/test-utils
+# tRPC parity — @rpc-effect/test-utils
 
 tRPC has no published test-utils package; its own suites use an internal `testServerAndClient`
 helper (`packages/tests/server/___testHelpers.ts`). This package is the equivalent shared harness:

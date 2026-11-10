@@ -1,4 +1,4 @@
-// Copies a fixture into `test/.tmp/` (inside the package, so `effect` and `@effect-trpc/*`
+// Copies a fixture into `test/.tmp/` (inside the package, so `effect` and `@rpc-effect/*`
 // resolve) and type-checks a directory with tsgo.
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';

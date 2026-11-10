@@ -1,12 +1,12 @@
 /**
  * Implements a router's procedures as an `effect/rpc` handler layer.
  *
- * `Handlers.make` takes a nested record mirroring the `@effect-trpc/core` router record and
+ * `Handlers.make` takes a nested record mirroring the `@rpc-effect/core` router record and
  * flattens it into `router.group.toLayer(...)`, so the resulting `Layer<Rpc.ToHandler<...>>` plugs
  * into everything that serves an `RpcGroup`: {@link toWebHandler}, `layerHttp`,
- * `@effect-trpc/server/node`, `createCaller`, `RpcServer` and `RpcTest.makeClient`.
+ * `@rpc-effect/server/node`, `createCaller`, `RpcServer` and `RpcTest.makeClient`.
  * `Handlers.fromService` / `Handlers.fromProcedures` build the same layer from the handlers of
- * procedures written with `@effect-trpc/core`'s `Procedure` builder (a router service or a plain
+ * procedures written with `@rpc-effect/core`'s `Procedure` builder (a router service or a plain
  * router), inferring their requirements.
  *
  * @since 0.1.0
@@ -14,8 +14,8 @@
 import { Context, Effect, Layer } from 'effect';
 import type { Scope, Stream } from 'effect';
 import type { Rpc, RpcGroup } from 'effect/rpc';
-import { Procedure, Router } from '@effect-trpc/core';
-import type { ProcedureDef, ProcedureWithHandler, RouterService } from '@effect-trpc/core';
+import { Procedure, Router } from '@rpc-effect/core';
+import type { ProcedureDef, ProcedureWithHandler, RouterService } from '@rpc-effect/core';
 import { RequestContext } from './internal/hooks.js';
 
 type RecordOf<R> = R extends Router<infer Rec> ? Rec : R;
@@ -293,8 +293,8 @@ const makeFromInput = (
  *
  * ```ts
  * import { Effect, Schema, Stream } from 'effect';
- * import { query, Router, subscription } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
+ * import { query, Router, subscription } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -376,8 +376,8 @@ const flatFromInput = (
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
  *
  * const appRouter = Router.make({
  *   post: { title: query({ payload: { id: Schema.Number }, success: Schema.String }) },
@@ -468,8 +468,8 @@ const proceduresHandlers = (router: Router.Any, owner: string): FlatHandlers => 
  *
  * ```ts
  * import { Context, Effect, Layer, Schema } from 'effect';
- * import { Procedure, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
+ * import { Procedure, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
  *
  * class Greeting extends Context.Service<Greeting, { readonly word: string }>()('Greeting') {}
  *
@@ -505,7 +505,7 @@ const fromProcedures = <R extends Router.Any>(
  *
  * Use to serve a router service: pass the layer, merged with the middleware implementations
  * and provided with the services `make` and the handlers read, to `toWebHandler`, `layerHttp`,
- * `createCaller` or `@effect-trpc/server/node`.
+ * `createCaller` or `@rpc-effect/server/node`.
  *
  * **Details**
  *
@@ -536,8 +536,8 @@ const fromProcedures = <R extends Router.Any>(
  *
  * ```ts
  * import { Context, Effect, Layer, Schema } from 'effect';
- * import { Procedure, query, Router } from '@effect-trpc/core';
- * import { Handlers, toWebHandler } from '@effect-trpc/server';
+ * import { Procedure, query, Router } from '@rpc-effect/core';
+ * import { Handlers, toWebHandler } from '@rpc-effect/server';
  *
  * class AppConfig extends Context.Service<AppConfig, { readonly prefix: string }>()('AppConfig') {}
  * class Database extends Context.Service<
@@ -628,8 +628,8 @@ const ofFromInput = <H>(input: Router.Input, handlers: H): H => {
  *
  * ```ts
  * import { Context, Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
  *
  * class Greeting extends Context.Service<Greeting, { readonly word: string }>()('Greeting') {}
  *
@@ -684,8 +684,8 @@ const of: {
  *
  * ```ts
  * import { Context, Effect, Option, Schema } from 'effect';
- * import { HttpContext, Procedure, Router } from '@effect-trpc/core';
- * import { Handlers, toWebHandler } from '@effect-trpc/server';
+ * import { HttpContext, Procedure, Router } from '@rpc-effect/core';
+ * import { Handlers, toWebHandler } from '@rpc-effect/server';
  *
  * class RequestId extends Context.Service<RequestId, string>()('RequestId') {}
  *
@@ -734,13 +734,13 @@ const withContext = <Out, E, R, C, CR>(
  * `subscription({...})` definitions, `Handlers.fromService(AppRouter)` for a router written as
  * an Effect service with `Procedure`; pass the resulting layer, merged
  * with the middleware implementations, to `toWebHandler`, `layerHttp`, `createCaller` or
- * `@effect-trpc/server/node`.
+ * `@rpc-effect/server/node`.
  *
  * **Details**
  *
  * - The layer is the one `router.group.toLayer(...)` would produce
  *   (`Layer<Rpc.ToHandler<...>>`), so it also works with plain `effect/rpc` (`RpcServer`,
- *   `RpcTest.makeClient`) and with `localLink` from `@effect-trpc/client`.
+ *   `RpcTest.makeClient`) and with `localLink` from `@rpc-effect/client`.
  * - `Handlers.make` accepts the record or an `Effect` producing it; an `Effect` build runs when
  *   the layer is built, and finalizers it adds run when the layer is released.
  *
@@ -755,8 +755,8 @@ const withContext = <Out, E, R, C, CR>(
  *
  * ```ts
  * import { Context, Effect, Layer, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers, Middleware } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers, Middleware } from '@rpc-effect/server';
  *
  * class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}
  * class NotFound extends Schema.TaggedError<NotFound>()('NotFound', { id: Schema.String }) {}

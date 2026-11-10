@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, PubSub, Schedule, Schema, Stream } from 'effect';
-import { mutation, Router, subscription } from '@effect-trpc/core';
-import { createCaller, Handlers } from '@effect-trpc/server';
+import { mutation, Router, subscription } from '@rpc-effect/core';
+import { createCaller, Handlers } from '@rpc-effect/server';
 
 // #region define
 class Tick extends Schema.Class<Tick>('Tick')({ n: Schema.Finite, at: Schema.Date }) {}

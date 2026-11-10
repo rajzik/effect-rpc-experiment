@@ -1,6 +1,6 @@
 import { RpcSerialization } from 'effect/rpc';
-import { serializationLayer, toWebHandler } from '@effect-trpc/server';
-import { createClient, httpLink } from '@effect-trpc/client';
+import { serializationLayer, toWebHandler } from '@rpc-effect/server';
+import { createClient, httpLink } from '@rpc-effect/client';
 
 import { appRouter } from '@/router';
 import { ServerLive } from '@/server';

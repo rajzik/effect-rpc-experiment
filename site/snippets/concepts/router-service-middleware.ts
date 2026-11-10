@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Schema } from 'effect';
-import { Procedure, Router } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { Procedure, Router } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 
 import { Auth, CurrentUser, Forbidden, Post, Unauthorized } from '@/router';
 

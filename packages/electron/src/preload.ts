@@ -1,5 +1,5 @@
 /**
- * Preload entry (`@effect-trpc/electron/preload`): the port-forwarding bridge for preload
+ * Preload entry (`@rpc-effect/electron/preload`): the port-forwarding bridge for preload
  * scripts.
  *
  * Exports `installPreloadBridge` and the handshake constants and types. It imports no Effect and

@@ -3,8 +3,8 @@
 // page.tsx and a server action with typed errors. Next-only pieces are stubbed: `headers()` is a
 // function returning `Headers`, `React.cache` is a per-"request" scope and `fetch` goes straight
 // into the route handler.
-import { mutation, query, Router } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { mutation, query, Router } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Effect, Schema } from 'effect';

@@ -1,6 +1,6 @@
 // The server module: the only one that imports the live layers.
 import { Effect, Layer, Stream } from 'effect';
-import { Handlers, toWebHandler } from '@effect-trpc/server';
+import { Handlers, toWebHandler } from '@rpc-effect/server';
 
 import { Post, PostNotFound } from '@/router';
 import { AppRouter, Database } from './router-service';

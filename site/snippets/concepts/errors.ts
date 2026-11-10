@@ -4,8 +4,8 @@ import {
   causeToClientError,
   isClientInfrastructureError,
   type ClientError,
-} from '@effect-trpc/core';
-import { createClient, localLink } from '@effect-trpc/client';
+} from '@rpc-effect/core';
+import { createClient, localLink } from '@rpc-effect/client';
 
 import { appRouter, PostNotFound } from '@/router';
 import { AuthLive, HandlersLive, ServerLive } from '@/server';
@@ -18,11 +18,11 @@ const describe = (error: ClientError<PostNotFound>): string => {
   switch (error._tag) {
     case 'PostNotFound':
       return `no post #${error.id}`; // your error, as a PostNotFound instance
-    case '@effect-trpc/RpcTransportError':
+    case '@rpc-effect/RpcTransportError':
       return 'network, HTTP status or protocol failure: retry may help';
-    case '@effect-trpc/RpcDefect':
+    case '@rpc-effect/RpcDefect':
       return `the handler died: ${error.message}`;
-    case '@effect-trpc/RpcInterrupted':
+    case '@rpc-effect/RpcInterrupted':
       return 'aborted';
     default:
       return error satisfies never; // a new error case fails to compile here
@@ -41,7 +41,7 @@ try {
 
 // #region guard
 const retryable = (error: unknown): boolean =>
-  isClientInfrastructureError(error) && error._tag === '@effect-trpc/RpcTransportError';
+  isClientInfrastructureError(error) && error._tag === '@rpc-effect/RpcTransportError';
 // #endregion guard
 
 // #region effect

@@ -1,7 +1,7 @@
 import { Context, Effect, Exit, Layer, Schema } from 'effect';
 import { FetchHttpClient } from 'effect/http';
 import { RpcClient, RpcSerialization } from 'effect/rpc';
-import { Procedure, query, Router } from '@effect-trpc/core';
+import { Procedure, query, Router } from '@rpc-effect/core';
 import { describe, expect, it } from 'vite-plus/test';
 import { createCaller, Handlers, toWebHandler } from '../src/index.js';
 import type { WebHandler } from '../src/index.js';

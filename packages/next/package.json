@@ -1,5 +1,5 @@
 {
-  "name": "@effect-trpc/next",
+  "name": "@rpc-effect/next",
   "version": "0.0.0",
   "files": [
     "dist"
@@ -20,15 +20,15 @@
     "test": "vp test"
   },
   "dependencies": {
-    "@effect-trpc/client": "workspace:*",
-    "@effect-trpc/core": "workspace:*",
-    "@effect-trpc/server": "workspace:*",
-    "@effect-trpc/tanstack-react-query": "workspace:*",
+    "@rpc-effect/client": "workspace:*",
+    "@rpc-effect/core": "workspace:*",
+    "@rpc-effect/server": "workspace:*",
+    "@rpc-effect/tanstack-react-query": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@effect-trpc/test-utils": "workspace:*",
     "@effect/vitest": "catalog:",
+    "@rpc-effect/test-utils": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/react": "catalog:",

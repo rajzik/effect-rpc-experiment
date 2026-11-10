@@ -7,7 +7,7 @@
  */
 import { Context, Schema } from 'effect';
 import { RpcMiddleware } from 'effect/rpc';
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
 
 /** How many tasks `tasks.list` returns per page. */
 export const PAGE_SIZE = 5;

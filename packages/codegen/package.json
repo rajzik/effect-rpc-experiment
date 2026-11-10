@@ -1,5 +1,5 @@
 {
-  "name": "@effect-trpc/codegen",
+  "name": "@rpc-effect/codegen",
   "version": "0.0.0",
   "bin": {
     "effect-trpc-codegen": "./dist/cli.mjs"
@@ -81,9 +81,9 @@
     "unplugin": "catalog:"
   },
   "devDependencies": {
-    "@effect-trpc/client": "workspace:*",
-    "@effect-trpc/core": "workspace:*",
-    "@effect-trpc/server": "workspace:*",
+    "@rpc-effect/client": "workspace:*",
+    "@rpc-effect/core": "workspace:*",
+    "@rpc-effect/server": "workspace:*",
     "@types/node": "catalog:",
     "effect": "catalog:",
     "esbuild": "catalog:",

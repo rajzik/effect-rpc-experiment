@@ -1,7 +1,7 @@
-import type { Client } from '@effect-trpc/client';
-import type { Router } from '@effect-trpc/core';
-import type { Caller } from '@effect-trpc/server';
-import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import type { Client } from '@rpc-effect/client';
+import type { Router } from '@rpc-effect/core';
+import type { Caller } from '@rpc-effect/server';
+import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
 import type { Exit } from 'effect';
 import { describe, expectTypeOf, it } from 'vite-plus/test';
 import {
@@ -62,7 +62,7 @@ describe('Next.js helpers with a router service (types)', () => {
       ReturnType<typeof decodeActionResult<typeof plainRouter, 'post.byId'>>
     >();
     expectTypeOf(decodeActionResult(AppRouter, 'post.byId', encoded)).toExtend<
-      Exit.Exit<Post, PostNotFound | { readonly _tag: `@effect-trpc/${string}` }>
+      Exit.Exit<Post, PostNotFound | { readonly _tag: `@rpc-effect/${string}` }>
     >();
     expectTypeOf(unwrapActionResult(AppRouter, 'post.byId', encoded)).toEqualTypeOf<
       Promise<Post>

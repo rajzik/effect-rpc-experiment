@@ -7,8 +7,8 @@ import type {
   inferRouterInputs,
   inferRouterOutputs,
   Router,
-} from '@effect-trpc/core';
-import type { Client } from '@effect-trpc/client';
+} from '@rpc-effect/core';
+import type { Client } from '@rpc-effect/client';
 
 import type { AppRouter } from '@/router';
 

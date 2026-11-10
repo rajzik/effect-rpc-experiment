@@ -1,6 +1,6 @@
-# @effect-trpc/start
+# @rpc-effect/start
 
-[TanStack Start](https://tanstack.com/start) integration for [`@effect-trpc`](../../README.md)
+[TanStack Start](https://tanstack.com/start) integration for [`@rpc-effect`](../../README.md)
 routers. It follows the layout of TanStack Start's `with-trpc` example:
 
 - **`createStartHandler`**: a server route handler for `src/routes/api/rpc.$.ts`
@@ -21,15 +21,15 @@ is normalised with `Router.from`.
 
 ## For AI agents
 
-**Use this package when** you wire an `@effect-trpc/core` router into a **TanStack Start** app:
+**Use this package when** you wire an `@rpc-effect/core` router into a **TanStack Start** app:
 a catch-all server route, loaders that prefetch into the router-context `QueryClient`, and SSR
 hydration that keeps `Schema.Class` / `TaggedError` instances.
 
-- Next.js App Router → use `@effect-trpc/next`.
-- Plain React without Start (Vite SPA) → `@effect-trpc/tanstack-react-query` + `@effect-trpc/client`.
-- Any other fetch server → `toWebHandler` from `@effect-trpc/server`.
+- Next.js App Router → use `@rpc-effect/next`.
+- Plain React without Start (Vite SPA) → `@rpc-effect/tanstack-react-query` + `@rpc-effect/client`.
+- Any other fetch server → `toWebHandler` from `@rpc-effect/server`.
 
-**Entry points** (all from `@effect-trpc/start`; no subpaths):
+**Entry points** (all from `@rpc-effect/start`; no subpaths):
 
 | export                                   | side    | what                                                                                        | source           |
 | ---------------------------------------- | ------- | ------------------------------------------------------------------------------------------- | ---------------- |
@@ -122,7 +122,7 @@ node scripts/verify-jsdoc.mjs start
 ```
 
 ```sh
-pnpm add @effect-trpc/start @effect-trpc/core @effect-trpc/server @effect-trpc/client @effect-trpc/tanstack-react-query effect @tanstack/react-query
+pnpm add @rpc-effect/start @rpc-effect/core @rpc-effect/server @rpc-effect/client @rpc-effect/tanstack-react-query effect @tanstack/react-query
 # already in a Start app: @tanstack/react-start @tanstack/react-router react
 ```
 
@@ -130,7 +130,7 @@ pnpm add @effect-trpc/start @effect-trpc/core @effect-trpc/server @effect-trpc/c
 
 ```ts
 // src/rpc/router.ts — shared by server and browser
-import { mutation, query, Router } from '@effect-trpc/core';
+import { mutation, query, Router } from '@rpc-effect/core';
 import { Schema } from 'effect';
 
 export class Post extends Schema.Class<Post>('Post')({
@@ -158,7 +158,7 @@ export type AppRouter = typeof appRouter;
 
 ```ts
 // src/rpc/handlers.server.ts — server only
-import { Handlers } from '@effect-trpc/server';
+import { Handlers } from '@rpc-effect/server';
 import { Effect } from 'effect';
 import { appRouter, Post, PostNotFound } from './router';
 
@@ -177,7 +177,7 @@ export const HandlersLive = Handlers.make(appRouter, {
 
 ```ts
 import { createFileRoute } from '@tanstack/react-router';
-import { createStartHandler } from '@effect-trpc/start';
+import { createStartHandler } from '@rpc-effect/start';
 import { appRouter } from '~/rpc/router';
 import { HandlersLive } from '~/rpc/handlers.server';
 
@@ -201,14 +201,14 @@ export const Route = createFileRoute('/api/rpc/$')({
   Subscriptions stream NDJSON. `serialization: 'json' | 'ndjson'` must match the client.
 - `Handlers.withContext(handlers, context)` (tRPC's `createContext`: an `Effect` of services
   evaluated per call, before middleware and the handler) and `onError({ path, cause, headers })`,
-  an option of `toWebHandler` from `@effect-trpc/server` passed through, apply to this route only:
+  an option of `toWebHandler` from `@rpc-effect/server` passed through, apply to this route only:
   give the in-process `createServerClient` handlers with those services provided. Handlers can
-  read the request and set response headers and cookies with `HttpContext` (`@effect-trpc/core`).
+  read the request and set response headers and cookies with `HttpContext` (`@rpc-effect/core`).
 
 ## 3. The client: `src/rpc/client.ts`
 
 ```ts
-import { createIsomorphicClient, createStartHelpers } from '@effect-trpc/start';
+import { createIsomorphicClient, createStartHelpers } from '@rpc-effect/start';
 import { appRouter } from './router';
 import { HandlersLive } from './handlers.server';
 
@@ -229,7 +229,7 @@ compiler removes the `.server()` branch from the client build:
 
 ```ts
 import { createIsomorphicFn } from '@tanstack/react-start';
-import { createBrowserClient, createServerClient } from '@effect-trpc/start';
+import { createBrowserClient, createServerClient } from '@rpc-effect/start';
 
 const makeClient = createIsomorphicFn()
   .server(() => createServerClient(appRouter, { handlers: HandlersLive }))
@@ -345,7 +345,7 @@ Then narrow by `_tag`:
 
 ```tsx
 import { useQuery } from '@tanstack/react-query';
-import type { ClientError } from '@effect-trpc/client';
+import type { ClientError } from '@rpc-effect/client';
 import type { PostNotFound } from '~/rpc/router';
 
 export const Route = createFileRoute('/drafts/$postId')({
@@ -368,10 +368,10 @@ const describeError = (error: ClientError<PostNotFound>): string => {
   switch (error._tag) {
     case 'PostNotFound':
       return `No post #${error.id}`;
-    case '@effect-trpc/RpcDefect':
-    case '@effect-trpc/RpcTransportError':
+    case '@rpc-effect/RpcDefect':
+    case '@rpc-effect/RpcTransportError':
       return error.message;
-    case '@effect-trpc/RpcInterrupted':
+    case '@rpc-effect/RpcInterrupted':
       return 'Cancelled';
   }
 };
@@ -383,7 +383,7 @@ These snippets are type-checked, and run through a real `@tanstack/react-router`
 ## Server functions
 
 You can call the router from a `createServerFn` handler with `createServerClient` or
-`createCaller` from `@effect-trpc/server`. The server function then becomes the transport, and
+`createCaller` from `@rpc-effect/server`. The server function then becomes the transport, and
 its return value goes through Start's serializer, not the procedure schemas. This package does
 not provide a server-function link.
 

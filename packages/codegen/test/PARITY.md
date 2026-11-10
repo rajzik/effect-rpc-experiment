@@ -1,4 +1,4 @@
-# tRPC parity — @effect-trpc/codegen
+# tRPC parity — @rpc-effect/codegen
 
 tRPC has no schema generator: its procedures infer output types without runtime schemas and rely
 on a transformer (e.g. superjson) for non-JSON values. This package has no ported tRPC tests.

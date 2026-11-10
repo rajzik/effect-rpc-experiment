@@ -1,7 +1,7 @@
 // The client types of the generated contract: exact, from the generated schemas.
 import { describe, expectTypeOf, it } from 'vite-plus/test';
-import type { ClientError, Router } from '@effect-trpc/core';
-import type { Client } from '@effect-trpc/client';
+import type { ClientError, Router } from '@rpc-effect/core';
+import type { Client } from '@rpc-effect/client';
 import type { AppRouter as ClientRouter } from './fixtures/app/router.client.gen.js';
 import type { AppRouter as ServerRouter } from './fixtures/app/router.gen.js';
 import type {

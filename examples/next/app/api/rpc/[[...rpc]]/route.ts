@@ -1,5 +1,5 @@
-import { appRouter } from '@effect-trpc-examples/shared';
-import { createRouteHandler } from '@effect-trpc/next';
+import { appRouter } from '@rpc-effect-examples/shared';
+import { createRouteHandler } from '@rpc-effect/next';
 
 import { ServerLive } from '@/server';
 

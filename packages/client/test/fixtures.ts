@@ -1,4 +1,4 @@
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
 import { Context, Effect, Layer, Schedule, Schema, Stream } from 'effect';
 import { RpcMiddleware } from 'effect/rpc';
 

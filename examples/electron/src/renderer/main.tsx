@@ -2,17 +2,17 @@
  * The renderer: the task board as a single page, routed by `location.hash` (`#/` is the list,
  * `#/tasks/<id>` a task), talking to the main process through `rendererLink`.
  */
-import { appRouter } from '@effect-trpc-examples/shared';
+import { appRouter } from '@rpc-effect-examples/shared';
 import {
   LiveFeed,
   NewTaskForm,
   SignedInAs,
   TaskDetail,
   TaskList,
-} from '@effect-trpc-examples/shared/ui';
-import { createClient } from '@effect-trpc/client';
-import { rendererLink } from '@effect-trpc/electron/renderer';
-import { createRpcContext } from '@effect-trpc/tanstack-react-query';
+} from '@rpc-effect-examples/shared/ui';
+import { createClient } from '@rpc-effect/client';
+import { rendererLink } from '@rpc-effect/electron/renderer';
+import { createRpcContext } from '@rpc-effect/tanstack-react-query';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // A router service class works with the options proxy, the typed context and the hydration
 // helpers: query results are class instances and typed errors, also after dehydrate / hydrate.
-import { createClient, localLink } from '@effect-trpc/client';
+import { createClient, localLink } from '@rpc-effect/client';
 import { QueryClientProvider, useQuery, type DehydratedState } from '@tanstack/react-query';
 import { cleanup, render, waitFor } from '@testing-library/react';
 import * as React from 'react';

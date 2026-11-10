@@ -1,4 +1,4 @@
-import { query, Router } from '@effect-trpc/core';
+import { query, Router } from '@rpc-effect/core';
 import { Effect, Layer, Schema } from 'effect';
 import { Headers } from 'effect/http';
 import { RpcMiddleware } from 'effect/rpc';

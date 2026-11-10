@@ -3,7 +3,7 @@
 The API follows `@trpc/tanstack-react-query`, so most code ports by renaming. These are the
 differences.
 
-| `@trpc/tanstack-react-query`               | `@effect-trpc/tanstack-react-query`                             |
+| `@trpc/tanstack-react-query`               | `@rpc-effect/tanstack-react-query`                              |
 | ------------------------------------------ | --------------------------------------------------------------- |
 | `createTRPCContext()`                      | `createRpcContext()`                                            |
 | `TRPCProvider`, `useTRPC`, `useTRPCClient` | `RpcProvider`, `useRpc`, `useRpcClient`                         |

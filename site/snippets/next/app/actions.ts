@@ -1,6 +1,6 @@
 // app/actions.ts
 'use server';
-import { createServerActionCaller, type InputAt } from '@effect-trpc/next';
+import { createServerActionCaller, type InputAt } from '@rpc-effect/next';
 import { headers } from 'next/headers';
 
 import { appRouter, type AppRouter } from '@/router';

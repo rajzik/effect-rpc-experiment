@@ -1,9 +1,9 @@
 // Authentication end to end: a bearer token → a typed User service → typed errors on the client.
 import { Context, Effect, Layer, Schema } from 'effect';
 import { RpcMiddleware } from 'effect/rpc';
-import { mutation, query, Router } from '@effect-trpc/core';
-import { createClient, httpLink } from '@effect-trpc/client';
-import { Handlers, toWebHandler } from '@effect-trpc/server';
+import { mutation, query, Router } from '@rpc-effect/core';
+import { createClient, httpLink } from '@rpc-effect/client';
+import { Handlers, toWebHandler } from '@rpc-effect/server';
 
 // #region shared
 // router.ts — shared

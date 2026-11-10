@@ -25,7 +25,7 @@ import { Cookies, Headers, HttpEffect, HttpServerRequest, HttpServerResponse } f
  *
  * ```ts
  * import { Effect, Option, Schema } from 'effect';
- * import { HttpContext, Procedure } from '@effect-trpc/core';
+ * import { HttpContext, Procedure } from '@rpc-effect/core';
  *
  * const userAgent = Procedure.output(Schema.String).query(() =>
  *   Effect.map(
@@ -91,7 +91,7 @@ const checkHeader = (name: string, value: string): Effect.Effect<void> =>
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { HttpContext, Procedure } from '@effect-trpc/core';
+ * import { HttpContext, Procedure } from '@rpc-effect/core';
  *
  * const now = Procedure.output(Schema.Finite).query(() =>
  *   HttpContext.setHeader('cache-control', 'no-store').pipe(Effect.as(Date.now())),
@@ -115,7 +115,7 @@ const setHeader = (name: string, value: string): Effect.Effect<void> =>
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { HttpContext, Procedure } from '@effect-trpc/core';
+ * import { HttpContext, Procedure } from '@rpc-effect/core';
  *
  * const greeting = Procedure.output(Schema.String).query(() =>
  *   HttpContext.appendHeader('vary', 'accept-language').pipe(Effect.as('hello')),
@@ -152,7 +152,7 @@ const appendHeader = (name: string, value: string): Effect.Effect<void> =>
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { HttpContext, Procedure } from '@effect-trpc/core';
+ * import { HttpContext, Procedure } from '@rpc-effect/core';
  *
  * const login = Procedure.input({ token: Schema.String }).mutation(({ token }) =>
  *   HttpContext.setCookie('session', token, { httpOnly: true, secure: true, path: '/' }),
@@ -221,7 +221,7 @@ const setCookie = (
  *
  * ```ts
  * import { Effect, Option, Schema } from 'effect';
- * import { HttpContext, Procedure, Router } from '@effect-trpc/core';
+ * import { HttpContext, Procedure, Router } from '@rpc-effect/core';
  *
  * const appRouter = Router.make({
  *   login: Procedure.input({ token: Schema.String }).mutation(({ token }) =>

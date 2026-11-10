@@ -1,7 +1,7 @@
 // A router written once as an Effect service (`Procedure` builder + `Context.Service`), shared by
 // `routerService.test.ts` and `routerService.test-d.ts`.
 import { Context, Effect, Layer, Schema, Stream } from 'effect';
-import { Procedure, query } from '@effect-trpc/core';
+import { Procedure, query } from '@rpc-effect/core';
 import { Auth, CurrentUser } from './fixtures.js';
 
 export class Post extends Schema.Class<Post>('Post')({

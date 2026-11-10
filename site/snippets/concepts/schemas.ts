@@ -1,6 +1,6 @@
 import { Exit, Schema } from 'effect';
-import { Codecs, query, Router } from '@effect-trpc/core';
-import { createClient, localLink } from '@effect-trpc/client';
+import { Codecs, query, Router } from '@rpc-effect/core';
+import { createClient, localLink } from '@rpc-effect/client';
 
 import { appRouter, Post, PostNotFound } from '@/router';
 import { ServerLive } from '@/server';

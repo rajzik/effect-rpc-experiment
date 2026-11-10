@@ -1,6 +1,6 @@
 // app/new-post.tsx
 'use client';
-import { unwrapActionResult, useServerAction } from '@effect-trpc/next';
+import { unwrapActionResult, useServerAction } from '@rpc-effect/next';
 
 import { appRouter } from '@/router';
 

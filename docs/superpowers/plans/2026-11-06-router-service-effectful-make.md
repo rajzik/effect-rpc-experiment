@@ -6,7 +6,7 @@
 
 **Architecture:** Core gains an "effectful" router-service type and an Effect that builds a service's router (nested services included) in the current context. `Handlers.fromService` becomes a `Layer.unwrap` over that Effect. `Router.withSchemas` over an effectful service returns a lazy wrapper service with the same key. Codegen learns `Effect.gen` makes and rejects schemas that depend on values read in `make`.
 
-**Tech Stack:** TypeScript 7 (tsgo), Effect v4 (`effect@4.x`, `effect/rpc`), Vite+ (`vp test`, Vitest 5), `@effect-trpc/*` monorepo.
+**Tech Stack:** TypeScript 7 (tsgo), Effect v4 (`effect@4.x`, `effect/rpc`), Vite+ (`vp test`, Vitest 5), `@rpc-effect/*` monorepo.
 
 **Spec:** `docs/superpowers/specs/2026-11-06-router-service-effectful-make-design.md`
 

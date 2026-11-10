@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Every Next.js helper takes a router service class: route handler, browser client, RSC helpers
 // and server actions decode class instances and typed errors.
-import { Router } from '@effect-trpc/core';
+import { Router } from '@rpc-effect/core';
 import { useQuery } from '@tanstack/react-query';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { Exit } from 'effect';

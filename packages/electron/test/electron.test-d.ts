@@ -2,8 +2,8 @@ import type { contextBridge, IpcMainEvent, ipcMain, ipcRenderer, MessagePortMain
 import type { MessagePort as NodeMessagePort } from 'node:worker_threads';
 import { MessageChannel as NodeMessageChannel } from 'node:worker_threads';
 import type { Effect, Layer, Stream } from 'effect';
-import { createClient, type Link, type RpcTransportError } from '@effect-trpc/client';
-import type { Handlers } from '@effect-trpc/server';
+import { createClient, type Link, type RpcTransportError } from '@rpc-effect/client';
+import type { Handlers } from '@rpc-effect/server';
 import { describe, expectTypeOf, it } from 'vite-plus/test';
 import {
   installPreloadBridge,

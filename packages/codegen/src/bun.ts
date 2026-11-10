@@ -1,5 +1,5 @@
 /**
- * The schema generator as a Bun plugin (see `@effect-trpc/codegen/unplugin`).
+ * The schema generator as a Bun plugin (see `@rpc-effect/codegen/unplugin`).
  *
  * @since 0.1.0
  */
@@ -25,7 +25,7 @@ import { unplugin } from './unplugin.js';
  * **Example** (Bun config)
  *
  * ```ts
- * import { effectTrpcCodegen } from '@effect-trpc/codegen/bun';
+ * import { effectTrpcCodegen } from '@rpc-effect/codegen/bun';
  *
  * // build.ts, run with `bun build.ts`: Bun.build({ entrypoints: ['src/main.ts'], plugins })
  * export const plugins = [effectTrpcCodegen({ routers: ['src/router.ts'] })];

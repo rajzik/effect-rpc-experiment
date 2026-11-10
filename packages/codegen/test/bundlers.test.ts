@@ -98,7 +98,7 @@ describe('Vite', () => {
       build: {
         outDir: path.join(dir, 'dist'),
         lib: { entry: path.join(dir, 'main.ts'), formats: ['es'], fileName: 'main' },
-        rollupOptions: { external: [/^effect/, /^@effect-trpc\//] },
+        rollupOptions: { external: [/^effect/, /^@rpc-effect\//] },
         minify: false,
       },
     });

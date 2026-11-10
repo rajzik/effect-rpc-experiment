@@ -1,7 +1,7 @@
-# @effect-trpc/tanstack-react-query
+# @rpc-effect/tanstack-react-query
 
 [TanStack React Query](https://tanstack.com/query) integration for
-[`@effect-trpc`](../../README.md) routers. It is a port of
+[`@rpc-effect`](../../README.md) routers. It is a port of
 [`@trpc/tanstack-react-query`](https://trpc.io/docs/client/tanstack-react-query/setup): you get a
 typed **options proxy** that mirrors your router and produces plain TanStack Query options, so
 you use the normal TanStack hooks (`useQuery`, `useMutation`, `useInfiniteQuery`,
@@ -17,13 +17,13 @@ you use the normal TanStack hooks (`useQuery`, `useMutation`, `useInfiniteQuery`
   handler.
 - SSR hydration encodes values with the procedures' schemas, so class instances and typed errors
   come back as instances on the client.
-- A router written as an Effect service (`@effect-trpc/core`'s router services) works like a
+- A router written as an Effect service (`@rpc-effect/core`'s router services) works like a
   router: `createRpcContext<typeof AppRouter>()`, `createHydrationHelpers(AppRouter)`,
   `dehydrate(AppRouter, ...)` / `hydrate(AppRouter, ...)` take the class, and
   `createRpcOptionsProxy` takes the client of `createClient(AppRouter, ...)`.
 
 ```sh
-pnpm add @effect-trpc/tanstack-react-query @effect-trpc/client @effect-trpc/core effect @tanstack/react-query react
+pnpm add @rpc-effect/tanstack-react-query @rpc-effect/client @rpc-effect/core effect @tanstack/react-query react
 ```
 
 ## For AI agents
@@ -39,29 +39,29 @@ pnpm add @effect-trpc/tanstack-react-query @effect-trpc/client @effect-trpc/core
 
 Use a sibling package instead when:
 
-- Next.js App Router: [`@effect-trpc/next`](../next/README.md) (route handler, RSC prefetch +
+- Next.js App Router: [`@rpc-effect/next`](../next/README.md) (route handler, RSC prefetch +
   `HydrationBoundary`, server actions). It builds on this package.
-- TanStack Start: [`@effect-trpc/start`](../start/README.md) (server route, isomorphic client,
+- TanStack Start: [`@rpc-effect/start`](../start/README.md) (server route, isomorphic client,
   loader helpers). It builds on this package.
 - No TanStack Query (scripts, servers, other UI libraries): the plain Promise / Effect client of
-  [`@effect-trpc/client`](../client/README.md).
+  [`@rpc-effect/client`](../client/README.md).
 
 **Entry points**
 
-The package has a single entry, `@effect-trpc/tanstack-react-query`.
+The package has a single entry, `@rpc-effect/tanstack-react-query`.
 
-| Import path                         | Exports                                                                                       | Source                                                                         |
-| ----------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `@effect-trpc/tanstack-react-query` | `createRpcContext` (`RpcProvider`, `useRpc`, `useRpcClient`)                                  | `src/Context.tsx`                                                              |
-| `@effect-trpc/tanstack-react-query` | `createRpcOptionsProxy`, `RpcOptionsProxy`, `Decorate*`, `inferProxyInput/Output/Error`       | `src/createOptionsProxy.ts`                                                    |
-| `@effect-trpc/tanstack-react-query` | `RpcQueryOptions`, `RpcInfiniteQueryOptions`, `RpcMutationOptions`, `MutationOptionsOverride` | `src/queryOptions.ts`, `src/infiniteQueryOptions.ts`, `src/mutationOptions.ts` |
-| `@effect-trpc/tanstack-react-query` | `useSubscription`, `RpcSubscriptionOptions`, `RpcSubscriptionResult`                          | `src/useSubscription.ts`, `src/subscriptionOptions.ts`                         |
-| `@effect-trpc/tanstack-react-query` | `createHydrationHelpers`, `dehydrate`, `hydrate`                                              | `src/Hydration.tsx`                                                            |
-| `@effect-trpc/tanstack-react-query` | `getQueryKey`, `getMutationKey`, `readQueryKey`, `QueryKeys`, key and flag types, `skipToken` | `src/internals/keys.ts`, `src/internals/types.ts`                              |
+| Import path                        | Exports                                                                                       | Source                                                                         |
+| ---------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `@rpc-effect/tanstack-react-query` | `createRpcContext` (`RpcProvider`, `useRpc`, `useRpcClient`)                                  | `src/Context.tsx`                                                              |
+| `@rpc-effect/tanstack-react-query` | `createRpcOptionsProxy`, `RpcOptionsProxy`, `Decorate*`, `inferProxyInput/Output/Error`       | `src/createOptionsProxy.ts`                                                    |
+| `@rpc-effect/tanstack-react-query` | `RpcQueryOptions`, `RpcInfiniteQueryOptions`, `RpcMutationOptions`, `MutationOptionsOverride` | `src/queryOptions.ts`, `src/infiniteQueryOptions.ts`, `src/mutationOptions.ts` |
+| `@rpc-effect/tanstack-react-query` | `useSubscription`, `RpcSubscriptionOptions`, `RpcSubscriptionResult`                          | `src/useSubscription.ts`, `src/subscriptionOptions.ts`                         |
+| `@rpc-effect/tanstack-react-query` | `createHydrationHelpers`, `dehydrate`, `hydrate`                                              | `src/Hydration.tsx`                                                            |
+| `@rpc-effect/tanstack-react-query` | `getQueryKey`, `getMutationKey`, `readQueryKey`, `QueryKeys`, key and flag types, `skipToken` | `src/internals/keys.ts`, `src/internals/types.ts`                              |
 
 **Golden path**
 
-1. Define the router with `@effect-trpc/core` ([section 1](#1-define-the-router)).
+1. Define the router with `@rpc-effect/core` ([section 1](#1-define-the-router)).
 2. Call `createRpcContext<AppRouter>()` once at module scope, and render `RpcProvider` inside
    `QueryClientProvider` with the same `QueryClient` ([section 2](#2-set-up-the-context-provider)).
 3. In components: `const rpc = useRpc()`, then `useQuery(rpc.x.queryOptions(input))` /
@@ -72,9 +72,9 @@ The package has a single entry, `@effect-trpc/tanstack-react-query`.
    the client ([section 7](#7-ssr-hydration-with-class-instances)).
 
 ```tsx
-import { createClient, httpLink } from '@effect-trpc/client';
-import { query, Router } from '@effect-trpc/core';
-import { createRpcContext } from '@effect-trpc/tanstack-react-query';
+import { createClient, httpLink } from '@rpc-effect/client';
+import { query, Router } from '@rpc-effect/core';
+import { createRpcContext } from '@rpc-effect/tanstack-react-query';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { useState, type ReactNode } from 'react';
@@ -115,8 +115,8 @@ export function PostTitle({ id }: { id: number }) {
 **Invariants**
 
 - `error` is `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted` (from
-  `@effect-trpc/core`); the infrastructure tags are `@effect-trpc/RpcDefect`,
-  `@effect-trpc/RpcTransportError` and `@effect-trpc/RpcInterrupted`.
+  `@rpc-effect/core`); the infrastructure tags are `@rpc-effect/RpcDefect`,
+  `@rpc-effect/RpcTransportError` and `@rpc-effect/RpcInterrupted`.
 - `data` is the decoded output: `Schema.Class` values are real instances, `Schema.Date` fields are
   `Date`.
 - Query keys are `[path, { input?, type: 'query' | 'infinite' }]` with `path` a string array
@@ -199,7 +199,7 @@ node scripts/verify-jsdoc.mjs tanstack-react-query
 ## 1. Define the router
 
 ```ts
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
 import { Schema } from 'effect';
 
 export class Post extends Schema.Class<Post>('Post')({
@@ -240,8 +240,8 @@ export type AppRouter = typeof appRouter;
 scope:
 
 ```tsx
-import { createClient, httpLink, RpcTransportError } from '@effect-trpc/client';
-import { createRpcContext } from '@effect-trpc/tanstack-react-query';
+import { createClient, httpLink, RpcTransportError } from '@rpc-effect/client';
+import { createRpcContext } from '@rpc-effect/tanstack-react-query';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -365,7 +365,7 @@ export function PostList() {
 ## 6. Subscriptions
 
 ```tsx
-import { useSubscription } from '@effect-trpc/tanstack-react-query';
+import { useSubscription } from '@rpc-effect/tanstack-react-query';
 
 export function Countdown() {
   const rpc = useRpc();
@@ -392,7 +392,7 @@ would not survive JSON. `createHydrationHelpers(router)` encodes the router's qu
 decodes them back to instances. Queries with other keys pass through unchanged.
 
 ```tsx
-import { createHydrationHelpers, createRpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import { createHydrationHelpers, createRpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
 
 export const { dehydrate, HydrationBoundary } = createHydrationHelpers(appRouter);
 

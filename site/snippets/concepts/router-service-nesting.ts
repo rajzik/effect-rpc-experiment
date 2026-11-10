@@ -1,6 +1,6 @@
 import { Context, Effect, Schema } from 'effect';
-import { Procedure, query, Router } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { Procedure, query, Router } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 
 // #region nesting
 // A service router inside another service's `make`…

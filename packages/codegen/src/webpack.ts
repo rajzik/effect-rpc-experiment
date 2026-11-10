@@ -1,5 +1,5 @@
 /**
- * The schema generator as a webpack plugin (see `@effect-trpc/codegen/unplugin`).
+ * The schema generator as a webpack plugin (see `@rpc-effect/codegen/unplugin`).
  *
  * @since 0.1.0
  */
@@ -26,7 +26,7 @@ import { unplugin } from './unplugin.js';
  *
  * ```ts
  * // webpack.config.mjs
- * import { effectTrpcCodegen } from '@effect-trpc/codegen/webpack';
+ * import { effectTrpcCodegen } from '@rpc-effect/codegen/webpack';
  *
  * export default {
  *   entry: './src/main.ts',

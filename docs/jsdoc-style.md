@@ -57,7 +57,7 @@ sections, all optional except the summary and the tags:
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  *
  * // Comments explain *why*, not what.
  * const router = Router.make({ ping: query({ success: Schema.String }) });
@@ -79,7 +79,7 @@ Rules:
   `**Example** (Title)` followed by a ` ```ts ` (or ` ```tsx `) fence. Examples are compiled with
   the repo's strict `tsconfig.base.json` (`exactOptionalPropertyTypes`,
   `noUncheckedIndexedAccess`), so they must be complete programs: real imports from the package's
-  public entry (`@effect-trpc/<name>` or its subpaths, never `../src`), every identifier declared.
+  public entry (`@rpc-effect/<name>` or its subpaths, never `../src`), every identifier declared.
   Use `declare const x: T` for values the example takes as given. Only import packages listed in
   that package's `dependencies`, `devDependencies` or `peerDependencies`. Mark a fence
   ` ```ts nocheck ` only when it cannot compile in isolation (e.g. a file split across processes),

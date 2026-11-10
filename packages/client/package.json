@@ -1,5 +1,5 @@
 {
-  "name": "@effect-trpc/client",
+  "name": "@rpc-effect/client",
   "version": "0.0.0",
   "files": [
     "dist"
@@ -20,7 +20,7 @@
     "test": "vp test"
   },
   "dependencies": {
-    "@effect-trpc/core": "workspace:*",
+    "@rpc-effect/core": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

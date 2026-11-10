@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite-plus';
 
 const bundled = {
-  alwaysBundle: [/^@effect-trpc\//, 'effect', /^effect\//],
+  alwaysBundle: [/^@rpc-effect\//, 'effect', /^effect\//],
   neverBundle: ['electron'],
 };
 
@@ -16,7 +16,7 @@ export default defineConfig({
       platform: 'node',
       clean: false,
       // `import.meta.dirname` stays valid: the output is `dist/main.mjs`.
-      deps: { ...bundled, alwaysBundle: [...bundled.alwaysBundle, /^@effect-trpc-examples\//] },
+      deps: { ...bundled, alwaysBundle: [...bundled.alwaysBundle, /^@rpc-effect-examples\//] },
     },
     {
       // A sandboxed preload cannot `require` npm packages and is not an ES module: one CJS file.

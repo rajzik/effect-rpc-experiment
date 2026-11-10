@@ -2,17 +2,17 @@
  * Serves an effect-trpc router from Electron's main process to its renderers.
  *
  * `MainRpcServer` listens on `ipcMain` for the `MessagePort`s that `installPreloadBridge`
- * (`@effect-trpc/electron/preload`) forwards, and turns each one into an `effect/rpc` client
+ * (`@rpc-effect/electron/preload`) forwards, and turns each one into an `effect/rpc` client
  * connection of a `MessagePortServer`. Renderers call it through `rendererLink`
- * (`@effect-trpc/electron/renderer`) and `createClient` from `@effect-trpc/client`; handlers
- * come from `Handlers.make` in `@effect-trpc/server`.
+ * (`@rpc-effect/electron/renderer`) and `createClient` from `@rpc-effect/client`; handlers
+ * come from `Handlers.make` in `@rpc-effect/server`.
  *
  * @since 0.1.0
  */
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import type { Scope } from 'effect';
-import { Router } from '@effect-trpc/core';
-import type { Handlers } from '@effect-trpc/server';
+import { Router } from '@rpc-effect/core';
+import type { Handlers } from '@rpc-effect/server';
 import { MessagePortServer } from './MessagePortServer.js';
 import type { ServeOptions } from './MessagePortServer.js';
 import { defaultChannel } from './types.js';
@@ -38,10 +38,10 @@ import type { IpcMainEventLike, IpcMainLike, IpcMainListener } from './types.js'
  * ```ts
  * // renderer.ts (renderer process)
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { createClient } from '@effect-trpc/client';
- * import { senderIdHeader } from '@effect-trpc/electron';
- * import { rendererLink } from '@effect-trpc/electron/renderer';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createClient } from '@rpc-effect/client';
+ * import { senderIdHeader } from '@rpc-effect/electron';
+ * import { rendererLink } from '@rpc-effect/electron/renderer';
  *
  * const appRouter = Router.make({ whoami: query({ success: Schema.NullOr(Schema.Number) }) });
  * const client = createClient(appRouter, { link: rendererLink() });
@@ -180,9 +180,9 @@ const makeFromInput = (
  * // main.ts (main process)
  * import { ipcMain } from 'electron';
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { MainRpcServer } from '@effect-trpc/electron/main';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { MainRpcServer } from '@rpc-effect/electron/main';
  *
  * const appRouter = Router.make({ ping: query({ success: Schema.String }) });
  * const HandlersLive = Handlers.make(appRouter, { ping: () => Effect.succeed('pong') });
@@ -249,9 +249,9 @@ const layerFromInput = (
  * // main.ts (main process)
  * import { app, ipcMain } from 'electron';
  * import { Effect, Fiber, Layer, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { MainRpcServer } from '@effect-trpc/electron/main';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { MainRpcServer } from '@rpc-effect/electron/main';
  *
  * const appRouter = Router.make({
  *   whoami: query({ success: Schema.NullOr(Schema.Number) }),
@@ -343,9 +343,9 @@ const runFromInput = (
  * import { fileURLToPath } from 'node:url';
  * import { app, BrowserWindow, ipcMain } from 'electron';
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { MainRpcServer } from '@effect-trpc/electron/main';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { MainRpcServer } from '@rpc-effect/electron/main';
  *
  * class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}
  * class NotFound extends Schema.TaggedError<NotFound>()('NotFound', { id: Schema.String }) {}
@@ -429,9 +429,9 @@ const run: {
  * ```ts
  * // main.ts (main process)
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { MainRpcServer } from '@effect-trpc/electron/main';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { MainRpcServer } from '@rpc-effect/electron/main';
  *
  * const appRouter = Router.make({ whoami: query({ success: Schema.NullOr(Schema.Number) }) });
  *
@@ -455,7 +455,7 @@ const senderId = (headers: Readonly<Record<string, string | undefined>>): number
  *
  * **When to use**
  *
- * Use in Electron's main process, imported from `@effect-trpc/electron/main`. Members: `run`
+ * Use in Electron's main process, imported from `@rpc-effect/electron/main`. Members: `run`
  * (Promise API, own runtime), `layer` / `make` (inside an Effect application), `senderId` (read
  * the caller's `webContents.id` in a handler) and `senderIdHeader`.
  *
@@ -480,9 +480,9 @@ const senderId = (headers: Readonly<Record<string, string | undefined>>): number
  * // main.ts (main process)
  * import { app, ipcMain } from 'electron';
  * import { Effect, Schedule, Schema, Stream } from 'effect';
- * import { query, Router, subscription } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { MainRpcServer } from '@effect-trpc/electron/main';
+ * import { query, Router, subscription } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { MainRpcServer } from '@rpc-effect/electron/main';
  *
  * const appRouter = Router.make({
  *   whoami: query({ success: Schema.NullOr(Schema.Number) }),

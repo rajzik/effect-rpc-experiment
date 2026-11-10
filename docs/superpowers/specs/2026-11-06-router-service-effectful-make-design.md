@@ -90,7 +90,7 @@ by the user: the server already has the class, so everything is inferred from it
 
 ## Design
 
-### Core (`@effect-trpc/core`, `Router.ts`)
+### Core (`@rpc-effect/core`, `Router.ts`)
 
 - `RouterService.Any` stays the pure service (`make: Effect<ServiceShape, never, never>`): accepted
   by `Router.Input` and every sync API, as today.
@@ -107,7 +107,7 @@ by the user: the server already has the class, so everything is inferred from it
   (same key/identifier type) whose `make` is the original `make` with the schemas patched in; no
   `make` runs at import. Its type is what `Router.WithSchemas` gives today.
 
-### Server (`@effect-trpc/server`, `Handlers.fromService`)
+### Server (`@rpc-effect/server`, `Handlers.fromService`)
 
 - One argument, as today, now typed for `RouterService.Effectful`:
   `Layer<Handlers.Provides<Router.Of<Svc>> | Svc, MakeE, Exclude<MakeR, Scope> | Handlers.ProcedureServices<Router.Of<Svc>>>`
@@ -126,7 +126,7 @@ by the user: the server already has the class, so everything is inferred from it
   effectful service classes are not provided as services by this layer (builder's call if trivial).
 - Codegen inlines nested services into the one contract, as it does today for pure ones.
 
-### Codegen (`@effect-trpc/codegen`)
+### Codegen (`@rpc-effect/codegen`)
 
 - `makeRecord` also reads `Effect.gen(function* () { …statements…; return { … } })`: the object
   literal of the generator's last top-level `return`.

@@ -2,7 +2,7 @@
 import { Context, Effect, Layer, Option, Schema } from 'effect';
 import type { HttpRouter, HttpServerError } from 'effect/http';
 import type { Rpc } from 'effect/rpc';
-import { HttpContext, Procedure, Router } from '@effect-trpc/core';
+import { HttpContext, Procedure, Router } from '@rpc-effect/core';
 import { describe, expectTypeOf, it } from 'vite-plus/test';
 import { Handlers, layerHttp, toWebHandler } from '../src/index.js';
 import type { WebHandler } from '../src/index.js';

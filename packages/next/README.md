@@ -1,10 +1,10 @@
-# @effect-trpc/next
+# @rpc-effect/next
 
 Next.js App Router integration for [effect-trpc](../../README.md). It follows tRPC's
 [TanStack React Query + Server Components guide](https://trpc.io/docs/client/tanstack-react-query/server-components),
-using an `@effect-trpc/core` router and Effect handlers:
+using an `@rpc-effect/core` router and Effect handlers:
 
-| tRPC (`@trpc/server/adapters/fetch` + `@trpc/tanstack-react-query`)       | `@effect-trpc/next`                                                          |
+| tRPC (`@trpc/server/adapters/fetch` + `@trpc/tanstack-react-query`)       | `@rpc-effect/next`                                                           |
 | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | `fetchRequestHandler` in `app/api/trpc/[trpc]/route.ts`                   | `createRouteHandler(router, { handlers })` → `{ GET, POST }`                 |
 | `trpc/query-client.ts` `makeQueryClient()`                                | `makeQueryClient()` (exported)                                               |
@@ -23,15 +23,15 @@ Handlers.fromService(AppRouter) })`); the class is normalised with `Router.from`
 
 ## For AI agents
 
-**Use this package when** you wire an `@effect-trpc/core` router into a **Next.js App Router**
+**Use this package when** you wire an `@rpc-effect/core` router into a **Next.js App Router**
 app: a `route.ts` endpoint, server components that prefetch into TanStack Query, client components
 that read the cache, and server actions that keep typed errors.
 
-- TanStack Start app → use `@effect-trpc/start`.
-- Plain React (Vite SPA, no RSC) → use `@effect-trpc/tanstack-react-query` + `@effect-trpc/client`.
-- Any other fetch server (Bun, Deno, Workers, Hono) → `toWebHandler` from `@effect-trpc/server`.
+- TanStack Start app → use `@rpc-effect/start`.
+- Plain React (Vite SPA, no RSC) → use `@rpc-effect/tanstack-react-query` + `@rpc-effect/client`.
+- Any other fetch server (Bun, Deno, Workers, Hono) → `toWebHandler` from `@rpc-effect/server`.
 
-**Entry points** (all from `@effect-trpc/next`; the package has no subpaths and no
+**Entry points** (all from `@rpc-effect/next`; the package has no subpaths and no
 `'use client'` / `'use server'` directives of its own):
 
 | export                                                          | side   | what                                                        | source                                 |
@@ -67,13 +67,13 @@ that read the cache, and server actions that keep typed errors.
 - `createRouteHandler` requires `handlers`; `path` defaults to `/api/rpc`; `serialization`
   (default `"ndjson"`) must match `createNextRpcClient`.
 - `createRouteHandler` takes the `onError` option of `toWebHandler` unchanged
-  (`@effect-trpc/server`): `onError({ path, cause, headers })` reports failed calls. It applies the
+  (`@rpc-effect/server`): `onError({ path, cause, headers })` reports failed calls. It applies the
   per-call context of a `Handlers.withContext(handlers, context)` layer, and so does
   `createServerActionCaller` (built on `createCaller`). `onError` works on the HTTP route only, and
   `createRscHelpers({ handlers })` runs the handlers through `localLink` without the context, so
   give it handlers with the services of `context` provided directly. Handlers
   can read the request and set response headers and cookies with `HttpContext`
-  (`@effect-trpc/core`) over HTTP.
+  (`@rpc-effect/core`) over HTTP.
 - `GET` always answers `405`; every call (subscriptions included) is a `POST`.
 - Server actions never reject with a procedure error: they resolve with an encoded `Exit`
   (`EncodedActionResult`), decoded on the client with the router's schemas.
@@ -139,8 +139,8 @@ node scripts/verify-jsdoc.mjs next
 ## Install
 
 ```bash
-pnpm add @effect-trpc/next @effect-trpc/core @effect-trpc/server @effect-trpc/client \
-  @effect-trpc/tanstack-react-query effect @tanstack/react-query
+pnpm add @rpc-effect/next @rpc-effect/core @rpc-effect/server @rpc-effect/client \
+  @rpc-effect/tanstack-react-query effect @tanstack/react-query
 ```
 
 Peers: `next >= 15`, `react >= 18.2` (React 19 for `React.cache`), `@tanstack/react-query` 5.
@@ -152,7 +152,7 @@ Keep the handlers (database access, secrets) in a server-only module.
 
 ```ts
 // server/router.ts — shared by server and client
-import { mutation, query, Router } from '@effect-trpc/core';
+import { mutation, query, Router } from '@rpc-effect/core';
 import { Schema } from 'effect';
 
 export class Post extends Schema.Class<Post>('Post')({
@@ -183,7 +183,7 @@ export type AppRouter = typeof appRouter;
 ```ts
 // server/handlers.ts
 import 'server-only';
-import { Handlers } from '@effect-trpc/server';
+import { Handlers } from '@rpc-effect/server';
 import { Effect } from 'effect';
 import { appRouter, Forbidden, Post, PostNotFound } from './router';
 
@@ -204,7 +204,7 @@ export const HandlersLive = Handlers.make(appRouter, {
 ## 2. Route handler — `app/api/rpc/[[...rpc]]/route.ts`
 
 ```ts
-import { createRouteHandler } from '@effect-trpc/next';
+import { createRouteHandler } from '@rpc-effect/next';
 import { HandlersLive } from '~/server/handlers';
 import { appRouter } from '~/server/router';
 
@@ -222,7 +222,7 @@ export const { GET, POST } = createRouteHandler(appRouter, { handlers: HandlersL
 - `serialization` (`"ndjson"` default, or `"json"`) must match the client.
 - `Handlers.withContext(handlers, context)` (tRPC's `createContext`: an `Effect` of services
   evaluated per call, before middleware and the handler) and `onError({ path, cause, headers })`, an
-  option of `toWebHandler`, work as in `@effect-trpc/server`; see
+  option of `toWebHandler`, work as in `@rpc-effect/server`; see
   [Request context, response headers and `onError`](../server/README.md#request-context-response-headers-and-onerror).
 - Both exports are `(request: Request) => Promise<Response>`, so they are valid Next route
   handlers (`NextRequest` extends `Request`). The package never imports `next` at runtime.
@@ -245,7 +245,7 @@ error class is lost. Queries that failed before `HydrateClient` rendered are enc
 
 ```tsx
 'use client';
-import { createNextRpcClient } from '@effect-trpc/next';
+import { createNextRpcClient } from '@rpc-effect/next';
 import { appRouter } from '~/server/router';
 
 export const { RpcProvider, useRpc, useRpcClient, HydrationBoundary } = createNextRpcClient(
@@ -280,7 +280,7 @@ browser, and a client over `httpLink`. Relative urls resolve against `getBaseUrl
 
 ```tsx
 import 'server-only';
-import { createRscHelpers } from '@effect-trpc/next';
+import { createRscHelpers } from '@rpc-effect/next';
 import { headers } from 'next/headers';
 import { HandlersLive } from '~/server/handlers';
 import { appRouter } from '~/server/router';
@@ -351,7 +351,7 @@ error. It resolves with the **encoded `Exit`** (`Codecs.exit(rpc)`), and the cli
 ```ts
 // app/actions.ts
 'use server';
-import { createServerActionCaller, type InputAt } from '@effect-trpc/next';
+import { createServerActionCaller, type InputAt } from '@rpc-effect/next';
 import { headers } from 'next/headers';
 import { HandlersLive } from '~/server/handlers';
 import { appRouter, type AppRouter } from '~/server/router';
@@ -369,7 +369,7 @@ export async function createPost(input: InputAt<AppRouter, 'post.create'>) {
 ```tsx
 // app/new-post.tsx
 'use client';
-import { useServerAction } from '@effect-trpc/next';
+import { useServerAction } from '@rpc-effect/next';
 import { appRouter } from '~/server/router';
 import { createPost } from './actions';
 

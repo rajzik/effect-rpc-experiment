@@ -1,7 +1,7 @@
 // Ports of tRPC tests/server/streaming.test.ts and the stream regressions
 // issue-5945-stream-null and issue-6461-stream-error.
 import { Chunk, Effect, Exit, Stream } from 'effect';
-import { causeToClientError } from '@effect-trpc/core';
+import { causeToClientError } from '@rpc-effect/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test';
 import { createCaller } from '../src/index.js';
 import type { Caller } from '../src/index.js';

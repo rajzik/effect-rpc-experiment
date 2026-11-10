@@ -1,5 +1,5 @@
 /**
- * The schema generator as a Rolldown plugin (see `@effect-trpc/codegen/unplugin`).
+ * The schema generator as a Rolldown plugin (see `@rpc-effect/codegen/unplugin`).
  *
  * @since 0.1.0
  */
@@ -26,7 +26,7 @@ import { unplugin } from './unplugin.js';
  *
  * ```ts
  * // rolldown.config.ts
- * import { effectTrpcCodegen } from '@effect-trpc/codegen/rolldown';
+ * import { effectTrpcCodegen } from '@rpc-effect/codegen/rolldown';
  *
  * export default {
  *   input: 'src/main.ts',

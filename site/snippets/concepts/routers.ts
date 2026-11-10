@@ -1,6 +1,6 @@
 import { Effect, Layer, Schema } from 'effect';
 import { RpcMiddleware } from 'effect/rpc';
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
 
 // #region nesting
 class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}

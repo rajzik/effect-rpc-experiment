@@ -1,11 +1,11 @@
 /**
- * Public entry of `@effect-trpc/core`: tRPC-style procedures, routers, the client error model and
+ * Public entry of `@rpc-effect/core`: tRPC-style procedures, routers, the client error model and
  * JSON codecs for Effect v4.
  *
  * Everything here is transport-free except `HttpContext`, which reads the HTTP request and sets
  * response headers through `effect/http` (it lives here so router modules need not import the
- * server). `@effect-trpc/server` implements routers built with these APIs, `@effect-trpc/client`
- * calls them and `@effect-trpc/tanstack-react-query` bridges them to TanStack Query; all of them
+ * server). `@rpc-effect/server` implements routers built with these APIs, `@rpc-effect/client`
+ * calls them and `@rpc-effect/tanstack-react-query` bridges them to TanStack Query; all of them
  * share {@link ClientError} and {@link Codecs}.
  *
  * @since 0.1.0

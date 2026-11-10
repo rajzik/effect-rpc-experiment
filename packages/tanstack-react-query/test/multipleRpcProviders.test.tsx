@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 // Port of trpc/packages/tanstack-react-query/test/multipleTrpcProviders.test.tsx
-import { createClient, localLink } from '@effect-trpc/client';
-import { query, Router } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { createClient, localLink } from '@rpc-effect/client';
+import { query, Router } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { cleanup, render } from '@testing-library/react';
 import { Effect, Schema } from 'effect';

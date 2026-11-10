@@ -1,5 +1,5 @@
 import { Effect, Exit } from 'effect';
-import { RpcDefect } from '@effect-trpc/core';
+import { RpcDefect } from '@rpc-effect/core';
 import { describe, expect, it } from 'vite-plus/test';
 import {
   assertInstance,

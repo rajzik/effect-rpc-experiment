@@ -5,14 +5,14 @@
  * `createTRPCOptionsProxy`. Every router node gets `pathKey` / `pathFilter`; every procedure gets
  * the helpers of its kind (`queryOptions`, `infiniteQueryOptions`, `mutationOptions`,
  * `subscriptionOptions` and the key/filter helpers). Calls go through the Promise client of
- * `@effect-trpc/client`, so `data` is the decoded output and `error` is `ClientError<E>` from
- * `@effect-trpc/core`. `createRpcContext` wraps this proxy for React.
+ * `@rpc-effect/client`, so `data` is the decoded output and `error` is `ClientError<E>` from
+ * `@rpc-effect/core`. `createRpcContext` wraps this proxy for React.
  *
  * @since 0.1.0
  */
-import type { Client } from '@effect-trpc/client';
-import { Router } from '@effect-trpc/core';
-import type { ProcedureDef, ProcedureKind } from '@effect-trpc/core';
+import type { Client } from '@rpc-effect/client';
+import { Router } from '@rpc-effect/core';
+import type { ProcedureDef, ProcedureKind } from '@rpc-effect/core';
 import type { DataTag, QueryClient, QueryFilters } from '@tanstack/react-query';
 import { rpcInfiniteQueryOptions, type RpcInfiniteQueryOptions } from './infiniteQueryOptions.js';
 import type { ProcedureCaller } from './internals/call.js';
@@ -232,7 +232,7 @@ export type DecoratedRouterRecord<Rec, TFeatureFlags extends FeatureFlags> = {
  * **Example** (A helper that prefetches through the proxy)
  *
  * ```ts
- * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { mutation, query, Router } from '@rpc-effect/core';
  * import { Schema } from 'effect';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
@@ -246,7 +246,7 @@ export type DecoratedRouterRecord<Rec, TFeatureFlags extends FeatureFlags> = {
  *   },
  * });
  * type AppRouter = typeof appRouter;
- * import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
  * import type { QueryClient } from '@tanstack/react-query';
  *
  * export const prefetchPost = (rpc: RpcOptionsProxy<AppRouter>, queryClient: QueryClient, id: number) =>
@@ -268,7 +268,7 @@ export type RpcOptionsProxy<
  * **Example** (Typing a form value from the procedure input)
  *
  * ```ts
- * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { mutation, query, Router } from '@rpc-effect/core';
  * import { Schema } from 'effect';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
@@ -287,7 +287,7 @@ export type RpcOptionsProxy<
  *   inferProxyInput,
  *   inferProxyOutput,
  *   RpcOptionsProxy,
- * } from '@effect-trpc/tanstack-react-query';
+ * } from '@rpc-effect/tanstack-react-query';
  *
  * declare const rpc: RpcOptionsProxy<AppRouter>;
  * type CreateInput = inferProxyInput<typeof rpc.post.create>; // { readonly title: string }
@@ -440,15 +440,15 @@ const createRecursiveProxy = (
  * - Calling the wrong helper for a procedure kind (`queryOptions` on a mutation) or a path that is
  *   not a procedure throws an `Error` at call time.
  * - tRPC's `router` + `ctx` server mode does not exist: on the server, create a client over
- *   `localLink({ handlers })` from `@effect-trpc/client`, which calls the handlers in-process.
+ *   `localLink({ handlers })` from `@rpc-effect/client`, which calls the handlers in-process.
  * - The request option is `rpc: { headers }` (tRPC: `trpc: { context }`), and the metadata on each
  *   result is `.rpc.path` (tRPC: `.trpc.path`).
  *
  * **Example** (Prefetching in a loader, then invalidating by path)
  *
  * ```ts
- * import { createClient, httpLink } from '@effect-trpc/client';
- * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { createClient, httpLink } from '@rpc-effect/client';
+ * import { mutation, query, Router } from '@rpc-effect/core';
  * import { Schema } from 'effect';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
@@ -462,7 +462,7 @@ const createRecursiveProxy = (
  *   },
  * });
  * type AppRouter = typeof appRouter;
- * import { createRpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import { createRpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
  * import { QueryClient } from '@tanstack/react-query';
  *
  * const client = createClient(appRouter, { link: httpLink({ url: 'http://localhost:3000/rpc' }) });
@@ -483,8 +483,8 @@ const createRecursiveProxy = (
  * **Example** (Invalidate everything after any mutation)
  *
  * ```ts
- * import type { Client } from '@effect-trpc/client';
- * import { mutation, query, Router } from '@effect-trpc/core';
+ * import type { Client } from '@rpc-effect/client';
+ * import { mutation, query, Router } from '@rpc-effect/core';
  * import { Schema } from 'effect';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
@@ -498,7 +498,7 @@ const createRecursiveProxy = (
  *   },
  * });
  * type AppRouter = typeof appRouter;
- * import { createRpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import { createRpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
  * import { QueryClient } from '@tanstack/react-query';
  *
  * declare const client: Client<AppRouter>;

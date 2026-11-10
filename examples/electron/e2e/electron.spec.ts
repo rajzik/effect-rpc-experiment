@@ -1,4 +1,4 @@
-import type { TaskBoardPage } from '@effect-trpc-examples/shared/e2e';
+import type { TaskBoardPage } from '@rpc-effect-examples/shared/e2e';
 import type { ElectronApplication } from '@playwright/test';
 
 import { expect, noSandbox, subscriberCount, test, windowOf, windowTitle } from './fixtures';

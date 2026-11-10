@@ -2,7 +2,7 @@
 // equivalent `Router.make` router of plain definitions, shared by `routerService.test(-d).ts`.
 import { Context, Effect, Layer, Schema, Stream } from 'effect';
 import type { Rpc } from 'effect/rpc';
-import { query, Procedure, Router, subscription } from '@effect-trpc/core';
+import { query, Procedure, Router, subscription } from '@rpc-effect/core';
 
 export class Post extends Schema.Class<Post>('Post')({
   id: Schema.Finite,

@@ -2,9 +2,9 @@
 import type { MessagePort } from 'node:worker_threads';
 import { Effect, Schema, Stream } from 'effect';
 import { describe, expect, it } from 'vite-plus/test';
-import { query, Router, subscription } from '@effect-trpc/core';
-import { createClient } from '@effect-trpc/client';
-import { Handlers } from '@effect-trpc/server';
+import { query, Router, subscription } from '@rpc-effect/core';
+import { createClient } from '@rpc-effect/client';
+import { Handlers } from '@rpc-effect/server';
 import { MainRpcServer } from '../src/main.js';
 import { installPreloadBridge } from '../src/preload.js';
 import { rendererLink } from '../src/renderer.js';

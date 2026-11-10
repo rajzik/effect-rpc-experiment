@@ -1,11 +1,11 @@
 /**
- * Typed clients for `@effect-trpc/core` routers: Promise and Effect APIs over pluggable links.
+ * Typed clients for `@rpc-effect/core` routers: Promise and Effect APIs over pluggable links.
  *
  * `createClient(router, { link })` is the entry point; links are `httpLink` (fetch + NDJSON),
  * `httpBatchLink` (same-tick queries in one POST), `wsLink` (one WebSocket), `localLink`
  * (in-process) or a custom `Link`. The client error types (`RpcDefect`, `RpcTransportError`,
- * `RpcInterrupted`, `ClientError`) are re-exported from `@effect-trpc/core`. Servers come from
- * `@effect-trpc/server`.
+ * `RpcInterrupted`, `ClientError`) are re-exported from `@rpc-effect/core`. Servers come from
+ * `@rpc-effect/server`.
  *
  * @since 0.1.0
  */
@@ -45,4 +45,4 @@ export {
   RpcTransportError,
   isClientInfrastructureError,
   type ClientError,
-} from '@effect-trpc/core';
+} from '@rpc-effect/core';

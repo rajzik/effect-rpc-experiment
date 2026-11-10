@@ -73,7 +73,7 @@ const report = (io: CommandIO, result: GenerateResult, check: boolean): boolean 
  * **Example** (A check in a script)
  *
  * ```ts
- * import { runCommand } from '@effect-trpc/codegen';
+ * import { runCommand } from '@rpc-effect/codegen';
  *
  * const code = runCommand(['--check', 'src/router.ts']);
  * process.exitCode = code;

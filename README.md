@@ -28,17 +28,17 @@ type-checked **Example**, `@category`, `@since`): hover it, or read it in `packa
 
 **Pick the package by job**
 
-| You need to…                                              | Use                                                         |
-| --------------------------------------------------------- | ----------------------------------------------------------- |
-| Declare procedures and a router (shared by server+client) | `@effect-trpc/core`                                         |
-| Implement handlers and serve them (Node, fetch, caller)   | `@effect-trpc/server` (`/node` for a Node listener)         |
-| Call procedures from TS (Promise or Effect)               | `@effect-trpc/client`                                       |
-| Use procedures in React with TanStack Query               | `@effect-trpc/tanstack-react-query`                         |
-| Wire it into Next.js App Router / RSC / server actions    | `@effect-trpc/next`                                         |
-| Wire it into TanStack Start (server route + loaders)      | `@effect-trpc/start`                                        |
-| Run the server in Electron main, call it from a renderer  | `@effect-trpc/electron` (`/main`, `/preload`, `/renderer`)  |
-| Write tests against a real server                         | `@effect-trpc/test-utils`                                   |
-| Generate schemas from handler types (no `.output`)        | `@effect-trpc/codegen` (CLI `effect-trpc-codegen`, `/vite`) |
+| You need to…                                              | Use                                                        |
+| --------------------------------------------------------- | ---------------------------------------------------------- |
+| Declare procedures and a router (shared by server+client) | `@rpc-effect/core`                                         |
+| Implement handlers and serve them (Node, fetch, caller)   | `@rpc-effect/server` (`/node` for a Node listener)         |
+| Call procedures from TS (Promise or Effect)               | `@rpc-effect/client`                                       |
+| Use procedures in React with TanStack Query               | `@rpc-effect/tanstack-react-query`                         |
+| Wire it into Next.js App Router / RSC / server actions    | `@rpc-effect/next`                                         |
+| Wire it into TanStack Start (server route + loaders)      | `@rpc-effect/start`                                        |
+| Run the server in Electron main, call it from a renderer  | `@rpc-effect/electron` (`/main`, `/preload`, `/renderer`)  |
+| Write tests against a real server                         | `@rpc-effect/test-utils`                                   |
+| Generate schemas from handler types (no `.output`)        | `@rpc-effect/codegen` (CLI `effect-trpc-codegen`, `/vite`) |
 
 **Golden path:** `Router.make({...})` in a shared module (core) → `Handlers.make(router, {...})` and
 `toWebHandler` / `serve` (server) → `createClient(router, { link: httpLink({ url }) })` (client) →
@@ -62,17 +62,17 @@ New or changed exports follow [`docs/jsdoc-style.md`](docs/jsdoc-style.md).
 
 ## Packages
 
-| Package                             | Purpose                                                                                                                                                                                                    |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@effect-trpc/core`                 | Router/procedure definitions (`query`, `mutation`, `subscription`, `Router.make`, `.annotate`), `HttpContext` (request, response headers, cookies), the client error model, JSON codecs                    |
-| `@effect-trpc/server`               | Handler layers (`Handlers.withContext`), HTTP / fetch `Request → Response` adapters (`onError`), in-process caller, middleware                                                                             |
-| `@effect-trpc/client`               | `createClient` + links (`httpLink`, `httpBatchLink`, `wsLink`, `localLink`): Promise and Effect clients                                                                                                    |
-| `@effect-trpc/tanstack-react-query` | Options proxy modeled on `@trpc/tanstack-react-query`: `queryOptions`, `infiniteQueryOptions`, `mutationOptions`, `subscriptionOptions`, keys/filters, provider, `useSubscription`, Schema-aware hydration |
-| `@effect-trpc/next`                 | Next.js App Router route handler, RSC prefetch + `HydrateClient`, server-action caller                                                                                                                     |
-| `@effect-trpc/start`                | TanStack Start server route handler, isomorphic client, loader helpers                                                                                                                                     |
-| `@effect-trpc/electron`             | Main-process server and renderer link over `MessagePort`, preload bridge                                                                                                                                   |
-| `@effect-trpc/test-utils`           | Shared test harness (real Node HTTP server + clients)                                                                                                                                                      |
-| `@effect-trpc/codegen`              | Schema generator for routers written without `.output` / `.error`: server overlay (`router.gen.ts`), handler-free client contract (`router.client.gen.ts`), CLI and Vite plugin                            |
+| Package                            | Purpose                                                                                                                                                                                                    |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@rpc-effect/core`                 | Router/procedure definitions (`query`, `mutation`, `subscription`, `Router.make`, `.annotate`), `HttpContext` (request, response headers, cookies), the client error model, JSON codecs                    |
+| `@rpc-effect/server`               | Handler layers (`Handlers.withContext`), HTTP / fetch `Request → Response` adapters (`onError`), in-process caller, middleware                                                                             |
+| `@rpc-effect/client`               | `createClient` + links (`httpLink`, `httpBatchLink`, `wsLink`, `localLink`): Promise and Effect clients                                                                                                    |
+| `@rpc-effect/tanstack-react-query` | Options proxy modeled on `@trpc/tanstack-react-query`: `queryOptions`, `infiniteQueryOptions`, `mutationOptions`, `subscriptionOptions`, keys/filters, provider, `useSubscription`, Schema-aware hydration |
+| `@rpc-effect/next`                 | Next.js App Router route handler, RSC prefetch + `HydrateClient`, server-action caller                                                                                                                     |
+| `@rpc-effect/start`                | TanStack Start server route handler, isomorphic client, loader helpers                                                                                                                                     |
+| `@rpc-effect/electron`             | Main-process server and renderer link over `MessagePort`, preload bridge                                                                                                                                   |
+| `@rpc-effect/test-utils`           | Shared test harness (real Node HTTP server + clients)                                                                                                                                                      |
+| `@rpc-effect/codegen`              | Schema generator for routers written without `.output` / `.error`: server overlay (`router.gen.ts`), handler-free client contract (`router.client.gen.ts`), CLI and Vite plugin                            |
 
 ## Toolchain
 

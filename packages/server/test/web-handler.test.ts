@@ -1,6 +1,6 @@
 import { Effect, Schema } from 'effect';
 import { RpcSerialization } from 'effect/rpc';
-import { Codecs, causeToClientError, query, Router } from '@effect-trpc/core';
+import { Codecs, causeToClientError, query, Router } from '@rpc-effect/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test';
 import { Handlers, toWebHandler } from '../src/index.js';
 import type { WebHandler } from '../src/index.js';

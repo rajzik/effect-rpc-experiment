@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The React bindings over a real HTTP server (`testServerAndClient`): NDJSON transport, class
 // instances, typed errors, infinite queries, mutations, subscriptions and abort.
-import { RpcDefect } from '@effect-trpc/core';
+import { RpcDefect } from '@rpc-effect/core';
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { fireEvent } from '@testing-library/react';
 import * as React from 'react';
@@ -30,7 +30,7 @@ describe('over HTTP', () => {
 
     const utils = ctx.renderApp(<MyComponent />);
     await waitFor(() => {
-      expect(utils.container.textContent).toBe('HELLO WORLD!|PostNotFound|@effect-trpc/RpcDefect');
+      expect(utils.container.textContent).toBe('HELLO WORLD!|PostNotFound|@rpc-effect/RpcDefect');
     });
     expect(seen.some((v) => v instanceof Post)).toBe(true);
     expect(seen.some((v) => v instanceof PostNotFound)).toBe(true);

@@ -3,8 +3,8 @@ import { Effect, Layer, ManagedRuntime } from 'effect';
 import { HttpRouter, HttpServer } from 'effect/http';
 import { NodeHttpServer } from '@effect/platform-node';
 import { afterAll, beforeAll, describe, expect, it } from 'vite-plus/test';
-import { createClient, wsLink, type Client } from '@effect-trpc/client';
-import { layerHttp } from '@effect-trpc/server';
+import { createClient, wsLink, type Client } from '@rpc-effect/client';
+import { layerHttp } from '@rpc-effect/server';
 import { appRouter, HandlersLive, NotFound, User, type AppRouter } from './fixtures.js';
 
 // Regression: `wsLink` and `layerHttp(..., { protocol: 'websocket' })` must agree on the wire

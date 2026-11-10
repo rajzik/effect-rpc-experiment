@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 // Executes the examples of README.md. Only the link differs (an in-process `localLink` instead of
-// `httpLink`), plus the server-side handlers the README leaves to @effect-trpc/server.
-import { createClient, localLink, RpcTransportError, type Client } from '@effect-trpc/client';
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+// `httpLink`), plus the server-side handlers the README leaves to @rpc-effect/server.
+import { createClient, localLink, RpcTransportError, type Client } from '@rpc-effect/client';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import {
   QueryClient,
   QueryClientProvider,

@@ -3,8 +3,8 @@
  *
  * A procedure's own typed error `E` (its `Schema.TaggedError` union) is kept apart from the three
  * infrastructure errors defined here — {@link RpcDefect}, {@link RpcTransportError} and
- * {@link RpcInterrupted}. `@effect-trpc/client`, `@effect-trpc/server`'s caller and
- * `@effect-trpc/tanstack-react-query` use {@link causeToClientError} to turn an `effect/rpc`
+ * {@link RpcInterrupted}. `@rpc-effect/client`, `@rpc-effect/server`'s caller and
+ * `@rpc-effect/tanstack-react-query` use {@link causeToClientError} to turn an `effect/rpc`
  * `Cause` into the value a Promise rejects with.
  *
  * @since 0.1.0
@@ -18,13 +18,13 @@ import type { RpcClientError } from 'effect/rpc';
  *
  * **When to use**
  *
- * Match on it (`instanceof RpcDefect` or `_tag === '@effect-trpc/RpcDefect'`) to tell "the
+ * Match on it (`instanceof RpcDefect` or `_tag === '@rpc-effect/RpcDefect'`) to tell "the
  * handler crashed" apart from the procedure's declared errors. You never construct it yourself
  * outside of tests; {@link causeToClientError} builds it from a `Die` cause.
  *
  * **Details**
  *
- * - `_tag` is `'@effect-trpc/RpcDefect'`.
+ * - `_tag` is `'@rpc-effect/RpcDefect'`.
  * - `message` is `defect.message` when the defect has a string `message`, else `String(defect)`.
  * - `cause` holds the original defect (encoded with `Schema.Defect`, so it survives JSON).
  *
@@ -37,7 +37,7 @@ import type { RpcClientError } from 'effect/rpc';
  *
  * ```ts
  * import { Cause, Schema } from 'effect';
- * import { causeToClientError, RpcDefect } from '@effect-trpc/core';
+ * import { causeToClientError, RpcDefect } from '@rpc-effect/core';
  *
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
  *   id: Schema.Number,
@@ -54,7 +54,7 @@ import type { RpcClientError } from 'effect/rpc';
  * @category errors
  * @since 0.1.0
  */
-export class RpcDefect extends Schema.TaggedError<RpcDefect>()('@effect-trpc/RpcDefect', {
+export class RpcDefect extends Schema.TaggedError<RpcDefect>()('@rpc-effect/RpcDefect', {
   message: Schema.String,
   cause: Schema.Defect(),
 }) {}
@@ -70,14 +70,14 @@ export class RpcDefect extends Schema.TaggedError<RpcDefect>()('@effect-trpc/Rpc
  *
  * **Details**
  *
- * - `_tag` is `'@effect-trpc/RpcTransportError'`.
+ * - `_tag` is `'@rpc-effect/RpcTransportError'`.
  * - {@link causeToClientError} builds it from a `Fail(RpcClientError)`: `message` is the
  *   original error's message and `cause` the original `RpcClientError` from `effect/rpc`.
  *
  * **Example** (Retrying only transport failures)
  *
  * ```ts
- * import { RpcTransportError } from '@effect-trpc/core';
+ * import { RpcTransportError } from '@rpc-effect/core';
  *
  * declare const call: () => Promise<string>;
  *
@@ -98,7 +98,7 @@ export class RpcDefect extends Schema.TaggedError<RpcDefect>()('@effect-trpc/Rpc
  * @since 0.1.0
  */
 export class RpcTransportError extends Schema.TaggedError<RpcTransportError>()(
-  '@effect-trpc/RpcTransportError',
+  '@rpc-effect/RpcTransportError',
   {
     message: Schema.String,
     cause: Schema.Defect(),
@@ -115,14 +115,14 @@ export class RpcTransportError extends Schema.TaggedError<RpcTransportError>()(
  *
  * **Details**
  *
- * - `_tag` is `'@effect-trpc/RpcInterrupted'`; it carries no fields.
+ * - `_tag` is `'@rpc-effect/RpcInterrupted'`; it carries no fields.
  * - {@link causeToClientError} returns it only when the cause has neither a typed failure nor a
  *   defect.
  *
  * **Example** (Ignoring aborted calls)
  *
  * ```ts
- * import { RpcInterrupted } from '@effect-trpc/core';
+ * import { RpcInterrupted } from '@rpc-effect/core';
  *
  * const report = (error: unknown): void => {
  *   if (error instanceof RpcInterrupted) return; // the caller aborted; nothing to report
@@ -135,7 +135,7 @@ export class RpcTransportError extends Schema.TaggedError<RpcTransportError>()(
  * @since 0.1.0
  */
 export class RpcInterrupted extends Schema.TaggedError<RpcInterrupted>()(
-  '@effect-trpc/RpcInterrupted',
+  '@rpc-effect/RpcInterrupted',
   {},
 ) {}
 
@@ -150,15 +150,15 @@ export class RpcInterrupted extends Schema.TaggedError<RpcInterrupted>()(
  * **Example** (Handling only infrastructure failures)
  *
  * ```ts
- * import type { ClientInfrastructureError } from '@effect-trpc/core';
+ * import type { ClientInfrastructureError } from '@rpc-effect/core';
  *
  * const describe = (error: ClientInfrastructureError): string => {
  *   switch (error._tag) {
- *     case '@effect-trpc/RpcDefect':
+ *     case '@rpc-effect/RpcDefect':
  *       return `server crashed: ${error.message}`;
- *     case '@effect-trpc/RpcTransportError':
+ *     case '@rpc-effect/RpcTransportError':
  *       return `network: ${error.message}`;
- *     case '@effect-trpc/RpcInterrupted':
+ *     case '@rpc-effect/RpcInterrupted':
  *       return 'cancelled';
  *   }
  * };
@@ -190,7 +190,7 @@ export type ClientInfrastructureError = RpcDefect | RpcTransportError | RpcInter
  *
  * ```ts
  * import { Schema } from 'effect';
- * import type { ClientError } from '@effect-trpc/core';
+ * import type { ClientError } from '@rpc-effect/core';
  *
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
  *   id: Schema.Number,
@@ -200,11 +200,11 @@ export type ClientInfrastructureError = RpcDefect | RpcTransportError | RpcInter
  *   switch (error._tag) {
  *     case 'PostNotFound':
  *       return `post ${error.id} does not exist`;
- *     case '@effect-trpc/RpcDefect':
+ *     case '@rpc-effect/RpcDefect':
  *       return 'the server crashed';
- *     case '@effect-trpc/RpcTransportError':
+ *     case '@rpc-effect/RpcTransportError':
  *       return 'you seem to be offline';
- *     case '@effect-trpc/RpcInterrupted':
+ *     case '@rpc-effect/RpcInterrupted':
  *       return 'cancelled';
  *   }
  * };
@@ -218,9 +218,9 @@ export type ClientInfrastructureError = RpcDefect | RpcTransportError | RpcInter
 export type ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted;
 
 const infrastructureTags: ReadonlySet<string> = new Set([
-  '@effect-trpc/RpcDefect',
-  '@effect-trpc/RpcTransportError',
-  '@effect-trpc/RpcInterrupted',
+  '@rpc-effect/RpcDefect',
+  '@rpc-effect/RpcTransportError',
+  '@rpc-effect/RpcInterrupted',
 ]);
 
 const RpcClientErrorTypeId = '~effect/rpc/RpcClientError';
@@ -241,7 +241,7 @@ const RpcClientErrorTypeId = '~effect/rpc/RpcClientError';
  * **Example** (Classifying a raw rpc failure)
  *
  * ```ts
- * import { isRpcClientError } from '@effect-trpc/core';
+ * import { isRpcClientError } from '@rpc-effect/core';
  *
  * declare const failure: unknown;
  *
@@ -272,8 +272,8 @@ export const isRpcClientError = (u: unknown): u is RpcClientError.RpcClientError
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { isClientInfrastructureError } from '@effect-trpc/core';
- * import type { ClientError } from '@effect-trpc/core';
+ * import { isClientInfrastructureError } from '@rpc-effect/core';
+ * import type { ClientError } from '@rpc-effect/core';
  *
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
  *   id: Schema.Number,
@@ -327,7 +327,7 @@ const defectMessage = (defect: unknown): string => {
  * ```ts
  * import { Effect, Exit, Schema } from 'effect';
  * import { RpcTest } from 'effect/rpc';
- * import { causeToClientError, isClientInfrastructureError, query, Router } from '@effect-trpc/core';
+ * import { causeToClientError, isClientInfrastructureError, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -400,7 +400,7 @@ export const causeToClientError = <E>(
  *
  * ```ts
  * import { Exit, Option, Schema } from 'effect';
- * import { exitToClientError } from '@effect-trpc/core';
+ * import { exitToClientError } from '@rpc-effect/core';
  *
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
  *   id: Schema.Number,

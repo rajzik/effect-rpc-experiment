@@ -2,7 +2,7 @@
  * TanStack Query helpers for TanStack Start: loader options proxy, React context and
  * Schema-aware SSR hydration.
  *
- * {@link createStartHelpers} binds the `@effect-trpc/tanstack-react-query` options proxy to a
+ * {@link createStartHelpers} binds the `@rpc-effect/tanstack-react-query` options proxy to a
  * router-context `QueryClient` (`rpc(context.queryClient)` in loaders) and creates the
  * `RpcProvider` / `useRpc` context. {@link createStartHydration} plugs Schema-aware `dehydrate` /
  * `hydrate` into TanStack Router's `createRouter({ dehydrate, hydrate })`, so `Schema.Class`
@@ -11,13 +11,13 @@
  *
  * @since 0.1.0
  */
-import type { Client } from '@effect-trpc/client';
-import { Router } from '@effect-trpc/core';
+import type { Client } from '@rpc-effect/client';
+import { Router } from '@rpc-effect/core';
 import {
   createHydrationHelpers,
   createRpcContext,
   createRpcOptionsProxy,
-} from '@effect-trpc/tanstack-react-query';
+} from '@rpc-effect/tanstack-react-query';
 import type {
   CreateRpcContextResult,
   DefaultFeatureFlags,
@@ -27,7 +27,7 @@ import type {
   RpcDehydrateOptions,
   RpcHydrateOptions,
   RpcOptionsProxy,
-} from '@effect-trpc/tanstack-react-query';
+} from '@rpc-effect/tanstack-react-query';
 import type { DehydratedState, QueryClient } from '@tanstack/react-query';
 
 /**
@@ -86,7 +86,7 @@ export interface StartRouterHydrationOptions {
 
 /**
  * Creates Schema-aware `dehydrate` / `hydrate` for a router (thin wrapper over
- * `@effect-trpc/tanstack-react-query`'s hydration helpers). `Schema.Class` instances, `Date`s and
+ * `@rpc-effect/tanstack-react-query`'s hydration helpers). `Schema.Class` instances, `Date`s and
  * `TaggedError`s survive the server → browser trip.
  *
  * **When to use**
@@ -118,8 +118,8 @@ export interface StartRouterHydrationOptions {
  *
  * ```tsx
  * // src/router.tsx — runs on the server and in the browser
- * import { query, Router } from '@effect-trpc/core';
- * import { createStartHydration } from '@effect-trpc/start';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createStartHydration } from '@rpc-effect/start';
  * import { QueryClient } from '@tanstack/react-query';
  * import { createRootRouteWithContext, createRouter } from '@tanstack/react-router';
  * import { Schema } from 'effect';
@@ -262,7 +262,7 @@ const createStartHelpersFromInput = (
  * **When to use**
  *
  * Call it once in `src/rpc/client.ts`, next to `createIsomorphicClient`, and import its exports
- * from `src/router.tsx` and routes. Use `@effect-trpc/tanstack-react-query` directly outside
+ * from `src/router.tsx` and routes. Use `@rpc-effect/tanstack-react-query` directly outside
  * TanStack Start.
  *
  * **Details**
@@ -297,9 +297,9 @@ const createStartHelpersFromInput = (
  *
  * ```tsx
  * // src/rpc/client.ts + src/router.tsx + src/routes/posts.$postId.tsx (server and browser)
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { createIsomorphicClient, createStartHelpers } from '@effect-trpc/start';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { createIsomorphicClient, createStartHelpers } from '@rpc-effect/start';
  * import { QueryClient, QueryClientProvider, useSuspenseQuery } from '@tanstack/react-query';
  * import { createRootRouteWithContext, createRoute, createRouter } from '@tanstack/react-router';
  * import { Effect, Schema } from 'effect';

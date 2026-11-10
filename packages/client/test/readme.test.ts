@@ -1,5 +1,5 @@
 // Executes the examples of README.md (only the server URL and logging differ).
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
 import { Effect, Schema, Stream } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vite-plus/test';
 import {
@@ -82,9 +82,9 @@ describe('README', () => {
         case 'PostNotFound':
           missing = error.id;
           break;
-        case '@effect-trpc/RpcInterrupted':
-        case '@effect-trpc/RpcTransportError':
-        case '@effect-trpc/RpcDefect':
+        case '@rpc-effect/RpcInterrupted':
+        case '@rpc-effect/RpcTransportError':
+        case '@rpc-effect/RpcDefect':
           throw error;
       }
     }

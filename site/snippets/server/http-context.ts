@@ -1,7 +1,7 @@
 import { Cause, Context, Effect, Option, Schema } from 'effect';
-import { HttpContext, Procedure, Router } from '@effect-trpc/core';
-import { Handlers, toWebHandler } from '@effect-trpc/server';
-import type { OnErrorInfo } from '@effect-trpc/server';
+import { HttpContext, Procedure, Router } from '@rpc-effect/core';
+import { Handlers, toWebHandler } from '@rpc-effect/server';
+import type { OnErrorInfo } from '@rpc-effect/server';
 
 // #region request
 // `None` when the call did not arrive over HTTP (`createCaller`, `localLink`, tests).

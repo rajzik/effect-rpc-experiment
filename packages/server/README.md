@@ -1,6 +1,6 @@
-# @effect-trpc/server
+# @rpc-effect/server
 
-Serve an [`@effect-trpc/core`](../core) router with [Effect](https://effect.website) v4. Built
+Serve an [`@rpc-effect/core`](../core) router with [Effect](https://effect.website) v4. Built
 directly on `effect/rpc` (`RpcServer`, `RpcGroup.toLayer`, `RpcTest`), it adds the tRPC-shaped
 pieces:
 
@@ -20,8 +20,8 @@ pieces:
 - **`Handlers.withContext` and the `onError` option** — `Handlers.withContext(handlers, context)`
   (tRPC's `createContext`) gives every HTTP adapter services computed per call; `onError` reports
   failed calls in one place. Handlers read the request and set response headers and cookies with
-  `HttpContext` from `@effect-trpc/core`.
-- **`@effect-trpc/server/node`** — `serve` (a Layer) and `runServer` (a Promise) on Node's `http`.
+  `HttpContext` from `@rpc-effect/core`.
+- **`@rpc-effect/server/node`** — `serve` (a Layer) and `runServer` (a Promise) on Node's `http`.
 
 Every function that takes a `router` also takes a pure router service class (`toWebHandler(AppRouter,
 ...)`); it is normalised with `Router.from` once at the call. A service whose `make` reads services
@@ -36,30 +36,30 @@ instances (methods, `Date` fields, `instanceof`).
 
 **Use this package when**
 
-- you implement an `@effect-trpc/core` router (`Handlers.make`, or `Handlers.fromService` /
+- you implement an `@rpc-effect/core` router (`Handlers.make`, or `Handlers.fromService` /
   `Handlers.fromProcedures` for `Procedure` routers) and serve it over HTTP
-  (`toWebHandler`, `layerHttp`, `@effect-trpc/server/node`);
+  (`toWebHandler`, `layerHttp`, `@rpc-effect/server/node`);
 - you call a router in-process from tests, scripts or SSR (`createCaller`);
 - you add auth with `Middleware`, per-call services with `Handlers.withContext`, or central failure
   reporting with the `onError` option of the HTTP adapters.
 
-Use a sibling instead to define procedures and routers (`@effect-trpc/core`), to call a server
-from another process or the browser (`@effect-trpc/client`), or for React Query hooks
-(`@effect-trpc/tanstack-react-query`).
+Use a sibling instead to define procedures and routers (`@rpc-effect/core`), to call a server
+from another process or the browser (`@rpc-effect/client`), or for React Query hooks
+(`@rpc-effect/tanstack-react-query`).
 
 **Entry points**
 
-| import path                | exports                                                                                                                                                                                                                                                                                                                                       | source                                                                                  |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `@effect-trpc/server`      | `Handlers` (`make`, `flat`, `of`, `fromService`, `fromProcedures`, `withContext`), `toWebHandler`, `layerHttp` / `toHttpLayer`, `serializationLayer`, `createCaller`, `Middleware`; types `Caller`, `CallerOptions`, `CallOptions`, `PromiseCallOptions`, `WebHandler`, `ServerOptions` (`onError`, ...), `OnErrorInfo`, `Serialization`, ... | `src/index.ts` → `src/Handlers.ts`, `src/Http.ts`, `src/Caller.ts`, `src/Middleware.ts` |
-| `@effect-trpc/server/node` | `serve` (Layer), `runServer` (Promise); types `NodeServeOptions`, `RunningServer`                                                                                                                                                                                                                                                             | `src/node.ts` (needs the optional peer `@effect/platform-node`)                         |
+| import path               | exports                                                                                                                                                                                                                                                                                                                                       | source                                                                                  |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `@rpc-effect/server`      | `Handlers` (`make`, `flat`, `of`, `fromService`, `fromProcedures`, `withContext`), `toWebHandler`, `layerHttp` / `toHttpLayer`, `serializationLayer`, `createCaller`, `Middleware`; types `Caller`, `CallerOptions`, `CallOptions`, `PromiseCallOptions`, `WebHandler`, `ServerOptions` (`onError`, ...), `OnErrorInfo`, `Serialization`, ... | `src/index.ts` → `src/Handlers.ts`, `src/Http.ts`, `src/Caller.ts`, `src/Middleware.ts` |
+| `@rpc-effect/server/node` | `serve` (Layer), `runServer` (Promise); types `NodeServeOptions`, `RunningServer`                                                                                                                                                                                                                                                             | `src/node.ts` (needs the optional peer `@effect/platform-node`)                         |
 
 **Golden path**
 
 ```ts
 import { Effect, Schema } from 'effect';
-import { query, Router } from '@effect-trpc/core';
-import { createCaller, Handlers, toWebHandler } from '@effect-trpc/server';
+import { query, Router } from '@rpc-effect/core';
+import { createCaller, Handlers, toWebHandler } from '@rpc-effect/server';
 
 class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
 class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -98,8 +98,8 @@ await dispose();
 
 ```ts
 import { Context, Effect, Layer, Schema } from 'effect';
-import { Procedure, Router } from '@effect-trpc/core';
-import { Handlers, toWebHandler } from '@effect-trpc/server';
+import { Procedure, Router } from '@rpc-effect/core';
+import { Handlers, toWebHandler } from '@rpc-effect/server';
 // `Post` and `PostNotFound` as above.
 
 class Database extends Context.Service<
@@ -137,9 +137,9 @@ await toWebHandler(AppRouter, {
 
 ```ts
 import { Cause, Context, Effect, Option, Schema } from 'effect';
-import { HttpContext, Procedure, Router } from '@effect-trpc/core';
-import { Handlers, toWebHandler } from '@effect-trpc/server';
-import type { OnErrorInfo } from '@effect-trpc/server';
+import { HttpContext, Procedure, Router } from '@rpc-effect/core';
+import { Handlers, toWebHandler } from '@rpc-effect/server';
+import type { OnErrorInfo } from '@rpc-effect/server';
 
 class RequestId extends Context.Service<RequestId, string>()('RequestId') {}
 
@@ -171,7 +171,7 @@ const { handler } = await toWebHandler(appRouter, {
 });
 ```
 
-For a Node process use `runServer` / `serve` from `@effect-trpc/server/node` ([Node server](#node-server--effect-trpcservernode));
+For a Node process use `runServer` / `serve` from `@rpc-effect/server/node` ([Node server](#node-server--effect-trpcservernode));
 for auth see [Middleware and auth context](#middleware-and-auth-context).
 
 **Invariants**
@@ -186,7 +186,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - `Handlers.withContext(handlers, context)` takes `context: Effect<Context<C>, never, CR>` (required) and returns the handlers layer without the requirement `C`. Every HTTP adapter (`toWebHandler`, `layerHttp`, `serve`, `runServer`, the Next / Start adapters) evaluates `context` once per call (over WebSocket too) before every middleware and the handler, and provides its services to both. `CR` is read from the output of `handlers`; what it does not provide stays a requirement of the returned layer. It cannot fail with a typed error (use a middleware); a defect in it fails the call with `RpcDefect`. `createCaller` applies it too (`HttpContext.request` is `None` there); `localLink` does not.
 - `onError({ path, cause, headers })` is called once for every call that fails while running (handler or middleware; typed failure or defect; a subscription failing mid-stream), before the failure is sent. It is not called for interruptions, nor for calls rejected outside the handler and middleware (invalid payload, unknown procedure, a success value that fails to encode: they reach the client as `RpcDefect`; tRPC's `BAD_REQUEST` input errors do reach its `onError`). It is awaited and uninterruptible; its own failures are ignored and never change the response.
 - The HTTP adapters and `createCaller` always add one internal middleware (outermost) for the request context and (HTTP only) `onError`; without them it only runs the call.
-- Response headers and cookies set with `HttpContext` (from `@effect-trpc/core`) apply when the response is written: with `ndjson` only if set before the first response chunk, with `json` until the last call of the request ends; the HTTP status cannot be set. Calls batched by `httpBatchLink` share one response.
+- Response headers and cookies set with `HttpContext` (from `@rpc-effect/core`) apply when the response is written: with `ndjson` only if set before the first response chunk, with `json` until the last call of the request ends; the HTTP status cannot be set. Calls batched by `httpBatchLink` share one response.
 - `$promise`, `$router` and `dispose` are reserved top-level keys on a caller: `createCaller` throws for a router that uses them.
 - `Handlers.fromService` / `Handlers.fromProcedures` produce the same handler layer as `Handlers.make` (same tags) from the procedures' `handler`s; their requirements are the handlers' services minus `Scope` and middleware-provided services. `fromService` also provides the service (`yield* AppRouter` is exactly what that build's `make` produced; nested router services stay classes). It accepts a router service whose `make` reads services and fails: it runs `make` (and nested makes) with `Router.buildService` once per layer build, and adds `RouterService.MakeError` to the layer's error and `RouterService.MakeServices` to its requirements (only `Scope` is excluded from those; middleware-provided services are excluded from the handlers' requirements only).
 - Every other API taking a router (`toWebHandler`, `serve` / `runServer`, `createCaller`, `layerHttp`, `Handlers.make` / `flat` / `of`) needs it synchronously: for a router service whose `make` reads services pass the contract (a schema-only `Router.make` router, normally `router.client.gen.ts`) and serve the class with `Handlers.fromService`.
@@ -198,7 +198,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - Don't return an un-annotated record from an `Effect` build → wrap it in `Handlers.of(router, {...})`.
 - Don't throw or `Effect.die` for expected failures → `Effect.fail(new PostNotFound({ id }))` with a declared `Schema.TaggedError`.
 - Don't use Effect v3 APIs (`Context.Tag`, `@effect/rpc`, `@effect/platform`) → `Context.Service`, `effect/rpc`, `effect/http`.
-- Don't import `serve` / `runServer` from `@effect-trpc/server` → import from `@effect-trpc/server/node`.
+- Don't import `serve` / `runServer` from `@rpc-effect/server` → import from `@rpc-effect/server/node`.
 - Don't forget `dispose()` on `toWebHandler`, `createCaller` and `runServer` results in tests → use `try/finally` or `await using`.
 - Don't pass a router with `query({...})` definitions to `Handlers.fromService` / `fromProcedures` (compile error `procedure '<path>' has no handler ...`; if forced, `fromProcedures` throws and `fromService` dies when its layer is built) → build them with `Procedure`, or implement the router with `Handlers.make`.
 - Don't write `Caller<typeof AppRouter>` for a router service → `Caller<Router.Of<typeof AppRouter>>` (functions take the class directly; type helpers take a router type).
@@ -229,16 +229,16 @@ node scripts/verify-jsdoc.mjs server
 ## Install
 
 ```bash
-pnpm add @effect-trpc/server @effect-trpc/core effect
-pnpm add @effect/platform-node # only for @effect-trpc/server/node
+pnpm add @rpc-effect/server @rpc-effect/core effect
+pnpm add @effect/platform-node # only for @rpc-effect/server/node
 ```
 
 ## Example
 
 ```ts
 import { Context, Effect, Layer, Schema, Stream } from 'effect';
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
-import { createCaller, Handlers, Middleware, toWebHandler } from '@effect-trpc/server';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
+import { createCaller, Handlers, Middleware, toWebHandler } from '@rpc-effect/server';
 
 class User extends Schema.Class<User>('User')({
   id: Schema.String,
@@ -269,7 +269,7 @@ const AuthLive = Layer.succeed(Auth)(
   }),
 );
 
-// --- Router (from @effect-trpc/core) --------------------------------------------------------
+// --- Router (from @rpc-effect/core) --------------------------------------------------------
 const appRouter = Router.make({
   user: {
     byId: query({ payload: { id: Schema.String }, success: User, error: NotFound }),
@@ -361,7 +361,7 @@ await caller.dispose();
 
 ## Routers as services (`Handlers.fromService`)
 
-A router written once with `@effect-trpc/core`'s `Procedure` builder carries its handlers, so
+A router written once with `@rpc-effect/core`'s `Procedure` builder carries its handlers, so
 there is no handler record to write:
 
 - `Handlers.fromService(AppRouter)` takes a router service (a `Context.Service` class whose `make`
@@ -372,7 +372,7 @@ there is no handler record to write:
   (`Router.buildService`), with the services you provide, once per build.
 - A `make` that reads services (`yield* AppConfig`) is served the same way, but the sync APIs
   below cannot run it: pass them the contract, a schema-only `Router.make` router (normally
-  `router.client.gen.ts` from `@effect-trpc/codegen`, which checks at compile time that it still
+  `router.client.gen.ts` from `@rpc-effect/codegen`, which checks at compile time that it still
   matches the class). A hand-written contract needs the same check
   (`Router.Rpcs<typeof Contract>` equal to `Router.Rpcs<typeof AppRouter>`): the server serves the
   contract's procedures, so one missing a `.middleware(Auth)` serves that procedure without `Auth`
@@ -430,7 +430,7 @@ Provide middleware implementations together with the handlers:
 `toWebHandler`, `createCaller` and `serve`. For `requiredForClient` middleware, `createCaller`
 also needs the client implementation (`Middleware.layerClient`).
 
-A procedure's metadata (tRPC's `meta`, `.annotate(Key, value)` in `@effect-trpc/core`) reaches the
+A procedure's metadata (tRPC's `meta`, `.annotate(Key, value)` in `@rpc-effect/core`) reaches the
 server implementation as `rpc.annotations`: `Context.get(rpc.annotations, Key)`.
 
 ## Web handler
@@ -458,7 +458,7 @@ with `HttpContext.request` inside it:
 
 ```ts
 import { Context, Effect, Option } from 'effect';
-import { HttpContext } from '@effect-trpc/core';
+import { HttpContext } from '@rpc-effect/core';
 
 class RequestId extends Context.Service<RequestId, string>()('RequestId') {}
 
@@ -483,15 +483,15 @@ interruptions or for calls rejected outside the handler and middleware (invalid 
 procedure, success that fails to encode). `onError` is an option of `toWebHandler`, `layerHttp`,
 `serve` and `runServer` here, and of `createRouteHandler` / `createStartHandler` in the Next.js and
 Start packages; all of them apply a `Handlers.withContext` context. Handlers and middleware also use `HttpContext.setHeader`,
-`appendHeader` and `setCookie` (from `@effect-trpc/core`) to change the response; with `ndjson`
+`appendHeader` and `setCookie` (from `@rpc-effect/core`) to change the response; with `ndjson`
 only before the first response chunk.
 
-## Node server — `@effect-trpc/server/node`
+## Node server — `@rpc-effect/server/node`
 
 ```ts
 import { Layer } from 'effect';
 import { NodeRuntime } from '@effect/platform-node';
-import { runServer, serve } from '@effect-trpc/server/node';
+import { runServer, serve } from '@rpc-effect/server/node';
 
 // As a Layer (long-running process)
 Layer.launch(serve(appRouter, { handlers: ServerLive, port: 3000 })).pipe(NodeRuntime.runMain);

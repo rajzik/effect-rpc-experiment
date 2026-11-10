@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Port of trpc/packages/tanstack-react-query/test/mutationOptions.test.tsx (+ tRPC regression
 // issue-2540: a mutation without input is callable with no argument).
-import type { ClientError } from '@effect-trpc/core';
+import type { ClientError } from '@rpc-effect/core';
 import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import { describe, expect, expectTypeOf, test, vi } from 'vite-plus/test';

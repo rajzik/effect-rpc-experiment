@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-unassigned-import -- Next's marker: bundling this into client code fails the build
 import 'server-only';
-import { appRouter } from '@effect-trpc-examples/shared';
-import { createRscHelpers } from '@effect-trpc/next';
+import { appRouter } from '@rpc-effect-examples/shared';
+import { createRscHelpers } from '@rpc-effect/next';
 import { headers } from 'next/headers';
 
 import { ServerLive } from '@/server';

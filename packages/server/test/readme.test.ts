@@ -1,7 +1,7 @@
 // Mirrors the example in README.md so the documentation stays correct.
 import { Context, Effect, Layer, Schema, Stream } from 'effect';
-import { mutation, Procedure, query, Router, subscription } from '@effect-trpc/core';
-import type { ClientError } from '@effect-trpc/core';
+import { mutation, Procedure, query, Router, subscription } from '@rpc-effect/core';
+import type { ClientError } from '@rpc-effect/core';
 import { describe, expect, expectTypeOf, it } from 'vite-plus/test';
 import { createCaller, Handlers, Middleware, toWebHandler } from '../src/index.js';
 import { runServer } from '../src/node.js';

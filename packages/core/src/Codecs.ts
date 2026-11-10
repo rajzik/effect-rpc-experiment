@@ -50,9 +50,9 @@ type CodecOf<S extends Schema.Top> = Schema.Codec<
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  * import type { Rpc } from 'effect/rpc';
- * import type { Codecs } from '@effect-trpc/core';
+ * import type { Codecs } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -80,9 +80,9 @@ export type PayloadType<R> = Parts<R>['payload']['Type'];
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  * import type { Rpc } from 'effect/rpc';
- * import type { Codecs } from '@effect-trpc/core';
+ * import type { Codecs } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -110,9 +110,9 @@ export type SuccessType<R> = Parts<R>['success']['Type'];
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  * import type { Rpc } from 'effect/rpc';
- * import type { Codecs } from '@effect-trpc/core';
+ * import type { Codecs } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -144,9 +144,9 @@ export type ExitSuccessType<R> = Parts<R>['exitSuccess']['Type'];
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  * import type { Rpc } from 'effect/rpc';
- * import type { Codecs } from '@effect-trpc/core';
+ * import type { Codecs } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -174,9 +174,9 @@ export type ErrorType<R> = Parts<R>['error']['Type'];
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  * import type { Rpc } from 'effect/rpc';
- * import type { Codecs } from '@effect-trpc/core';
+ * import type { Codecs } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -204,9 +204,9 @@ export type PayloadCodec<R> = CodecOf<Parts<R>['payload']>;
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  * import type { Rpc } from 'effect/rpc';
- * import type { Codecs } from '@effect-trpc/core';
+ * import type { Codecs } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -234,9 +234,9 @@ export type SuccessCodec<R> = CodecOf<Parts<R>['success']>;
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  * import type { Rpc } from 'effect/rpc';
- * import type { Codecs } from '@effect-trpc/core';
+ * import type { Codecs } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -264,9 +264,9 @@ export type ErrorCodec<R> = CodecOf<Parts<R>['error']>;
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  * import type { Rpc } from 'effect/rpc';
- * import type { Codecs } from '@effect-trpc/core';
+ * import type { Codecs } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -345,7 +345,7 @@ const exitCodec = memo((rpc) => Rpc.exitSchema(rpc));
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { Codecs, query, Router } from '@effect-trpc/core';
+ * import { Codecs, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -395,7 +395,7 @@ export const payload = <R extends Rpc.Any>(rpc: R): PayloadCodec<R> => payloadCo
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { Codecs, query, Router } from '@effect-trpc/core';
+ * import { Codecs, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -443,7 +443,7 @@ export const success = <R extends Rpc.Any>(rpc: R): SuccessCodec<R> => successCo
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { Codecs, query, Router } from '@effect-trpc/core';
+ * import { Codecs, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -491,7 +491,7 @@ export const error = <R extends Rpc.Any>(rpc: R): ErrorCodec<R> => errorCodec(rp
  *
  * ```ts
  * import { Exit, Schema } from 'effect';
- * import { Codecs, query, Router } from '@effect-trpc/core';
+ * import { Codecs, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -569,7 +569,7 @@ const decoderOf = (codec: AnyCodec): Decode => {
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { Codecs, query, Router } from '@effect-trpc/core';
+ * import { Codecs, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -616,7 +616,7 @@ export const encodePayloadSync = <R extends Rpc.Any>(rpc: R, value: PayloadType<
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { Codecs, query, Router } from '@effect-trpc/core';
+ * import { Codecs, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -664,7 +664,7 @@ export const decodePayloadSync = <R extends Rpc.Any>(rpc: R, json: unknown): Pay
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { Codecs, query, Router } from '@effect-trpc/core';
+ * import { Codecs, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -713,7 +713,7 @@ export const encodeSuccessSync = <R extends Rpc.Any>(rpc: R, value: SuccessType<
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { Codecs, query, Router } from '@effect-trpc/core';
+ * import { Codecs, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -764,7 +764,7 @@ export const decodeSuccessSync = <R extends Rpc.Any>(rpc: R, json: unknown): Suc
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { Codecs, query, Router } from '@effect-trpc/core';
+ * import { Codecs, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -812,7 +812,7 @@ export const encodeErrorSync = <R extends Rpc.Any>(rpc: R, value: ErrorType<R>):
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { Codecs, query, Router } from '@effect-trpc/core';
+ * import { Codecs, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -860,7 +860,7 @@ export const decodeErrorSync = <R extends Rpc.Any>(rpc: R, json: unknown): Error
  *
  * ```ts
  * import { Exit, Schema } from 'effect';
- * import { Codecs, query, Router } from '@effect-trpc/core';
+ * import { Codecs, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -911,7 +911,7 @@ export const encodeExitSync = <R extends Rpc.Any>(
  *
  * ```ts
  * import { Exit, Schema } from 'effect';
- * import { Codecs, query, Router } from '@effect-trpc/core';
+ * import { Codecs, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,

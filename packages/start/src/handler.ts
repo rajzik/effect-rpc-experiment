@@ -1,16 +1,16 @@
 /**
  * Serves an effect-trpc router from a TanStack Start server route (`src/routes/api/rpc.$.ts`).
  *
- * {@link createStartHandler} wraps `@effect-trpc/server`'s `toWebHandler` (an `effect/rpc` HTTP
+ * {@link createStartHandler} wraps `@rpc-effect/server`'s `toWebHandler` (an `effect/rpc` HTTP
  * server) in the `({ request }) => Promise<Response>` shape of Start's `server.handlers`. Browser
  * clients (`createBrowserClient`, the browser half of `createIsomorphicClient`) call it; server
  * code usually runs the router in-process instead. Server-only.
  *
  * @since 0.1.0
  */
-import { Router } from '@effect-trpc/core';
-import { toWebHandler } from '@effect-trpc/server';
-import type { WebHandler, WebHandlerOptions } from '@effect-trpc/server';
+import { Router } from '@rpc-effect/core';
+import { toWebHandler } from '@rpc-effect/server';
+import type { WebHandler, WebHandlerOptions } from '@rpc-effect/server';
 
 /**
  * The default rpc path of a TanStack Start app: `"/api/rpc"` (`src/routes/api/rpc.$.ts`).
@@ -24,7 +24,7 @@ import type { WebHandler, WebHandlerOptions } from '@effect-trpc/server';
  *
  * ```ts
  * // src/rpc/urls.ts — server or browser
- * import { defaultStartPath, getRpcUrl } from '@effect-trpc/start';
+ * import { defaultStartPath, getRpcUrl } from '@rpc-effect/start';
  *
  * // `http://localhost:3000/api/rpc` during SSR in dev, the page origin in the browser.
  * export const rpcUrl: URL = getRpcUrl(defaultStartPath);
@@ -217,9 +217,9 @@ const createStartHandlerFromInput = (
  *
  * ```ts
  * // src/routes/api/rpc.$.ts — server route
- * import { query, Router } from '@effect-trpc/core';
- * import { createStartHandler } from '@effect-trpc/start';
- * import { Handlers } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createStartHandler } from '@rpc-effect/start';
+ * import { Handlers } from '@rpc-effect/server';
  * import { createRootRoute, createRoute } from '@tanstack/react-router';
  * import type {} from '@tanstack/react-start'; // adds the `server` route option (types only)
  * import { Effect, Schema } from 'effect';

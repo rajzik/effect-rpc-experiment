@@ -44,7 +44,7 @@ const generatorFor = (root: string, project: string, routers: ReadonlyArray<stri
  * **When to use**
  *
  * With Turbopack, which does not run bundler plugins: apply it to the router module with a
- * `turbopack.rules` entry in `next.config`. With webpack, prefer `@effect-trpc/codegen/webpack`.
+ * `turbopack.rules` entry in `next.config`. With webpack, prefer `@rpc-effect/codegen/webpack`.
  *
  * **Details**
  *
@@ -71,7 +71,7 @@ const generatorFor = (root: string, project: string, routers: ReadonlyArray<stri
  *       // because a JSDoc comment cannot contain the two characters that close it).
  *       '**\/server/router.ts': {
  *         loaders: [
- *           { loader: '@effect-trpc/codegen/loader', options: { routers: ['src/server/router.ts'] } },
+ *           { loader: '@rpc-effect/codegen/loader', options: { routers: ['src/server/router.ts'] } },
  *         ],
  *       },
  *     },

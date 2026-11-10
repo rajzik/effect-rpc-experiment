@@ -1,6 +1,6 @@
-# @effect-trpc/client
+# @rpc-effect/client
 
-Typed clients for [`@effect-trpc/core`](../core) routers: a tRPC-style **Promise client**
+Typed clients for [`@rpc-effect/core`](../core) routers: a tRPC-style **Promise client**
 (`client.post.byId(input)`), an **Effect client** (`client.$effect.post.byId(input)`), and
 subscriptions as `AsyncIterable` / `Stream`. Each call goes through a **link** (`httpLink`,
 `httpBatchLink`, `wsLink` or `localLink`) built on `effect/rpc`.
@@ -19,28 +19,28 @@ subscriptions as `AsyncIterable` / `Stream`. Each call goes through a **link** (
 
 **Use this package when**
 
-- code in a browser, another server or a script calls an `@effect-trpc/core` router served by
-  `@effect-trpc/server` (`httpLink`, `wsLink`, or `httpBatchLink` to send the queries of one tick
+- code in a browser, another server or a script calls an `@rpc-effect/core` router served by
+  `@rpc-effect/server` (`httpLink`, `wsLink`, or `httpBatchLink` to send the queries of one tick
   in one POST);
 - tests or SSR should exercise the client API against in-process handlers (`localLink`);
 - you need a custom transport over any `effect/rpc` `RpcClient.Protocol` (`Link.fromProtocol`).
 
-Use a sibling instead to define routers (`@effect-trpc/core`), to implement / serve them or call
-them in-process without the client API (`@effect-trpc/server`, `createCaller`), or for React
-Query (`@effect-trpc/tanstack-react-query`, which wraps this client).
+Use a sibling instead to define routers (`@rpc-effect/core`), to implement / serve them or call
+them in-process without the client API (`@rpc-effect/server`, `createCaller`), or for React
+Query (`@rpc-effect/tanstack-react-query`, which wraps this client).
 
 **Entry points**
 
-| import path           | exports                                                                                                                                                                                                                                                                                                                                                               | source                                                                        |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `@effect-trpc/client` | `createClient`, `httpLink`, `httpBatchLink`, `wsLink`, `localLink`, `Link` (`make`, `fromProtocol`); types `Client`, `ClientMethods`, `CreateClientOptions`, `ProcedureCallOptions`, `EffectCallOptions`, `HttpLinkOptions`, `HttpBatchLinkOptions`, ...; re-exports `RpcDefect`, `RpcTransportError`, `RpcInterrupted`, `ClientError`, `isClientInfrastructureError` | `src/index.ts` → `src/Client.ts`, `src/Link.ts` (errors: `@effect-trpc/core`) |
+| import path          | exports                                                                                                                                                                                                                                                                                                                                                               | source                                                                       |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `@rpc-effect/client` | `createClient`, `httpLink`, `httpBatchLink`, `wsLink`, `localLink`, `Link` (`make`, `fromProtocol`); types `Client`, `ClientMethods`, `CreateClientOptions`, `ProcedureCallOptions`, `EffectCallOptions`, `HttpLinkOptions`, `HttpBatchLinkOptions`, ...; re-exports `RpcDefect`, `RpcTransportError`, `RpcInterrupted`, `ClientError`, `isClientInfrastructureError` | `src/index.ts` → `src/Client.ts`, `src/Link.ts` (errors: `@rpc-effect/core`) |
 
 **Golden path**
 
 ```ts
 import { Effect, Schema } from 'effect';
-import { query, Router } from '@effect-trpc/core';
-import { createClient, httpLink, type Client } from '@effect-trpc/client';
+import { query, Router } from '@rpc-effect/core';
+import { createClient, httpLink, type Client } from '@rpc-effect/client';
 
 class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
 class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -52,7 +52,7 @@ const appRouter = Router.make({
   post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
 });
 
-// 2. A client over an ABSOLUTE url, served by @effect-trpc/server (HTTP + NDJSON).
+// 2. A client over an ABSOLUTE url, served by @rpc-effect/server (HTTP + NDJSON).
 const client = createClient(appRouter, { link: httpLink({ url: 'http://localhost:3000/rpc' }) });
 
 // 3a. Promise API: rejects with ClientError<PostNotFound>.
@@ -80,7 +80,7 @@ See [Links](#links) for `wsLink` / `localLink` and [Effect client](#effect-clien
 - Typed errors are the procedure's `Schema.TaggedError` instances, discriminated by `_tag`.
 - Promise rejections are `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; `$effect` calls fail with `E | RpcTransportError` (defects are defects, cancellation is interruption).
 - `httpLink` / `httpBatchLink` need an absolute `http(s):` URL and `wsLink` an absolute `ws(s):` URL; anything else throws when the link is created.
-- `httpBatchLink({ ...httpLink options, maxItems? })` sends the queries called in the same tick (within 1 ms of the first) in one POST (`effect/rpc`'s batching HTTP protocol), split into POSTs of at most `maxItems` (a positive integer; default unlimited, otherwise the link throws when created). Mutations and subscriptions are never batched: one POST each, like `httpLink`. The server needs no option: every `@effect-trpc/server` HTTP adapter already accepts several requests in one body and streams the responses back by request id (NDJSON: each call settles as soon as its own result arrives).
+- `httpBatchLink({ ...httpLink options, maxItems? })` sends the queries called in the same tick (within 1 ms of the first) in one POST (`effect/rpc`'s batching HTTP protocol), split into POSTs of at most `maxItems` (a positive integer; default unlimited, otherwise the link throws when created). Mutations and subscriptions are never batched: one POST each, like `httpLink`. The server needs no option: every `@rpc-effect/server` HTTP adapter already accepts several requests in one body and streams the responses back by request id (NDJSON: each call settles as soon as its own result arrives).
 - Batched calls keep their own typed errors, decoding and middleware. A `headers` function runs once per POST. A non-2xx response or network error fails every call of the POST with `RpcTransportError`; a typed failure or defect fails only its call.
 - Aborting one call of a batch rejects it at once with `RpcInterrupted` and the POST goes on for the others. A batch POST is never aborted for its callers, not even when all of them abort: the server runs aborted queries to the end, and `client.dispose()` aborts the POSTs still open.
 - The calls of a batch share one HTTP response: headers and cookies a handler sets (`HttpContext`) apply to all of them, and (framed) only if set before the first response chunk. With `serialization: 'json'` a batch waits for its slowest call.
@@ -96,7 +96,7 @@ See [Links](#links) for `wsLink` / `localLink` and [Effect client](#effect-clien
 - Don't use `httpBatchLink` for calls that set cookies or headers → a batch shares one response, and only queries are batched: set them from a mutation (never batched) or use `httpLink`.
 - Don't use `serialization: 'json'` with `httpBatchLink` → the server answers when every call of the POST has finished; keep the default `"ndjson"`.
 - Don't point `wsLink` at a `toWebHandler` endpoint → serve `layerHttp(router, { protocol: 'websocket' })` and match `serialization` (both default to `"ndjson"`; override on both sides or neither).
-- Don't treat every rejection as a domain error → switch on `error._tag`; infrastructure tags start with `@effect-trpc/`.
+- Don't treat every rejection as a domain error → switch on `error._tag`; infrastructure tags start with `@rpc-effect/`.
 - Don't expect `RpcDefect` / `RpcInterrupted` in the `$effect` error channel → inspect the `Cause` (`Effect.exit`, `Effect.catchCause`).
 - Don't give `localLink` a handler layer without the middleware implementations → `Layer.mergeAll(handlers, AuthLive)` (missing ones are a type error).
 - Don't create a client per call → create one per app (or per request on the server) and `dispose()` it.
@@ -121,13 +121,13 @@ node scripts/verify-jsdoc.mjs client
 ## Install
 
 ```sh
-pnpm add @effect-trpc/client @effect-trpc/core effect
+pnpm add @rpc-effect/client @rpc-effect/core effect
 ```
 
 ## Define a router (shared by server and client)
 
 ```ts
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
 import { Schema } from 'effect';
 
 export class Post extends Schema.Class<Post>('Post')({
@@ -153,13 +153,13 @@ export const appRouter = Router.make({
 });
 ```
 
-Serve it with `@effect-trpc/server`, or directly with
+Serve it with `@rpc-effect/server`, or directly with
 `RpcServer.layerHttp({ group: appRouter.group, path: '/rpc', protocol: 'http', disableFatalDefects: true })`.
 
 ## Promise client over HTTP
 
 ```ts
-import { createClient, httpLink, type Client } from '@effect-trpc/client';
+import { createClient, httpLink, type Client } from '@rpc-effect/client';
 
 const client = createClient(appRouter, {
   link: httpLink({
@@ -182,9 +182,9 @@ try {
     case 'PostNotFound':
       console.log('no post', error.id); // `error` is a PostNotFound instance
       break;
-    case '@effect-trpc/RpcInterrupted': // aborted
-    case '@effect-trpc/RpcTransportError': // network, HTTP status, protocol
-    case '@effect-trpc/RpcDefect': // the handler died
+    case '@rpc-effect/RpcInterrupted': // aborted
+    case '@rpc-effect/RpcTransportError': // network, HTTP status, protocol
+    case '@rpc-effect/RpcDefect': // the handler died
       throw error;
   }
 }
@@ -246,7 +246,7 @@ request. `maxItems` caps the calls per POST.
 Calls that set response headers or cookies belong on `httpLink`: a batch shares one response.
 
 ```ts
-import { createClient, localLink, wsLink } from '@effect-trpc/client';
+import { createClient, localLink, wsLink } from '@rpc-effect/client';
 import { Effect, Layer, Stream } from 'effect';
 
 // Tests and SSR: run the handlers in-process. The type checks that every procedure has a handler.

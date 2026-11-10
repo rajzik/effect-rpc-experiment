@@ -5,7 +5,7 @@ import {
   SignedInAs,
   taskListOptions,
   TaskList,
-} from '@effect-trpc-examples/shared/ui';
+} from '@rpc-effect-examples/shared/ui';
 import { createFileRoute, Link } from '@tanstack/react-router';
 
 import { rpc, useRpc } from '../rpc/client';

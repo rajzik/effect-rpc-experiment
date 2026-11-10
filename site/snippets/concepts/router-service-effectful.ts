@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from 'effect';
-import { Procedure, query, Router } from '@effect-trpc/core';
-import { createClient, httpLink } from '@effect-trpc/client';
-import { Handlers, toWebHandler } from '@effect-trpc/server';
+import { Procedure, query, Router } from '@rpc-effect/core';
+import { createClient, httpLink } from '@rpc-effect/client';
+import { Handlers, toWebHandler } from '@rpc-effect/server';
 
 import { Post, PostNotFound } from '@/router';
 import { Database } from './router-service';

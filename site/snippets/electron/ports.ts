@@ -1,7 +1,7 @@
 // Generic MessagePort building blocks: utility processes, workers, custom handshakes.
 import { Effect } from 'effect';
-import { createClient } from '@effect-trpc/client';
-import { MessagePortServer, messagePortLink } from '@effect-trpc/electron';
+import { createClient } from '@rpc-effect/client';
+import { MessagePortServer, messagePortLink } from '@rpc-effect/electron';
 
 import { appRouter } from '@/router';
 import { ServerLive } from '@/server';

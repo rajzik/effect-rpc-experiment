@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Schema } from 'effect';
 import type { Rpc } from 'effect/rpc';
-import { Procedure, query, Router } from '@effect-trpc/core';
+import { Procedure, query, Router } from '@rpc-effect/core';
 import { describe, expectTypeOf, it } from 'vite-plus/test';
 import { Handlers, toWebHandler } from '../src/index.js';
 import { Auth, CurrentUser } from './fixtures.js';

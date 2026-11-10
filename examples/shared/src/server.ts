@@ -6,7 +6,7 @@
  * request names its user: they pass `resolveUser`, e.g. `cookieUser` for cookie sessions.
  */
 import { Effect, Layer, Stream } from 'effect';
-import { Handlers } from '@effect-trpc/server';
+import { Handlers } from '@rpc-effect/server';
 
 import {
   appRouter,

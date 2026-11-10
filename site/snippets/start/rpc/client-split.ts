@@ -1,6 +1,6 @@
 // src/rpc/client.ts — keeping the server half out of the browser bundle
 import { createIsomorphicFn } from '@tanstack/react-start';
-import { createBrowserClient, createServerClient } from '@effect-trpc/start';
+import { createBrowserClient, createServerClient } from '@rpc-effect/start';
 
 import { appRouter } from '@/router';
 import { ServerLive } from '@/server';

@@ -160,15 +160,15 @@ const trackResult = <T extends object>(
  *
  * - There is no `connecting` state after an error and no automatic reconnect (tRPC's `wsLink`
  *   reconnects); call `reset()` to retry.
- * - The hook is exported from this package (`@effect-trpc/tanstack-react-query`), not from
+ * - The hook is exported from this package (`@rpc-effect/tanstack-react-query`), not from
  *   `@tanstack/react-query`, and takes the options object, not the procedure.
  *
  * **Example** (Live countdown with a typed stream error)
  *
  * ```tsx
- * import { Router, subscription } from '@effect-trpc/core';
- * import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
- * import { skipToken, useSubscription } from '@effect-trpc/tanstack-react-query';
+ * import { Router, subscription } from '@rpc-effect/core';
+ * import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
+ * import { skipToken, useSubscription } from '@rpc-effect/tanstack-react-query';
  * import { Schema } from 'effect';
  *
  * class Cancelled extends Schema.TaggedError<Cancelled>()('Cancelled', { at: Schema.Number }) {}

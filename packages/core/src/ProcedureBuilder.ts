@@ -4,7 +4,7 @@
  *
  * A builder procedure is an ordinary `ProcedureDef` — `Router.make`, the client proxies, codecs
  * and every inference helper treat it exactly like the equivalent `query({...})` — plus a
- * `handler` field holding the implementation. `@effect-trpc/server` serves those handlers
+ * `handler` field holding the implementation. `@rpc-effect/server` serves those handlers
  * (`Handlers.fromService`, `Handlers.fromProcedures`), so a router written with the builder is
  * written once.
  *
@@ -41,8 +41,8 @@ import type { ProcedureKind } from './ProcedureKind.js';
  *
  * ```ts
  * import { Context, Effect, Schema } from 'effect';
- * import { Procedure } from '@effect-trpc/core';
- * import type { inferInput } from '@effect-trpc/core';
+ * import { Procedure } from '@rpc-effect/core';
+ * import type { inferInput } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Finite, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -238,7 +238,7 @@ export declare namespace Procedure {
    * The success schema type of a procedure whose output is inferred from a handler succeeding
    * with `A`: `Schema.Void` for `void` (and `undefined` / `never`), else a `Schema.declare<A>`
    * that carries `A` for the client types. At runtime the schema is `Schema.Void`; a handler
-   * value other than `undefined` is a defect until `@effect-trpc/codegen` (or `.output`) sets
+   * value other than `undefined` is a defect until `@rpc-effect/codegen` (or `.output`) sets
    * a real schema.
    *
    * @since 0.1.0
@@ -343,7 +343,7 @@ export declare namespace Procedure {
       schema: E,
     ) => Builder<Payload, Success, E, Middleware, Requires, Exclude<Infer_, 'error'>>;
     /**
-     * Sets the schemas inferred from the handler (what `@effect-trpc/codegen` applies through
+     * Sets the schemas inferred from the handler (what `@rpc-effect/codegen` applies through
      * `Router.withSchemas`). By hand, use `.output` / `.error`. The output is checked; failures not in
      * `error` stay allowed (they reach the client as defects).
      */
@@ -410,7 +410,7 @@ const missingOutputSchema = (): Error =>
   new Error(
     'effect-trpc: this procedure has no output schema, so the value its handler returned cannot ' +
       'be sent. Add `.output(schema)` to the procedure, or generate the schemas from the handler ' +
-      'types with `effect-trpc-codegen` (@effect-trpc/codegen) and serve the generated router.',
+      'types with `effect-trpc-codegen` (@rpc-effect/codegen) and serve the generated router.',
   );
 
 const checkVoid = (value: unknown): Effect.Effect<unknown> =>
@@ -525,7 +525,7 @@ const empty: Procedure.Builder<
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { Procedure, query } from '@effect-trpc/core';
+ * import { Procedure, query } from '@rpc-effect/core';
  *
  * Procedure.hasHandler(Procedure.query(() => Effect.void)); // true
  * Procedure.hasHandler(query({ success: Schema.String })); // false
@@ -558,7 +558,7 @@ const hasHandler = (u: unknown): u is ProcedureWithHandler.Any =>
  * - Without `.output(...)` the builder is in inference mode: the output type is the handler's
  *   success type (`inferOutput` gives it), and the handler may fail with anything unless
  *   `.error(...)` was set (then failures stay checked). The schemas themselves come from
- *   `@effect-trpc/codegen`, which reads the handler types and writes `router.gen.ts`
+ *   `@rpc-effect/codegen`, which reads the handler types and writes `router.gen.ts`
  *   (`Router.withSchemas` over the router: serve it) and `router.client.gen.ts` (the
  *   handler-free contract: give it to clients). `.inferred({ output, error })` is the same step
  *   on a single chain; by hand, write `.output` / `.error`.
@@ -588,7 +588,7 @@ const hasHandler = (u: unknown): u is ProcedureWithHandler.Any =>
  *
  * ```ts
  * import { Context, Effect, Schema, Stream } from 'effect';
- * import { Procedure, Router } from '@effect-trpc/core';
+ * import { Procedure, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Finite, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -630,8 +630,8 @@ const hasHandler = (u: unknown): u is ProcedureWithHandler.Any =>
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { Procedure } from '@effect-trpc/core';
- * import type { inferError, inferOutput } from '@effect-trpc/core';
+ * import { Procedure } from '@rpc-effect/core';
+ * import type { inferError, inferOutput } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Finite, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -659,7 +659,7 @@ const hasHandler = (u: unknown): u is ProcedureWithHandler.Any =>
  * ```ts
  * import { Context, Effect, Layer, Schema } from 'effect';
  * import { RpcMiddleware } from 'effect/rpc';
- * import { Procedure, Router } from '@effect-trpc/core';
+ * import { Procedure, Router } from '@rpc-effect/core';
  *
  * class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {}) {}
  * class CurrentUser extends Context.Service<CurrentUser, { readonly roles: ReadonlyArray<string> }>()(

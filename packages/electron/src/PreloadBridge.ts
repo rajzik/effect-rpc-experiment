@@ -69,7 +69,7 @@ const isConnectMessage = (data: unknown, channel: string): data is ConnectMessag
  * - No `contextBridge.exposeInMainWorld` is needed: the page never sees `ipcRenderer`; it only
  *   posts a port to its own window. Keep `contextIsolation: true`.
  * - With `sandbox: true` the preload cannot `require` npm packages: bundle it. Import only
- *   `@effect-trpc/electron/preload` there, never `/main` or the root entry.
+ *   `@rpc-effect/electron/preload` there, never `/main` or the root entry.
  * - Any script in the page (not iframes) can hand a port to the bridge. Authorize in the main
  *   process (`authorize`, handlers, middleware), not here.
  *
@@ -78,7 +78,7 @@ const isConnectMessage = (data: unknown, channel: string): data is ConnectMessag
  * ```ts
  * // preload.ts (preload script, isolated world; bundled when `sandbox: true`)
  * import { ipcRenderer } from 'electron';
- * import { installPreloadBridge } from '@effect-trpc/electron/preload';
+ * import { installPreloadBridge } from '@rpc-effect/electron/preload';
  *
  * installPreloadBridge({ ipcRenderer });
  * ```
@@ -89,7 +89,7 @@ const isConnectMessage = (data: unknown, channel: string): data is ConnectMessag
  * // preload.ts (preload script): one bridge per channel; the main process runs one
  * // `MainRpcServer` per channel and the renderer passes the same `channel` to `rendererLink`.
  * import { ipcRenderer } from 'electron';
- * import { installPreloadBridge } from '@effect-trpc/electron/preload';
+ * import { installPreloadBridge } from '@rpc-effect/electron/preload';
  *
  * installPreloadBridge({ ipcRenderer, channel: 'app-rpc' });
  * installPreloadBridge({ ipcRenderer, channel: 'admin-rpc' });

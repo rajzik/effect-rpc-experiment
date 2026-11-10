@@ -52,7 +52,7 @@ const { handler } = await toWebHandler(AppRouter, {
 
 ## Goals
 
-1. **`Procedure` builder** (`@effect-trpc/core`): `Procedure.input(fields | schema)`,
+1. **`Procedure` builder** (`@rpc-effect/core`): `Procedure.input(fields | schema)`,
    `.output(schema)`, `.error(schema)`, `.middleware(M)`, terminal `.query(handler)`,
    `.mutation(handler)`, `.subscription(handler)` (handler returns `Stream`). Each step is
    optional except the terminal; defaults match today's `query({...})` (`Void`, `Void`, `Never`).
@@ -100,8 +100,8 @@ const { handler } = await toWebHandler(AppRouter, {
 
 - Effect v4: `Context.Service<Self>()(id, { make })` infers the shape from `make` and exposes static
   `make` (`effect/dist/Context.d.ts`, `Service` overloads). Verify every API against the d.ts.
-- Package boundaries: `Procedure` and the normalizer live in `@effect-trpc/core` (no dependency on
-  server); `Handlers.fromService` in `@effect-trpc/server`.
+- Package boundaries: `Procedure` and the normalizer live in `@rpc-effect/core` (no dependency on
+  server); `Handlers.fromService` in `@rpc-effect/server`.
 - A procedure value now holds a handler (a closure). Today's `ProcedureDef` is schema-only and the
   wire tag/compile path (`compileDef`, `Router.make`) must stay unchanged for existing users.
 - Repo conventions (AGENTS.md): Effect-style JSDoc with compiling examples, `.test-d.ts` for every

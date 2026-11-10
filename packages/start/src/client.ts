@@ -3,21 +3,21 @@
  *
  * {@link createServerClient} runs the router's handlers in-process (`localLink`) for loaders and
  * SSR, {@link createBrowserClient} calls the `createStartHandler` route over `httpLink`, and
- * {@link createIsomorphicClient} picks one by environment. All return the `@effect-trpc/client`
+ * {@link createIsomorphicClient} picks one by environment. All return the `@rpc-effect/client`
  * Promise client (`Client<R>`) whose results are `Schema.Class` instances and whose errors are
  * `ClientError<E>`. Pass the client to `createStartHelpers` for TanStack Query.
  *
  * @since 0.1.0
  */
-import { createClient, httpLink, localLink } from '@effect-trpc/client';
+import { createClient, httpLink, localLink } from '@rpc-effect/client';
 import type {
   Client,
   HeadersOption,
   MiddlewareOption,
   SerializationOption,
-} from '@effect-trpc/client';
-import { Router } from '@effect-trpc/core';
-import type { Handlers } from '@effect-trpc/server';
+} from '@rpc-effect/client';
+import { Router } from '@rpc-effect/core';
+import type { Handlers } from '@rpc-effect/server';
 import type { Layer } from 'effect';
 import { defaultStartPath } from './handler.js';
 
@@ -66,7 +66,7 @@ const env = (name: string): string | undefined => {
  *
  * ```ts
  * // src/rpc/urls.ts — server or browser
- * import { getBaseUrl } from '@effect-trpc/start';
+ * import { getBaseUrl } from '@rpc-effect/start';
  *
  * // Browser: the page origin. Server: the configured origin instead of the env fallbacks.
  * export const origin = getBaseUrl({ serverOrigin: 'https://my-app.com/' }); // no trailing slash
@@ -99,9 +99,9 @@ export const getBaseUrl = (options: BaseUrlOptions = {}): string => {
  *
  * ```ts
  * // src/rpc/client.ts — browser (and SSR) code
- * import { createClient, httpLink } from '@effect-trpc/client';
- * import { query, Router } from '@effect-trpc/core';
- * import { getRpcUrl } from '@effect-trpc/start';
+ * import { createClient, httpLink } from '@rpc-effect/client';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { getRpcUrl } from '@rpc-effect/start';
  * import { Schema } from 'effect';
  *
  * const appRouter = Router.make({ health: query({ success: Schema.String }) });
@@ -229,9 +229,9 @@ const createServerClientFromInput = (
  *
  * ```ts
  * // src/rpc/client.ts — shared module; the .server() branch is removed from the browser build
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { createBrowserClient, createServerClient } from '@effect-trpc/start';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { createBrowserClient, createServerClient } from '@rpc-effect/start';
  * import { createIsomorphicFn } from '@tanstack/react-start';
  * import { Effect, Schema } from 'effect';
  *
@@ -317,8 +317,8 @@ const createBrowserClientFromInput = (
  *
  * ```ts
  * // src/rpc/client.ts — browser code
- * import { query, Router } from '@effect-trpc/core';
- * import { createBrowserClient } from '@effect-trpc/start';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createBrowserClient } from '@rpc-effect/start';
  * import { Schema } from 'effect';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
@@ -404,9 +404,9 @@ const createIsomorphicClientFromInput = (
  *
  * ```ts
  * // src/rpc/client.ts — runs on the server (SSR, loaders) and in the browser
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { createIsomorphicClient, createStartHelpers } from '@effect-trpc/start';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { createIsomorphicClient, createStartHelpers } from '@rpc-effect/start';
  * import { Effect, Schema } from 'effect';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}

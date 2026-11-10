@@ -37,9 +37,9 @@ export { expect as effectExpect, it as effectIt } from '@effect/vitest';
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { assertInstance, testServerAndClient } from '@effect-trpc/test-utils';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { assertInstance, testServerAndClient } from '@rpc-effect/test-utils';
  * import { expect, it } from '@effect/vitest';
  *
  * class User extends Schema.Class<User>('User')({ id: Schema.String }) {}

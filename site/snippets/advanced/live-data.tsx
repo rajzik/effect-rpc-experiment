@@ -4,9 +4,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Layer } from 'effect';
 import { HttpRouter } from 'effect/http';
 import { NodeHttpServer } from '@effect/platform-node';
-import { createClient, wsLink } from '@effect-trpc/client';
-import { layerHttp } from '@effect-trpc/server';
-import { useSubscription, type RpcConnectionState } from '@effect-trpc/tanstack-react-query';
+import { createClient, wsLink } from '@rpc-effect/client';
+import { layerHttp } from '@rpc-effect/server';
+import { useSubscription, type RpcConnectionState } from '@rpc-effect/tanstack-react-query';
 import { useState } from 'react';
 
 import { appRouter, type PostNotFound } from '@/router';

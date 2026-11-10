@@ -5,7 +5,7 @@ serialization. Middleware still runs, and headers you pass reach it. Use it for 
 that needs a procedure (cron jobs, scripts, RSC), and for tests.
 
 ```ts
-import { createCaller } from '@effect-trpc/server';
+import { createCaller } from '@rpc-effect/server';
 
 const caller = createCaller(appRouter, { handlers: ServerLive });
 ```

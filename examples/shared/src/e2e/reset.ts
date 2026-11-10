@@ -1,7 +1,7 @@
 /**
  * `resetData`: puts the server back to its seed data, so every test starts from the same state.
  */
-import { createClient, httpLink } from '@effect-trpc/client';
+import { createClient, httpLink } from '@rpc-effect/client';
 
 import { appRouter } from '../domain';
 

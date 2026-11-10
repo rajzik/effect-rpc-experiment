@@ -3,7 +3,7 @@
  *
  * Middleware is how effect-trpc does auth and request context: a middleware is a service class
  * attached to procedures (`query(...).middleware(Auth)`) or routers (`router.middleware(Auth)`)
- * in `@effect-trpc/core`; its server implementation is a `Layer` merged with the handler layer
+ * in `@rpc-effect/core`; its server implementation is a `Layer` merged with the handler layer
  * from `Handlers.make`.
  *
  * @since 0.1.0
@@ -44,8 +44,8 @@ import { RpcMiddleware as EffectRpcMiddleware } from 'effect/rpc';
  *
  * ```ts
  * import { Context, Effect, Layer, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { createCaller, Handlers, Middleware } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createCaller, Handlers, Middleware } from '@rpc-effect/server';
  *
  * class Unauthorized extends Schema.TaggedError<Unauthorized>()('Unauthorized', {}) {}
  * class CurrentUser extends Context.Service<CurrentUser, { readonly name: string }>()(
@@ -102,7 +102,7 @@ export const Middleware = {
    *
    * ```ts
    * import { Context, Schema } from 'effect';
-   * import { Middleware } from '@effect-trpc/server';
+   * import { Middleware } from '@rpc-effect/server';
    *
    * class Unauthorized extends Schema.TaggedError<Unauthorized>()('Unauthorized', {}) {}
    * class CurrentUser extends Context.Service<CurrentUser, { readonly name: string }>()(

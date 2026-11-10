@@ -23,17 +23,17 @@ serialization formats, `RpcMiddleware`, `RpcTest`.
 
 ## Packages
 
-| Package                             | Use it to                                                              |
-| ----------------------------------- | ---------------------------------------------------------------------- |
-| `@effect-trpc/core`                 | declare procedures and routers; the shared error model and JSON codecs |
-| `@effect-trpc/server`               | implement handlers; serve them (fetch handler, `effect/http`); callers |
-| `@effect-trpc/server/node`          | run a Node HTTP server                                                 |
-| `@effect-trpc/client`               | call procedures from TypeScript: Promise and Effect clients, links     |
-| `@effect-trpc/tanstack-react-query` | use procedures in React with TanStack Query                            |
-| `@effect-trpc/next`                 | Next.js App Router: route handler, RSC prefetch, server actions        |
-| `@effect-trpc/start`                | TanStack Start: server route, isomorphic client, loaders               |
-| `@effect-trpc/electron`             | Electron: server in the main process, client in a renderer             |
-| `@effect-trpc/test-utils`           | test against a real server (Vitest helpers)                            |
+| Package                            | Use it to                                                              |
+| ---------------------------------- | ---------------------------------------------------------------------- |
+| `@rpc-effect/core`                 | declare procedures and routers; the shared error model and JSON codecs |
+| `@rpc-effect/server`               | implement handlers; serve them (fetch handler, `effect/http`); callers |
+| `@rpc-effect/server/node`          | run a Node HTTP server                                                 |
+| `@rpc-effect/client`               | call procedures from TypeScript: Promise and Effect clients, links     |
+| `@rpc-effect/tanstack-react-query` | use procedures in React with TanStack Query                            |
+| `@rpc-effect/next`                 | Next.js App Router: route handler, RSC prefetch, server actions        |
+| `@rpc-effect/start`                | TanStack Start: server route, isomorphic client, loaders               |
+| `@rpc-effect/electron`             | Electron: server in the main process, client in a renderer             |
+| `@rpc-effect/test-utils`           | test against a real server (Vitest helpers)                            |
 
 ## How it maps
 
@@ -47,7 +47,7 @@ serialization formats, `RpcMiddleware`, `RpcTest`.
 | `createContext`                      | `Handlers.withContext(handlers, context)`        | —                                     |
 | fetch adapter                        | `toWebHandler(router, { handlers })`             | `RpcServer.layerHttp`                 |
 | `createTRPCClient` + `httpBatchLink` | `createClient(…, { link: httpBatchLink(…) })`    | `RpcClient` + a protocol              |
-| `@trpc/tanstack-react-query`         | `@effect-trpc/tanstack-react-query`              | —                                     |
+| `@trpc/tanstack-react-query`         | `@rpc-effect/tanstack-react-query`               | —                                     |
 | superjson transformer                | Effect Schema (nothing to configure)             | `RpcSerialization`                    |
 
 ## Requirements

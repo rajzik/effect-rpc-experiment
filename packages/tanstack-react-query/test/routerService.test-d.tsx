@@ -1,6 +1,6 @@
-import { createClient, localLink } from '@effect-trpc/client';
-import type { Client } from '@effect-trpc/client';
-import type { Router } from '@effect-trpc/core';
+import { createClient, localLink } from '@rpc-effect/client';
+import type { Client } from '@rpc-effect/client';
+import type { Router } from '@rpc-effect/core';
 import type { QueryClient } from '@tanstack/react-query';
 import { describe, expectTypeOf, it } from 'vite-plus/test';
 import { createHydrationHelpers, createRpcContext, createRpcOptionsProxy } from '../src/index.js';

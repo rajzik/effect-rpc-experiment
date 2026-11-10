@@ -37,14 +37,14 @@ pieces are missing, plus several server/client features. The user asked to do, i
 
 ## Goals
 
-1. `HttpContext` in `@effect-trpc/core` (core, because router-service handlers ship to the client and
-   must not import `@effect-trpc/server`), no requirements in `R`:
+1. `HttpContext` in `@rpc-effect/core` (core, because router-service handlers ship to the client and
+   must not import `@rpc-effect/server`), no requirements in `R`:
    - `HttpContext.request: Effect<Option<HttpServerRequest>>` — `Some` when the call arrived over HTTP
      (or a WebSocket upgrade request), `None` for `createCaller`, `localLink`, Electron, tests.
    - `HttpContext.setHeader(name, value)`, `appendHeader(name, value)`,
      `setCookie(name, value, options?)`: `Effect<void>`, register a pre-response handler on the
      current HTTP request; no-ops when there is none.
-2. `Handlers.withContext(handlers, context)` in `@effect-trpc/server`, applied by every HTTP adapter
+2. `Handlers.withContext(handlers, context)` in `@rpc-effect/server`, applied by every HTTP adapter
    (`layerHttp`, `toWebHandler`, `serve` / `runServer`, Next `createRouteHandler`, Start
    `createStartHandler`): `context: Effect<Context<C>, never, CR>` is evaluated per call before
    middleware and handler; its services are provided to the call. The returned layer no longer
@@ -57,7 +57,7 @@ pieces are missing, plus several server/client features. The user asked to do, i
    `onError?: (error: { readonly path: string; readonly cause: Cause<unknown>; readonly headers: Headers }) => Effect<void>`,
    called for every call that fails (typed failure or defect, including middleware failures; not
    interruption), before the failure is sent.
-5. `httpBatchLink(options)` in `@effect-trpc/client`: options of `httpLink` plus
+5. `httpBatchLink(options)` in `@rpc-effect/client`: options of `httpLink` plus
    `maxItems?: number` (default unlimited). Queries issued in the same tick go in one POST;
    mutations and subscriptions are sent alone (one POST each, as `httpLink`). Responses are
    dispatched per request id as they stream back. Built on effect/rpc's batching HTTP protocol (a
@@ -94,7 +94,7 @@ pieces are missing, plus several server/client features. The user asked to do, i
 
 ## Design notes
 
-- Internal middleware: a `RpcMiddleware` service private to `@effect-trpc/server`, always added with
+- Internal middleware: a `RpcMiddleware` service private to `@rpc-effect/server`, always added with
   `group.middleware(Hooks)` to the group passed to `RpcServer` inside `layerHttp`. Its layer reads
   the internal `RequestContext` service that `Handlers.withContext` adds to the handlers layer
   (`Effect.serviceOption`); that service already carries what `context` needs (`CR`). Order: added

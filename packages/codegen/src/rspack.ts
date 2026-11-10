@@ -1,5 +1,5 @@
 /**
- * The schema generator as a Rspack plugin (see `@effect-trpc/codegen/unplugin`).
+ * The schema generator as a Rspack plugin (see `@rpc-effect/codegen/unplugin`).
  *
  * @since 0.1.0
  */
@@ -26,7 +26,7 @@ import { unplugin } from './unplugin.js';
  *
  * ```ts
  * // rspack.config.mjs
- * import { effectTrpcCodegen } from '@effect-trpc/codegen/rspack';
+ * import { effectTrpcCodegen } from '@rpc-effect/codegen/rspack';
  *
  * export default {
  *   entry: './src/main.ts',

@@ -23,8 +23,8 @@ import {
   type ProcedureDef,
   type ProcedureInfo,
   Router,
-} from '@effect-trpc/core';
-import { createCaller, type Caller } from '@effect-trpc/server';
+} from '@rpc-effect/core';
+import { createCaller, type Caller } from '@rpc-effect/server';
 import { Cause, Effect, Exit, Schema } from 'effect';
 import type { Layer } from 'effect';
 import type { Headers } from 'effect/http';
@@ -265,7 +265,7 @@ const decodeInput = (info: ProcedureInfo, input: unknown): Exit.Exit<unknown, un
   const schema = info.rpc.payloadSchema;
   const asType = Schema.decodeUnknownExit(Schema.toType(schema))(input);
   if (Exit.isSuccess(asType)) return asType;
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Rpc.AnyWithProps` erases the payload schema to `Schema.Top`; procedure payload schemas are decoded without services everywhere (the rpc codecs in `@effect-trpc/core` assume the same)
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Rpc.AnyWithProps` erases the payload schema to `Schema.Top`; procedure payload schemas are decoded without services everywhere (the rpc codecs in `@rpc-effect/core` assume the same)
   const asEncoded = Schema.decodeUnknownExit(schema as Schema.Codec<unknown>)(input);
   return Exit.isSuccess(asEncoded) ? asEncoded : asType;
 };
@@ -400,9 +400,9 @@ const createServerActionCallerFromInput = (
  * ```ts
  * // app/actions.ts — server only
  * 'use server';
- * import { mutation, Router } from '@effect-trpc/core';
- * import { createServerActionCaller, type InputAt } from '@effect-trpc/next';
- * import { Handlers } from '@effect-trpc/server';
+ * import { mutation, Router } from '@rpc-effect/core';
+ * import { createServerActionCaller, type InputAt } from '@rpc-effect/next';
+ * import { Handlers } from '@rpc-effect/server';
  * import { Effect, Schema } from 'effect';
  *
  * // In the app: `import { headers } from 'next/headers'`.
@@ -538,8 +538,8 @@ const decodeActionResultFromInput = (
  *
  * ```ts
  * // app/new-post.tsx — client code ('use client')
- * import { mutation, Router } from '@effect-trpc/core';
- * import { decodeActionResult, type ServerActionAt } from '@effect-trpc/next';
+ * import { mutation, Router } from '@rpc-effect/core';
+ * import { decodeActionResult, type ServerActionAt } from '@rpc-effect/next';
  * import { Exit, Schema } from 'effect';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
@@ -644,12 +644,12 @@ const unwrapActionResultFromInput = (
  *
  * ```ts
  * // app/new-post.tsx — client code ('use client')
- * import { mutation, Router } from '@effect-trpc/core';
+ * import { mutation, Router } from '@rpc-effect/core';
  * import {
  *   unwrapActionResult,
  *   type inferActionClientError,
  *   type ServerActionAt,
- * } from '@effect-trpc/next';
+ * } from '@rpc-effect/next';
  * import { useMutation } from '@tanstack/react-query';
  * import { Schema } from 'effect';
  *

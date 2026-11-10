@@ -70,7 +70,7 @@ When unsure, grep `node_modules/effect/dist/**/*.d.ts` — do not trust memory o
   `src/` file opens with a module header. Each package README has a `## For AI agents` section
   (entry points, golden path, invariants, common mistakes, verify commands): update it with the API.
 - Errors: `Schema.TaggedError` classes, discriminated by `_tag`. The client error union is
-  `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted` (from `@effect-trpc/core`).
+  `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted` (from `@rpc-effect/core`).
 - Tests prove behaviour through the public API; every typed-error claim has a `.test-d.ts` check.
 - Each package keeps `test/PARITY.md` mapping ported tRPC test files (see
   `docs/trpc-test-inventory.txt`) to local tests.

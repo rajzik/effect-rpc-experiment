@@ -1,8 +1,8 @@
 // rpc.tsx — one context per router, created at module scope.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { createClient, httpLink, RpcTransportError } from '@effect-trpc/client';
-import { createRpcContext } from '@effect-trpc/tanstack-react-query';
+import { createClient, httpLink, RpcTransportError } from '@rpc-effect/client';
+import { createRpcContext } from '@rpc-effect/tanstack-react-query';
 
 import { appRouter, type AppRouter } from '@/router';
 

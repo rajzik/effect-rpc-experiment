@@ -14,7 +14,7 @@ if (!existsSync(entry)) {
 const mod = await import(pathToFileURL(entry).href);
 const missing = symbols.filter((s) => !(s in mod));
 if (missing.length > 0) {
-  process.stdout.write(`missing exports from @effect-trpc/${name}: ${missing.join(', ')}\n`);
+  process.stdout.write(`missing exports from @rpc-effect/${name}: ${missing.join(', ')}\n`);
   process.exit(1);
 }
 process.stdout.write(`EXPORTS OK ${name}: ${symbols.join(', ')}\n`);

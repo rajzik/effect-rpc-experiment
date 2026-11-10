@@ -27,7 +27,7 @@ describe('causeToClientError', () => {
     const original = transportError();
     const error = causeToClientError(Cause.fail(original));
     expect(error).toBeInstanceOf(RpcTransportError);
-    expect(error._tag).toBe('@effect-trpc/RpcTransportError');
+    expect(error._tag).toBe('@rpc-effect/RpcTransportError');
     expect(error).toHaveProperty('cause', original);
     expect(error).toHaveProperty('message', original.message);
   });
@@ -49,7 +49,7 @@ describe('causeToClientError', () => {
   it('maps interruption-only causes to RpcInterrupted', () => {
     const error = causeToClientError(Cause.interrupt());
     expect(error).toBeInstanceOf(RpcInterrupted);
-    expect(error._tag).toBe('@effect-trpc/RpcInterrupted');
+    expect(error._tag).toBe('@rpc-effect/RpcInterrupted');
   });
 
   it('prefers typed failures over defects over interruption', () => {

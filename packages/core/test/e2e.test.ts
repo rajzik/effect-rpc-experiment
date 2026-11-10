@@ -58,7 +58,7 @@ describe('end-to-end through RpcTest.makeClient(router.group)', () => {
     const exit = await run((client) => Effect.exit(client['post.byId']({ id: 3 })));
     const error = causeToClientError(getCause(exit));
     expect(error).toBeInstanceOf(RpcDefect);
-    expect(error).toMatchObject({ _tag: '@effect-trpc/RpcDefect', message: 'database exploded' });
+    expect(error).toMatchObject({ _tag: '@rpc-effect/RpcDefect', message: 'database exploded' });
   });
 
   it('streams subscription elements as class instances', async () => {

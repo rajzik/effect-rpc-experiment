@@ -69,7 +69,7 @@ ecosystem.
 
 ### Location and wiring
 
-- New private workspace package `site/` (`@effect-trpc/site`), added to `pnpm-workspace.yaml`
+- New private workspace package `site/` (`@rpc-effect/site`), added to `pnpm-workspace.yaml`
   (`- site`). It is not under `packages/`, so `verify-jsdoc` and package conventions don't apply.
 - Scripts are prefixed `docs:` (`docs:dev`, `docs:build` = `docs:api` → `vitepress build`,
   `docs:snippets`, `docs:api`) so the existing `vp run -r build` / `vp run -r test` / `pnpm ready`

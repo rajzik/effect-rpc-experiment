@@ -30,7 +30,7 @@ that app. `pnpm ready` does not run those Playwright suites or build the documen
 ## Prove the behavior
 
 Read the changed package's README and nearby public API tests before adding coverage.
-For RPC tests, use `@effect-trpc/test-utils` and its documented harness:
+For RPC tests, use `@rpc-effect/test-utils` and its documented harness:
 
 - Serialization or typed errors crossing the wire: `testServerAndClient` or `testWebHandler`.
   `testCaller` bypasses transport and codecs.

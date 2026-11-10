@@ -6,12 +6,12 @@
  * returned `RpcProvider` builds one {@link createRpcOptionsProxy} proxy per `client` /
  * `queryClient` / `keyPrefix`, and `useRpc()` returns it so components can call
  * `useQuery(rpc.post.byId.queryOptions(...))` with the plain TanStack hooks. The `client` is a
- * Promise client from `@effect-trpc/client` (`createClient(router, { link })`).
+ * Promise client from `@rpc-effect/client` (`createClient(router, { link })`).
  *
  * @since 0.1.0
  */
-import type { Client } from '@effect-trpc/client';
-import type { Router } from '@effect-trpc/core';
+import type { Client } from '@rpc-effect/client';
+import type { Router } from '@rpc-effect/core';
 import type { QueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import { createRpcOptionsProxy, type RpcOptionsProxy } from './createOptionsProxy.js';
@@ -125,7 +125,7 @@ const createRpcContextFor = <
  * Use in a React app: call it once per router at module scope, render `RpcProvider` inside
  * `QueryClientProvider`, and read the options proxy with `useRpc()` in components. Prefer
  * {@link createRpcOptionsProxy} outside of React (route loaders, server components, scripts), and
- * the `@effect-trpc/next` / `@effect-trpc/start` helpers when you use those frameworks.
+ * the `@rpc-effect/next` / `@rpc-effect/start` helpers when you use those frameworks.
  *
  * **Details**
  *
@@ -153,9 +153,9 @@ const createRpcContextFor = <
  * **Example** (App provider and a query component)
  *
  * ```tsx
- * import { createClient, httpLink, RpcTransportError } from '@effect-trpc/client';
- * import { query, Router } from '@effect-trpc/core';
- * import { createRpcContext } from '@effect-trpc/tanstack-react-query';
+ * import { createClient, httpLink, RpcTransportError } from '@rpc-effect/client';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createRpcContext } from '@rpc-effect/tanstack-react-query';
  * import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
  * import { Schema } from 'effect';
  * import { useState, type ReactNode } from 'react';
@@ -204,9 +204,9 @@ const createRpcContextFor = <
  * **Example** (Two routers on one QueryClient with key prefixes)
  *
  * ```tsx
- * import type { Client } from '@effect-trpc/client';
- * import { query, Router } from '@effect-trpc/core';
- * import { createRpcContext } from '@effect-trpc/tanstack-react-query';
+ * import type { Client } from '@rpc-effect/client';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createRpcContext } from '@rpc-effect/tanstack-react-query';
  * import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
  * import { Schema } from 'effect';
  * import type { ReactNode } from 'react';

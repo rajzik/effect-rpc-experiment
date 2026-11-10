@@ -1,7 +1,7 @@
 // The harness takes a router service class: the client and caller decode class instances and
 // typed errors.
 import { Effect, Stream } from 'effect';
-import { Router } from '@effect-trpc/core';
+import { Router } from '@rpc-effect/core';
 import { describe, expect, it } from 'vite-plus/test';
 import { testCaller, testServerAndClient, testWebHandler, withTestServer } from '../src/index.js';
 import { AppHandlers, AppRouter, Post, PostNotFound, postCreatedAt } from './service-fixtures.js';

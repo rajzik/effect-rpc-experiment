@@ -2,8 +2,8 @@ import { createServer } from 'node:http';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerResponse } from 'effect/http';
 import { NodeHttpServer, NodeRuntime } from '@effect/platform-node';
-import { layerHttp, toWebHandler } from '@effect-trpc/server';
-import { runServer, serve } from '@effect-trpc/server/node';
+import { layerHttp, toWebHandler } from '@rpc-effect/server';
+import { runServer, serve } from '@rpc-effect/server/node';
 
 import { appRouter } from '@/router';
 import { ServerLive } from '@/server';

@@ -1,8 +1,8 @@
 // The README example, verbatim apart from imports (source paths instead of package names).
 import { Effect, Schema, Stream } from 'effect';
-import { query, Router, subscription } from '@effect-trpc/core';
-import { RpcDefect } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { query, Router, subscription } from '@rpc-effect/core';
+import { RpcDefect } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import { describe, expect, it } from 'vite-plus/test';
 import { assertInstance, testServerAndClient } from '../src/index.js';
 
