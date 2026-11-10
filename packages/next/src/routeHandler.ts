@@ -9,8 +9,8 @@
  * @since 0.1.0
  */
 import { Router } from '@rpc-effect/core';
-import { toWebHandler } from '@rpc-effect/server';
-import type { WebHandler, WebHandlerOptions } from '@rpc-effect/server';
+import { makeLazyWebHandler, toWebHandler } from '@rpc-effect/server';
+import type { WebHandlerOptions } from '@rpc-effect/server';
 
 /**
  * Options of {@link createRouteHandler}: `handlers`, `serialization` and `onError` of
@@ -122,17 +122,7 @@ const createRouteHandlerFor = <R extends Router.Any, LE = never>(
       ? [path]
       : [`${trimTrailingSlash(options.basePath)}${path === '/' ? '' : path}`, path];
 
-  let server: Promise<WebHandler> | undefined;
-  let disposed: Promise<void> | undefined;
-
-  const getServer = (): Promise<WebHandler> => {
-    server ??= toWebHandler(router, { ...options, path }).catch((error: unknown) => {
-      // Let the next request retry instead of caching the failure forever.
-      server = undefined;
-      throw error;
-    });
-    return server;
-  };
+  const server = makeLazyWebHandler(() => toWebHandler(router, { ...options, path }));
 
   const toEndpoint = async (request: Request): Promise<Request | Response> => {
     const url = new URL(request.url);
@@ -156,24 +146,18 @@ const createRouteHandlerFor = <R extends Router.Any, LE = never>(
   const POST: NextRouteHandlerFn = async (request) => {
     const endpoint = await toEndpoint(request);
     if (endpoint instanceof Response) return endpoint;
-    // Checked after the await (not before): `dispose()` may have run while the body was read, and
-    // `getServer()` must never start a server that `dispose()` has already missed.
-    if (disposed !== undefined) return json(503, { _tag: 'Disposed', message: 'Server disposed' });
-    const web = await getServer();
+    // Checked after the await (not before): `dispose()` may have run while the body was read.
+    if (server.isDisposed()) return json(503, { _tag: 'Disposed', message: 'Server disposed' });
+    const web = await server.get();
     return web.handler(endpoint);
   };
 
-  const dispose = (): Promise<void> => {
-    disposed ??= (async () => {
-      const pending = server;
-      if (pending === undefined) return;
-      const web = await pending.catch(() => undefined);
-      await web?.dispose();
-    })();
-    return disposed;
+  return {
+    GET: methodNotAllowed,
+    POST,
+    dispose: server.dispose,
+    [Symbol.asyncDispose]: server.dispose,
   };
-
-  return { GET: methodNotAllowed, POST, dispose, [Symbol.asyncDispose]: dispose };
 };
 
 /** `createRouteHandler` for a router or a router service: normalises the input with `Router.from`. */

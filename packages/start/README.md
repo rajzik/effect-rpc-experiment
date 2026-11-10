@@ -100,7 +100,8 @@ hydration that keeps `Schema.Class` / `TaggedError` instances.
 
 - Route handler (encoding, NDJSON, rewrites, 405/404/503, lazy build, retry, `dispose`,
   `Handlers.withContext` and `onError`): `test/handler.test.ts`; the `withContext` types:
-  `test/start.test-d.tsx`.
+  `test/start.test-d.tsx`. The lazy build, retry and dispose rules live in `makeLazyWebHandler`
+  (`@rpc-effect/server`, `packages/server/test/lazy-web-handler.test.ts`).
 - Clients (`isServer` switching, `httpLink`, subscriptions, SSR url resolution):
   `test/client.test.ts`.
 - Helpers (loader `ensureQueryData`, typed errors, dehydrate/hydrate, infinite queries,
@@ -196,7 +197,8 @@ export const Route = createFileRoute('/api/rpc/$')({
   gives a clear answer to someone opening the url in a browser.
 - The handler layer is built lazily on the first request and shared after that. If the build
   fails, that request rejects (Start answers `500`) and the next request tries again.
-  `handler.dispose()` releases the layer.
+  `handler.dispose()` releases the layer. This lifecycle is `makeLazyWebHandler` from
+  `@rpc-effect/server`, shared with `@rpc-effect/next`.
 - Typed failures and defects are encoded into the response `Exit` with status `200`.
   Subscriptions stream NDJSON. `serialization: 'json' | 'ndjson'` must match the client.
 - `Handlers.withContext(handlers, context)` (tRPC's `createContext`: an `Effect` of services

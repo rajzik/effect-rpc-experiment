@@ -49,10 +49,10 @@ from another process or the browser (`@rpc-effect/client`), or for React Query h
 
 **Entry points**
 
-| import path               | exports                                                                                                                                                                                                                                                                                                                                       | source                                                                                  |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `@rpc-effect/server`      | `Handlers` (`make`, `flat`, `of`, `fromService`, `fromProcedures`, `withContext`), `toWebHandler`, `layerHttp` / `toHttpLayer`, `serializationLayer`, `createCaller`, `Middleware`; types `Caller`, `CallerOptions`, `CallOptions`, `PromiseCallOptions`, `WebHandler`, `ServerOptions` (`onError`, ...), `OnErrorInfo`, `Serialization`, ... | `src/index.ts` → `src/Handlers.ts`, `src/Http.ts`, `src/Caller.ts`, `src/Middleware.ts` |
-| `@rpc-effect/server/node` | `serve` (Layer), `runServer` (Promise); types `NodeServeOptions`, `RunningServer`                                                                                                                                                                                                                                                             | `src/node.ts` (needs the optional peer `@effect/platform-node`)                         |
+| import path               | exports                                                                                                                                                                                                                                                                                                                                                                               | source                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `@rpc-effect/server`      | `Handlers` (`make`, `flat`, `of`, `fromService`, `fromProcedures`, `withContext`), `toWebHandler`, `makeLazyWebHandler`, `layerHttp` / `toHttpLayer`, `serializationLayer`, `createCaller`, `Middleware`; types `Caller`, `CallerOptions`, `CallOptions`, `PromiseCallOptions`, `WebHandler`, `LazyWebHandler`, `ServerOptions` (`onError`, ...), `OnErrorInfo`, `Serialization`, ... | `src/index.ts` → `src/Handlers.ts`, `src/Http.ts`, `src/Caller.ts`, `src/Middleware.ts` |
+| `@rpc-effect/server/node` | `serve` (Layer), `runServer` (Promise); types `NodeServeOptions`, `RunningServer`                                                                                                                                                                                                                                                                                                     | `src/node.ts` (needs the optional peer `@effect/platform-node`)                         |
 
 **Golden path**
 
@@ -183,6 +183,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - Promise caller rejections are `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; Effect caller calls fail with exactly `E`.
 - Every function taking a `router` takes a `Router.Input` (a router or a router service class) and calls `Router.from` once; types are computed with `Router.Of<X>`, so a service and the equivalent `Router.make` router infer the same caller / handler types. Type helpers (`Caller<R>`, `Handlers.Requirements<R>`, ...) take a router type: `Router.Of<typeof AppRouter>`.
 - `toWebHandler` / `runServer` build the handler layer eagerly (the promise rejects on failure); `createCaller` builds it on the first call.
+- `makeLazyWebHandler(build)` owns the lazy lifecycle of the Next and Start adapters: nothing runs until `get()`, concurrent calls share one build, a failed build is retried by the next `get()`, and `dispose()` closes it at once (`isDisposed()`, `get()` rejects, no build ever again), waits for a pending build and disposes its result once. Fix adapter lifecycle bugs there, not in the adapters.
 - `Handlers.withContext(handlers, context)` takes `context: Effect<Context<C>, never, CR>` (required) and returns the handlers layer without the requirement `C`. Every HTTP adapter (`toWebHandler`, `layerHttp`, `serve`, `runServer`, the Next / Start adapters) evaluates `context` once per call (over WebSocket too) before every middleware and the handler, and provides its services to both. `CR` is read from the output of `handlers`; what it does not provide stays a requirement of the returned layer. It cannot fail with a typed error (use a middleware); a defect in it fails the call with `RpcDefect`. `createCaller` applies it too (`HttpContext.request` is `None` there); `localLink` does not.
 - `onError({ path, cause, headers })` is called once for every call that fails while running (handler or middleware; typed failure or defect; a subscription failing mid-stream), before the failure is sent. It is not called for interruptions, nor for calls rejected outside the handler and middleware (invalid payload, unknown procedure, a success value that fails to encode: they reach the client as `RpcDefect`; tRPC's `BAD_REQUEST` input errors do reach its `onError`). It is awaited and uninterruptible; its own failures are ignored and never change the response.
 - The HTTP adapters and `createCaller` always add one internal middleware (outermost) for the request context and (HTTP only) `onError`; without them it only runs the call.
@@ -215,7 +216,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 
 **Where to look**
 
-- `test/readme.test.ts` (this README's example), `test/handlers.test.ts` / `test/handlers.test-d.ts` (`Handlers`), `test/routerService.test.ts` / `test/routerService.test-d.ts` (`Handlers.fromService` / `fromProcedures`, fixtures in `test/service-fixtures.ts`), `test/routerServiceEffectful.test.ts` / `.test-d.ts` (a `make` that reads services), `test/web-handler.test.ts` (`toWebHandler`: errors, defects, NDJSON, path, dispose → 503), `test/node.test.ts` (`runServer`, `layerHttp` in an Effect app), `test/caller.test.ts` / `test/caller.test-d.ts` (`createCaller`, abort, dispose), `test/middlewares.test.ts` (ordering, provided services, middleware errors), `test/context.test.ts` / `test/context.test-d.ts` (`Handlers.withContext` and its types), `test/onError.test.ts` (`onError`), `test/httpContext.test.ts` (`HttpContext` over HTTP, WebSocket and the caller), `test/annotate.test.ts` (annotations read by middleware), `test/procedure-errors.test.ts` (typed errors vs defects), `test/streaming.test.ts`, `test/validation.test.ts`, `test/PARITY.md`.
+- `test/readme.test.ts` (this README's example), `test/handlers.test.ts` / `test/handlers.test-d.ts` (`Handlers`), `test/routerService.test.ts` / `test/routerService.test-d.ts` (`Handlers.fromService` / `fromProcedures`, fixtures in `test/service-fixtures.ts`), `test/routerServiceEffectful.test.ts` / `.test-d.ts` (a `make` that reads services), `test/web-handler.test.ts` (`toWebHandler`: errors, defects, NDJSON, path, dispose → 503), `test/lazy-web-handler.test.ts` (`makeLazyWebHandler`: shared build, retry, dispose before / during builds, dispose failure), `test/node.test.ts` (`runServer`, `layerHttp` in an Effect app), `test/caller.test.ts` / `test/caller.test-d.ts` (`createCaller`, abort, dispose), `test/middlewares.test.ts` (ordering, provided services, middleware errors), `test/context.test.ts` / `test/context.test-d.ts` (`Handlers.withContext` and its types), `test/onError.test.ts` (`onError`), `test/httpContext.test.ts` (`HttpContext` over HTTP, WebSocket and the caller), `test/annotate.test.ts` (annotations read by middleware), `test/procedure-errors.test.ts` (typed errors vs defects), `test/streaming.test.ts`, `test/validation.test.ts`, `test/PARITY.md`.
 - JSDoc on every export (`src/*.ts`) follows `docs/jsdoc-style.md`.
 
 **Verify**
@@ -448,6 +449,20 @@ until `dispose()`, which interrupts in-flight requests (their `Exit` is an inter
 layer's finalizers and makes later requests answer `503`. Clients must use the same serialization (`RpcSerialization.layerNdjson` for
 an `effect/rpc` client). For an existing Effect HTTP app use `layerHttp(appRouter, { handlers, path })`
 (alias `toHttpLayer`), which needs an `HttpRouter`; `protocol: "websocket"` is also available there.
+
+To build the server on the first request instead (framework adapters, route modules loaded at
+import time), wrap the build in `makeLazyWebHandler`: concurrent first requests share one build,
+a failed build is retried by the next `get()`, and `dispose()` stops any further build.
+
+```ts
+const web = makeLazyWebHandler(() => toWebHandler(appRouter, { handlers: ServerLive }));
+const fetchHandler = async (request: Request): Promise<Response> => {
+  if (web.isDisposed()) return new Response('Server disposed', { status: 503 });
+  const { handler } = await web.get();
+  return handler(request);
+};
+await web.dispose(); // waits for a pending build, then releases the layer once
+```
 
 ## Request context, response headers and `onError`
 
