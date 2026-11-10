@@ -1,7 +1,7 @@
 // The task board's server side through the in-process caller: auth, typed errors, pagination,
 // the change feed and the test-only reset.
-import { RpcDefect } from '@effect-trpc/core';
-import { testCaller } from '@effect-trpc/test-utils';
+import { RpcDefect } from '@rpc-effect/core';
+import { testCaller } from '@rpc-effect/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 
 import {

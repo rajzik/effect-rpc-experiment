@@ -3,9 +3,9 @@
  *
  * `createRpcContext` / `createRpcOptionsProxy` give a typed options proxy that mirrors the router
  * and produces plain TanStack options (`useQuery(rpc.post.byId.queryOptions({ id }))`), with
- * `error` typed as `ClientError<E>` from `@effect-trpc/core`. `useSubscription` consumes
+ * `error` typed as `ClientError<E>` from `@rpc-effect/core`. `useSubscription` consumes
  * subscription procedures, and `createHydrationHelpers` provides schema-aware SSR hydration. Calls
- * go through the Promise client of `@effect-trpc/client`.
+ * go through the Promise client of `@rpc-effect/client`.
  *
  * @since 0.1.0
  */

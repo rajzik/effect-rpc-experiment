@@ -1,6 +1,6 @@
 // main.ts — the main process hosts the server.
 import { app, BrowserWindow, ipcMain } from 'electron';
-import { MainRpcServer } from '@effect-trpc/electron/main';
+import { MainRpcServer } from '@rpc-effect/electron/main';
 
 import { appRouter } from '@/router';
 import { ServerLive } from '@/server';

@@ -1,5 +1,5 @@
-import { appRouter } from '@effect-trpc-examples/shared';
-import { createBrowserClient, createServerClient, createStartHelpers } from '@effect-trpc/start';
+import { appRouter } from '@rpc-effect-examples/shared';
+import { createBrowserClient, createServerClient, createStartHelpers } from '@rpc-effect/start';
 import { createIsomorphicFn } from '@tanstack/react-start';
 import { getRequestHeader } from '@tanstack/react-start/server';
 

@@ -1,7 +1,7 @@
 // The demo router's server side. Samples import it as `@/server`: handlers plus the Auth
 // middleware implementation, merged into the one layer every adapter takes as `handlers`.
 import { Effect, Layer, Stream } from 'effect';
-import { Handlers } from '@effect-trpc/server';
+import { Handlers } from '@rpc-effect/server';
 
 import {
   appRouter,

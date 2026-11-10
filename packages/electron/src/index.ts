@@ -3,10 +3,10 @@
  * `MessagePort` per renderer client.
  *
  * This root entry re-exports everything for tests and tooling. Apps should import the
- * process-specific entries instead: `@effect-trpc/electron/main` (main process),
- * `@effect-trpc/electron/preload` (preload script, no Effect) and
- * `@effect-trpc/electron/renderer` (renderer). Routers come from `@effect-trpc/core`, handlers
- * from `@effect-trpc/server` and clients from `@effect-trpc/client`.
+ * process-specific entries instead: `@rpc-effect/electron/main` (main process),
+ * `@rpc-effect/electron/preload` (preload script, no Effect) and
+ * `@rpc-effect/electron/renderer` (renderer). Routers come from `@rpc-effect/core`, handlers
+ * from `@rpc-effect/server` and clients from `@rpc-effect/client`.
  *
  * @since 0.1.0
  */

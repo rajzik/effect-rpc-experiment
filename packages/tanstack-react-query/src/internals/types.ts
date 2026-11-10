@@ -7,8 +7,8 @@
  *
  * @since 0.1.0
  */
-import type { inferClientInput, ProcedureCallOptions } from '@effect-trpc/client';
-import type { ClientError, inferError, inferOutput, ProcedureDef } from '@effect-trpc/core';
+import type { inferClientInput, ProcedureCallOptions } from '@rpc-effect/client';
+import type { ClientError, inferError, inferOutput, ProcedureDef } from '@rpc-effect/core';
 import type { InfiniteData } from '@tanstack/react-query';
 
 /** Makes the given optional keys of `TObj` required. */

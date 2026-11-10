@@ -1,6 +1,6 @@
 // Server actions (tRPC `next/src/app-dir/{client,procedureErrors}.test.tsx`): the action resolves
 // with an encoded Exit; the client decodes it to class instances with typed errors.
-import { RpcDefect, RpcInterrupted, RpcTransportError } from '@effect-trpc/core';
+import { RpcDefect, RpcInterrupted, RpcTransportError } from '@rpc-effect/core';
 import { Exit } from 'effect';
 import { assert, describe, expect, test } from 'vite-plus/test';
 import { createServerActionCaller, decodeActionResult, unwrapActionResult } from '../src/index.js';

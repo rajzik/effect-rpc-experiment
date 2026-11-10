@@ -3,8 +3,8 @@
 import { MessageChannel as NodeMessageChannel } from 'node:worker_threads';
 import type { MessagePort } from 'node:worker_threads';
 import { Effect, Exit, Layer, Scope } from 'effect';
-import { createClient } from '@effect-trpc/client';
-import { Router } from '@effect-trpc/core';
+import { createClient } from '@rpc-effect/client';
+import { Router } from '@rpc-effect/core';
 import { describe, expect, it, onTestFinished } from 'vite-plus/test';
 import {
   installPreloadBridge,

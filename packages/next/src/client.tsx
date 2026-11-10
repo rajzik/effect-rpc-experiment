@@ -3,22 +3,22 @@
  *
  * {@link createNextRpcClient} bundles a per-request / browser-singleton `QueryClient`, an
  * `httpLink` client pointed at the route handler of `createRouteHandler`, the
- * `@effect-trpc/tanstack-react-query` context (`useRpc`) and the router's Schema-aware
+ * `@rpc-effect/tanstack-react-query` context (`useRpc`) and the router's Schema-aware
  * `HydrationBoundary`, which `createRscHelpers` renders to hand server-prefetched data to client
  * components. The package itself has no `'use client'` directive: call it from your own
  * `'use client'` module.
  *
  * @since 0.1.0
  */
-import { createClient, httpLink } from '@effect-trpc/client';
-import type { Client, HeadersOption, SerializationOption } from '@effect-trpc/client';
-import { Router } from '@effect-trpc/core';
-import { createHydrationHelpers, createRpcContext } from '@effect-trpc/tanstack-react-query';
+import { createClient, httpLink } from '@rpc-effect/client';
+import type { Client, HeadersOption, SerializationOption } from '@rpc-effect/client';
+import { Router } from '@rpc-effect/core';
+import { createHydrationHelpers, createRpcContext } from '@rpc-effect/tanstack-react-query';
 import type {
   FeatureFlags,
   RpcHydrationBoundaryProps,
   RpcOptionsProxy,
-} from '@effect-trpc/tanstack-react-query';
+} from '@rpc-effect/tanstack-react-query';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import type { Layer } from 'effect';
@@ -47,14 +47,14 @@ const isServer = (): boolean => typeof window === 'undefined';
  * - `fetch` / `httpLink` on the server need absolute urls, also while client components render
  *   during SSR. Behind a proxy or on a non-Vercel host, the server-side guess can be wrong: pass
  *   an absolute `url` to `createNextRpcClient` instead.
- * - Unlike `@effect-trpc/start`'s `getBaseUrl`, it takes no options and ignores `PUBLIC_URL` /
+ * - Unlike `@rpc-effect/start`'s `getBaseUrl`, it takes no options and ignores `PUBLIC_URL` /
  *   `URL`.
  *
  * **Example** (Absolute url of an app endpoint, client or server)
  *
  * ```ts
  * // lib/urls.ts — imported by server and client code
- * import { getBaseUrl } from '@effect-trpc/next';
+ * import { getBaseUrl } from '@rpc-effect/next';
  *
  * // `https://my-app.vercel.app/api/health` on Vercel, `http://localhost:3000/...` in dev SSR.
  * export const healthUrl = (): URL => new URL('/api/health', getBaseUrl());
@@ -272,8 +272,8 @@ const createNextRpcClientFromInput = (
  * ```tsx
  * // trpc/client.tsx — client code
  * 'use client';
- * import { query, Router } from '@effect-trpc/core';
- * import { createNextRpcClient } from '@effect-trpc/next';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createNextRpcClient } from '@rpc-effect/next';
  * import { Schema } from 'effect';
  *
  * // server/router.ts in a real app: schemas only, no handlers.
@@ -292,8 +292,8 @@ const createNextRpcClientFromInput = (
  *
  * ```tsx
  * // app/layout.tsx (server component) + app/post-view.tsx ('use client')
- * import { query, Router } from '@effect-trpc/core';
- * import { createNextRpcClient } from '@effect-trpc/next';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createNextRpcClient } from '@rpc-effect/next';
  * import { useSuspenseQuery } from '@tanstack/react-query';
  * import { Schema } from 'effect';
  * import type { ReactNode } from 'react';

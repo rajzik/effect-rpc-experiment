@@ -28,7 +28,7 @@ Effect v4, effect-trpc workspace packages (built `dist`), `@playwright/test` (Ch
 - Example scripts are prefixed `example:` (`example:build`, `example:start`, `example:test`), so
   `vp run -r build|test`, `pnpm ready` and `ci.yml` are unchanged. Root: `pnpm examples:test`.
 - Lint: examples pass `pnpm check` (`--deny-warnings`); per-line reasoned disables only.
-- Apps consume `@effect-trpc/*` via `workspace:*` (built `dist`), Effect v4 APIs only.
+- Apps consume `@rpc-effect/*` via `workspace:*` (built `dist`), Effect v4 APIs only.
 - Library bugs found: fix in `packages/*` in their own commit, failing unit test first (plus
   `.test-d.ts` if types change), README / `test/PARITY.md` updated, full `pnpm ready` green. Never
   skip or weaken an example test to pass.
@@ -76,7 +76,7 @@ real scaffold in Tasks 4–5); `pnpm-workspace.yaml` (`allowBuilds`).
 
 **Files:**
 
-- Create: `examples/shared/package.json` (`@effect-trpc-examples/shared`, private, exports `.`,
+- Create: `examples/shared/package.json` (`@rpc-effect-examples/shared`, private, exports `.`,
   `./server`, `./ui`, `./e2e`), `src/domain.ts`, `src/server.ts`, `src/store.ts`, `src/ui/*.tsx`,
   `src/e2e/*.ts`, `test/server.test.ts`, `tsconfig.json`
 - Modify: root `vite.config.ts` only if lint needs an override for `examples/**/e2e/**` (Playwright

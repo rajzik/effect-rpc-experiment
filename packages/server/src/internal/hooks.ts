@@ -22,10 +22,10 @@ import type { ServerOptions } from '../Http.js';
 export class RequestContext extends Context.Service<
   RequestContext,
   Effect.Effect<Context.Context<never>>
->()('@effect-trpc/server/RequestContext') {}
+>()('@rpc-effect/server/RequestContext') {}
 
 /** The hooks middleware: no error, provides nothing. */
-class Hooks extends RpcMiddleware.Service<Hooks>()('@effect-trpc/server/Hooks') {}
+class Hooks extends RpcMiddleware.Service<Hooks>()('@rpc-effect/server/Hooks') {}
 
 /**
  * Adds the hooks middleware to `group`. Returns the group to serve and the layer implementing the

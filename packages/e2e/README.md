@@ -1,15 +1,15 @@
-# @effect-trpc/e2e
+# @rpc-effect/e2e
 
 Private end-to-end tests that run the published packages together, the way an app uses them. The
-package has no `src/` and is never published. It imports `@effect-trpc/*` through their package
+package has no `src/` and is never published. It imports `@rpc-effect/*` through their package
 entries (`dist/`), not through source paths, so it also checks that the built packages fit
 together.
 
 ## What the suite proves
 
 `test/full-stack.test.tsx` (jsdom) wires core → server (a real Node HTTP server from
-`@effect-trpc/test-utils`' `testServerAndClient`) → `@effect-trpc/client` over HTTP →
-`@effect-trpc/tanstack-react-query` (`createRpcContext`, `createRpcOptionsProxy`,
+`@rpc-effect/test-utils`' `testServerAndClient`) → `@rpc-effect/client` over HTTP →
+`@rpc-effect/tanstack-react-query` (`createRpcContext`, `createRpcOptionsProxy`,
 `createHydrationHelpers`) → a React component rendered with `@testing-library/react`. It checks
 that:
 
@@ -67,7 +67,7 @@ package's `test/PARITY.md`.
 
 **Invariants**
 
-- Import only public package entries (`@effect-trpc/<name>`), never `../<name>/src`; the suite
+- Import only public package entries (`@rpc-effect/<name>`), never `../<name>/src`; the suite
   tests the built output.
 - React test files start with `// @vitest-environment jsdom` and import test APIs from
   `vite-plus/test`.

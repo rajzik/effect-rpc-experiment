@@ -1,4 +1,4 @@
-import { httpAdapter, resetData, TaskBoardPage } from '@effect-trpc-examples/shared/e2e';
+import { httpAdapter, resetData, TaskBoardPage } from '@rpc-effect-examples/shared/e2e';
 
 import { expect, rpcUrl, test } from './fixtures';
 

@@ -48,7 +48,7 @@ import type { QueryClientConfig } from '@tanstack/react-query';
  *
  * ```ts
  * // trpc/query-client.ts — imported by server and client code
- * import { makeQueryClient } from '@effect-trpc/next';
+ * import { makeQueryClient } from '@rpc-effect/next';
  *
  * // Keep the effect-trpc dehydration defaults; only change what the app needs.
  * export const makeAppQueryClient = () =>

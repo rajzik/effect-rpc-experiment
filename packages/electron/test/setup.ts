@@ -1,5 +1,5 @@
 import type { MessagePort } from 'node:worker_threads';
-import { createClient, type Client } from '@effect-trpc/client';
+import { createClient, type Client } from '@rpc-effect/client';
 import {
   installPreloadBridge,
   MainRpcServer,

@@ -1,5 +1,5 @@
 import type { Effect, Layer, Stream } from 'effect';
-import type { ClientError } from '@effect-trpc/core';
+import type { ClientError } from '@rpc-effect/core';
 import { describe, expectTypeOf, it } from 'vite-plus/test';
 import { createCaller, toWebHandler } from '../src/index.js';
 import type { Caller, Handlers, WebHandler } from '../src/index.js';

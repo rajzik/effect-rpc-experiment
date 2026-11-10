@@ -2,19 +2,19 @@
  * End-to-end test harnesses for effect-trpc routers: a real Node HTTP server, a fetch web
  * handler and an in-process caller, each bound to one handler layer.
  *
- * The harnesses compose the public adapters — `runServer` from `@effect-trpc/server/node`,
- * `toWebHandler` and `createCaller` from `@effect-trpc/server`, and `createClient` + `httpLink`
- * from `@effect-trpc/client` — so a test exercises exactly the wire format an app uses. Every
+ * The harnesses compose the public adapters — `runServer` from `@rpc-effect/server/node`,
+ * `toWebHandler` and `createCaller` from `@rpc-effect/server`, and `createClient` + `httpLink`
+ * from `@rpc-effect/client` — so a test exercises exactly the wire format an app uses. Every
  * harness is disposable (`await using`).
  *
  * @since 0.1.0
  */
 import type { Layer } from 'effect';
-import { Router } from '@effect-trpc/core';
-import type { Client } from '@effect-trpc/client';
-import { createCaller, toWebHandler } from '@effect-trpc/server';
-import type { Caller, WebHandler } from '@effect-trpc/server';
-import { runServer } from '@effect-trpc/server/node';
+import { Router } from '@rpc-effect/core';
+import type { Client } from '@rpc-effect/client';
+import { createCaller, toWebHandler } from '@rpc-effect/server';
+import type { Caller, WebHandler } from '@rpc-effect/server';
+import { runServer } from '@rpc-effect/server/node';
 import { callerLayer, DEFAULT_PATH, makeHttpClient, onceDispose, toRequest } from './internal.js';
 import type { TestFetch, TestHarnessOptions } from './internal.js';
 
@@ -34,9 +34,9 @@ import type { TestFetch, TestHarnessOptions } from './internal.js';
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { type TestServerOptions } from '@effect-trpc/test-utils';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { type TestServerOptions } from '@rpc-effect/test-utils';
  *
  * class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}
  * class NotFound extends Schema.TaggedError<NotFound>()('NotFound', { id: Schema.String }) {}
@@ -74,9 +74,9 @@ export type TestServerOptions<R extends Router.Any, LE = never> = TestHarnessOpt
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { type TestWebHandlerOptions } from '@effect-trpc/test-utils';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { type TestWebHandlerOptions } from '@rpc-effect/test-utils';
  *
  * class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}
  * class NotFound extends Schema.TaggedError<NotFound>()('NotFound', { id: Schema.String }) {}
@@ -118,9 +118,9 @@ export type TestWebHandlerOptions<R extends Router.Any, LE = never> = TestHarnes
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { testServerAndClient, type TestServerAndClient } from '@effect-trpc/test-utils';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { testServerAndClient, type TestServerAndClient } from '@rpc-effect/test-utils';
  * import { afterAll, beforeAll } from '@effect/vitest';
  *
  * class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}
@@ -186,9 +186,9 @@ export interface TestServerAndClient<R extends Router.Any> {
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { testWebHandler, type TestWebHandler } from '@effect-trpc/test-utils';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { testWebHandler, type TestWebHandler } from '@rpc-effect/test-utils';
  * import { afterAll, beforeAll } from '@effect/vitest';
  *
  * class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}
@@ -320,9 +320,9 @@ const testServerAndClientFromInput = (
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { testServerAndClient } from '@effect-trpc/test-utils';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { testServerAndClient } from '@rpc-effect/test-utils';
  * import { expect, it } from '@effect/vitest';
  *
  * class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}
@@ -416,9 +416,9 @@ const withTestServerFromInput = (
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { withTestServer } from '@effect-trpc/test-utils';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { withTestServer } from '@rpc-effect/test-utils';
  * import { expect, it } from '@effect/vitest';
  *
  * class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}
@@ -520,9 +520,9 @@ const testWebHandlerFromInput = (
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { testWebHandler } from '@effect-trpc/test-utils';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { testWebHandler } from '@rpc-effect/test-utils';
  * import { expect, it } from '@effect/vitest';
  *
  * class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}
@@ -600,9 +600,9 @@ const testCallerFromInput = (
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { testCaller } from '@effect-trpc/test-utils';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { testCaller } from '@rpc-effect/test-utils';
  * import { expect, it } from '@effect/vitest';
  *
  * class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}

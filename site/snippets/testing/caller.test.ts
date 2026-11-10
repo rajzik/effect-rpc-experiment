@@ -1,7 +1,7 @@
 import { Effect, Layer, Stream } from 'effect';
-import { createClient, localLink } from '@effect-trpc/client';
-import { Handlers } from '@effect-trpc/server';
-import { effectExpect, effectIt, testCaller } from '@effect-trpc/test-utils';
+import { createClient, localLink } from '@rpc-effect/client';
+import { Handlers } from '@rpc-effect/server';
+import { effectExpect, effectIt, testCaller } from '@rpc-effect/test-utils';
 
 import { appRouter, Post, PostNotFound, PostPage } from '@/router';
 import { AuthLive, ServerLive } from '@/server';

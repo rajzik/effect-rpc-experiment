@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 // Schema-aware SSR hydration: `dehydrate` encodes with the procedures' schemas, `hydrate` /
 // `HydrationBoundary` restore class instances, typed errors and defects.
-import { createClient, localLink } from '@effect-trpc/client';
-import { query, Router, RpcDefect } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { createClient, localLink } from '@rpc-effect/client';
+import { query, Router, RpcDefect } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import { QueryClientProvider, useQuery, type DehydratedState } from '@tanstack/react-query';
 import { cleanup, render } from '@testing-library/react';
 import { Effect, Schema } from 'effect';
@@ -72,7 +72,7 @@ describe('dehydrate', () => {
       cause: [{ _tag: 'Fail', error: { _tag: 'PostNotFound', id: 404 } }],
     });
     const boom = keyOf(state, 'boom');
-    expect(boom?.state.error).toMatchObject({ _tag: '@effect-trpc/RpcDefect', message: 'kaboom' });
+    expect(boom?.state.error).toMatchObject({ _tag: '@rpc-effect/RpcDefect', message: 'kaboom' });
     // infinite queries: every page is encoded
     const list = keyOf(state, 'list');
     expect(list?.state.data).toMatchObject({

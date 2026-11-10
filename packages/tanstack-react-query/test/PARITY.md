@@ -1,4 +1,4 @@
-# @effect-trpc/tanstack-react-query — tRPC test parity
+# @rpc-effect/tanstack-react-query — tRPC test parity
 
 tRPC's `@trpc/tanstack-react-query` tests (see `docs/trpc-test-inventory.txt`) and the local
 tests that port their behaviour. `trpc` → `rpc`, `useTRPC` → `useRpc`, `TRPCClientError` →

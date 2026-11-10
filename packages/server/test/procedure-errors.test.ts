@@ -1,6 +1,6 @@
 // Port of tRPC tests/server/procedureErrors.test.ts: typed procedure errors vs defects.
 import { Effect, Schema } from 'effect';
-import { mutation, query, Router, RpcDefect } from '@effect-trpc/core';
+import { mutation, query, Router, RpcDefect } from '@rpc-effect/core';
 import { describe, expect, it } from 'vite-plus/test';
 import { createCaller, Handlers, toWebHandler } from '../src/index.js';
 import { rejection } from './fixtures.js';

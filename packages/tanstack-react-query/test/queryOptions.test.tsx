@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // Port of trpc/packages/tanstack-react-query/test/queryOptions.test.tsx
-import type { ClientError } from '@effect-trpc/core';
+import type { ClientError } from '@rpc-effect/core';
 import {
   queryOptions,
   skipToken,

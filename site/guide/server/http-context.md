@@ -58,8 +58,8 @@ provided to both.
   procedure's errors. A defect in `context` fails the call with `RpcDefect`.
 
 Every HTTP adapter applies it, with the same meaning: `toWebHandler` and `layerHttp` from
-`@effect-trpc/server`, `serve` and `runServer` from `@effect-trpc/server/node`, `createRouteHandler`
-from `@effect-trpc/next` and `createStartHandler` from `@effect-trpc/start`. `createCaller` applies
+`@rpc-effect/server`, `serve` and `runServer` from `@rpc-effect/server/node`, `createRouteHandler`
+from `@rpc-effect/next` and `createStartHandler` from `@rpc-effect/start`. `createCaller` applies
 it too, with `HttpContext.request` as `None`. `localLink` does not: give it the handlers layer with
 the services provided directly, since with a `withContext` layer the calls needing them die.
 

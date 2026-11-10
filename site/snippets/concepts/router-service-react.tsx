@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { createClient, httpLink, type Client } from '@effect-trpc/client';
-import { Router } from '@effect-trpc/core';
-import { createRpcContext } from '@effect-trpc/tanstack-react-query';
+import { createClient, httpLink, type Client } from '@rpc-effect/client';
+import { Router } from '@rpc-effect/core';
+import { createRpcContext } from '@rpc-effect/tanstack-react-query';
 
 import { AppRouter } from './router-service';
 

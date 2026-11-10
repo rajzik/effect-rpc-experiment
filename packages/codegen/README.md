@@ -1,4 +1,4 @@
-# @effect-trpc/codegen
+# @rpc-effect/codegen
 
 Write routers without `.output(...)` / `.error(...)` and let the handler types define the
 contract. The generator reads each handler's inferred `Effect<A, E>` / `Stream<A, E>` with the
@@ -49,18 +49,18 @@ The generator is also an [unplugin](https://unplugin.unjs.io), with one entry pe
 generates when a build starts (and on every rebuild in watch mode), fails the build on generator
 errors, and only warns in Vite dev, where every change regenerates:
 
-| Bundler                                                    | Entry                                                                  |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Vite (Vitest, TanStack Start, electron-vite, Astro, …)     | `@effect-trpc/codegen/vite`                                            |
-| Rollup / Rolldown                                          | `@effect-trpc/codegen/rollup`, `/rolldown`                             |
-| webpack (also Next.js with `--webpack`) / Rspack / Rsbuild | `@effect-trpc/codegen/webpack`, `/rspack`, `/rsbuild`                  |
-| esbuild / Farm / Bun                                       | `@effect-trpc/codegen/esbuild`, `/farm`, `/bun`                        |
-| Turbopack (Next.js default)                                | `@effect-trpc/codegen/loader` (a webpack loader)                       |
-| any other unplugin target                                  | `@effect-trpc/codegen/unplugin` (`unplugin`, `codegenUnpluginFactory`) |
+| Bundler                                                    | Entry                                                                 |
+| ---------------------------------------------------------- | --------------------------------------------------------------------- |
+| Vite (Vitest, TanStack Start, electron-vite, Astro, …)     | `@rpc-effect/codegen/vite`                                            |
+| Rollup / Rolldown                                          | `@rpc-effect/codegen/rollup`, `/rolldown`                             |
+| webpack (also Next.js with `--webpack`) / Rspack / Rsbuild | `@rpc-effect/codegen/webpack`, `/rspack`, `/rsbuild`                  |
+| esbuild / Farm / Bun                                       | `@rpc-effect/codegen/esbuild`, `/farm`, `/bun`                        |
+| Turbopack (Next.js default)                                | `@rpc-effect/codegen/loader` (a webpack loader)                       |
+| any other unplugin target                                  | `@rpc-effect/codegen/unplugin` (`unplugin`, `codegenUnpluginFactory`) |
 
 ```ts
 // vite.config.ts (every entry takes the same options)
-import { effectTrpcCodegen } from '@effect-trpc/codegen/vite';
+import { effectTrpcCodegen } from '@rpc-effect/codegen/vite';
 
 export default { plugins: [effectTrpcCodegen({ routers: ['src/router.ts'] })] };
 ```
@@ -74,7 +74,7 @@ const config: NextConfig = {
     rules: {
       '**/server/router.ts': {
         loaders: [
-          { loader: '@effect-trpc/codegen/loader', options: { routers: ['src/server/router.ts'] } },
+          { loader: '@rpc-effect/codegen/loader', options: { routers: ['src/server/router.ts'] } },
         ],
       },
     },
@@ -121,11 +121,11 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
 
 **Entry points**
 
-| Import path                 | Exports                                                                                                                                              | Source                              |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `@effect-trpc/codegen`      | `generate`, `createGenerator`, `runCommand`; types `GenerateOptions`, `GenerateResult`, `GeneratedFile`, `ProcedureReport`, `Generator`, `CommandIO` | `src/generate.ts`, `src/command.ts` |
-| `@effect-trpc/codegen/vite` | `effectTrpcCodegen`; types `CodegenPlugin`, `CodegenPluginOptions`, `CodegenPluginContext`                                                           | `src/vite.ts`                       |
-| bin `effect-trpc-codegen`   | `[--project tsconfig.json] [--watch \| --check] <router.ts>...`                                                                                      | `src/cli.ts`                        |
+| Import path                | Exports                                                                                                                                              | Source                              |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `@rpc-effect/codegen`      | `generate`, `createGenerator`, `runCommand`; types `GenerateOptions`, `GenerateResult`, `GeneratedFile`, `ProcedureReport`, `Generator`, `CommandIO` | `src/generate.ts`, `src/command.ts` |
+| `@rpc-effect/codegen/vite` | `effectTrpcCodegen`; types `CodegenPlugin`, `CodegenPluginOptions`, `CodegenPluginContext`                                                           | `src/vite.ts`                       |
+| bin `effect-trpc-codegen`  | `[--project tsconfig.json] [--watch \| --check] <router.ts>...`                                                                                      | `src/cli.ts`                        |
 
 **Golden path**
 
@@ -133,7 +133,7 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
    `Procedure` chains and no `.output` / `.error`; keep schemas, errors and middleware tags in a
    separate module (e.g. `models.ts`).
 2. `effect-trpc-codegen src/router.ts`, or the bundler plugin of your bundler
-   (`@effect-trpc/codegen/<bundler>`; Turbopack: `@effect-trpc/codegen/loader`).
+   (`@rpc-effect/codegen/<bundler>`; Turbopack: `@rpc-effect/codegen/loader`).
 3. Server: `import { AppRouter } from './router.gen.js'`, serve with
    `Handlers.fromService(AppRouter)` (a router service) or `Handlers.fromProcedures(AppRouter)`
    (a `Router.make` router) plus the middleware layers.

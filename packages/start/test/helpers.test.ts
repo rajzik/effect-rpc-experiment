@@ -1,5 +1,5 @@
 // `createStartHelpers` / `createStartHydration`: the loader + SSR hydration path of a Start app.
-import { RpcDefect } from '@effect-trpc/core';
+import { RpcDefect } from '@rpc-effect/core';
 import type { DehydratedState } from '@tanstack/react-query';
 import { afterEach, describe, expect, test } from 'vite-plus/test';
 import { createServerClient, createStartHelpers, createStartHydration } from '../src/index.js';

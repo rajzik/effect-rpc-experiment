@@ -1,6 +1,6 @@
 # TanStack Start example
 
-The task board on TanStack Start (Vite+) with `@effect-trpc/start`. The session is an httpOnly
+The task board on TanStack Start (Vite+) with `@rpc-effect/start`. The session is an httpOnly
 `session` cookie set by `/sign-in?user=<name>`.
 
 ## What it demonstrates
@@ -11,7 +11,7 @@ The task board on TanStack Start (Vite+) with `@effect-trpc/start`. The session 
 - **Loader prefetch + hydration**: `src/routes/index.tsx` and `src/routes/tasks.$id.tsx` prefetch in
   the loader, so the server-rendered HTML already contains the data; the dehydrated query cache
   keeps the typed `TaskNotFound` for `/tasks/999`.
-- **Shared components**: the routes render `@effect-trpc-examples/shared/ui`.
+- **Shared components**: the routes render `@rpc-effect-examples/shared/ui`.
 
 ## Files worth reading
 

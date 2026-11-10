@@ -1,7 +1,7 @@
 'use client';
 /** The live feed: subscribes to `tasks.onChanged` and shows the latest change. */
 import { useQueryClient } from '@tanstack/react-query';
-import { useSubscription, type RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import { useSubscription, type RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
 
 import type { AppRouter } from '../domain';
 import { useHydrated } from './useHydrated';

@@ -1,6 +1,6 @@
 // A nested record with a procedure named `make`, next to another router.
 import { Context, Effect, Schema } from 'effect';
-import { Procedure, Router } from '@effect-trpc/core';
+import { Procedure, Router } from '@rpc-effect/core';
 
 export class NestedRouter extends Context.Service<NestedRouter>()('NestedRouter', {
   make: Effect.succeed({

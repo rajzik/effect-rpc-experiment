@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 // Port of trpc/packages/tanstack-react-query/test/useSubscription.test.tsx
-import type { ClientError } from '@effect-trpc/core';
+import type { ClientError } from '@rpc-effect/core';
 import { act, fireEvent } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, expectTypeOf, test, vi } from 'vite-plus/test';
-import { createClient, localLink } from '@effect-trpc/client';
+import { createClient, localLink } from '@rpc-effect/client';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import {

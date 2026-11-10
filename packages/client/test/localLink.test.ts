@@ -58,7 +58,7 @@ describe('localLink: Promise client', () => {
     const client = makeClient();
     const defect = await rejectionOf(client.boom());
     expect(defect).toBeInstanceOf(RpcDefect);
-    expect(defect).toMatchObject({ _tag: '@effect-trpc/RpcDefect', message: 'kaboom' });
+    expect(defect).toMatchObject({ _tag: '@rpc-effect/RpcDefect', message: 'kaboom' });
     await expect(client.health()).resolves.toBe('ok');
   });
 
@@ -217,7 +217,7 @@ describe('createClient: proxy and lifecycle', () => {
   });
 
   it('rejects routers with reserved top-level keys', async () => {
-    const { Router, query } = await import('@effect-trpc/core');
+    const { Router, query } = await import('@rpc-effect/core');
     const router = Router.make({ dispose: query() });
     expect(() =>
       createClient(router, {

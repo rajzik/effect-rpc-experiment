@@ -1,8 +1,8 @@
 // Route handler adapter (tRPC `tests/server/adapters/next.test.ts` + `next-app-dir.test.ts`):
 // `export const { GET, POST } = createRouteHandler(...)` in `app/api/rpc/[[...rpc]]/route.ts`.
-import { createClient, httpLink } from '@effect-trpc/client';
-import { Codecs, Procedure, Router } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { createClient, httpLink } from '@rpc-effect/client';
+import { Codecs, Procedure, Router } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import { Context, Effect, Exit, Layer, Schema } from 'effect';
 import { describe, expect, test } from 'vite-plus/test';
 import { createRouteHandler } from '../src/index.js';

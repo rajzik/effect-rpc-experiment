@@ -1,6 +1,6 @@
 import { Cause, Effect, Schema } from 'effect';
-import { query, Router, RpcDefect } from '@effect-trpc/core';
-import { createCaller, Handlers } from '@effect-trpc/server';
+import { query, Router, RpcDefect } from '@rpc-effect/core';
+import { createCaller, Handlers } from '@rpc-effect/server';
 
 // #region handlers
 class RateLimited extends Schema.TaggedError<RateLimited>()('RateLimited', {

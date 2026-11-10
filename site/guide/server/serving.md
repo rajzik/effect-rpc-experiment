@@ -22,7 +22,7 @@ request until `dispose()`.
 
 <<< @/snippets/server/serving.ts#node
 
-`@effect/platform-node` is an optional peer of `@effect-trpc/server`: only `@effect-trpc/server/node`
+`@effect/platform-node` is an optional peer of `@rpc-effect/server`: only `@rpc-effect/server/node`
 imports it, and the main entry stays platform-neutral.
 
 ## Inside an Effect HTTP app

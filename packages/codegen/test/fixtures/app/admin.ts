@@ -1,5 +1,5 @@
 import { Context, Effect } from 'effect';
-import { Procedure } from '@effect-trpc/core';
+import { Procedure } from '@rpc-effect/core';
 
 import { db } from './db.js';
 

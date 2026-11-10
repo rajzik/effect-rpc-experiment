@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 // React Server Components helpers (tRPC's `trpc/server.tsx`): per-request query client, in-process
 // prefetch, Schema-aware `HydrateClient`.
-import { RpcDefect } from '@effect-trpc/core';
+import { RpcDefect } from '@rpc-effect/core';
 import { Cause, Effect } from 'effect';
-import { hydrate } from '@effect-trpc/tanstack-react-query';
-import { testServerAndClient } from '@effect-trpc/test-utils';
+import { hydrate } from '@rpc-effect/tanstack-react-query';
+import { testServerAndClient } from '@rpc-effect/test-utils';
 import {
   QueryClient,
   QueryClientProvider,

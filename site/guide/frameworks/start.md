@@ -1,6 +1,6 @@
 # TanStack Start
 
-`@effect-trpc/start` wires a router into TanStack Start: a server route for the HTTP endpoint, an
+`@rpc-effect/start` wires a router into TanStack Start: a server route for the HTTP endpoint, an
 isomorphic client (in-process on the server, `httpLink` in the browser), loader helpers and a
 Schema-aware SSR hand-off of the query cache.
 

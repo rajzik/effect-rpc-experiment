@@ -5,9 +5,9 @@ import {
   SignedInAs,
   TaskDetail,
   TaskList,
-} from '@effect-trpc-examples/shared/ui';
-import { appRouter } from '@effect-trpc-examples/shared';
-import { useServerAction } from '@effect-trpc/next';
+} from '@rpc-effect-examples/shared/ui';
+import { appRouter } from '@rpc-effect-examples/shared';
+import { useServerAction } from '@rpc-effect/next';
 import Link from 'next/link';
 
 import { useRpc } from '@/trpc/client';

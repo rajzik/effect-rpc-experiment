@@ -81,7 +81,7 @@ describe('useServerAction', () => {
     await act(async () => {
       await result.current.run({ title: 'x' });
     });
-    expect(result.current.error?._tag).toBe('@effect-trpc/RpcTransportError');
+    expect(result.current.error?._tag).toBe('@rpc-effect/RpcTransportError');
     expect(result.current.error).not.toBeInstanceOf(Forbidden);
     await actions.dispose();
   });

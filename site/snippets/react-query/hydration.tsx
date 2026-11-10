@@ -1,6 +1,6 @@
 import { QueryClient, type DehydratedState } from '@tanstack/react-query';
-import { createClient, localLink, type Client } from '@effect-trpc/client';
-import { createHydrationHelpers, createRpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import { createClient, localLink, type Client } from '@rpc-effect/client';
+import { createHydrationHelpers, createRpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
 
 import { appRouter, type AppRouter } from '@/router';
 import { ServerLive } from '@/server';

@@ -1,7 +1,7 @@
 // Every TanStack Start helper takes a router service class: the route handler, the server /
 // browser / isomorphic clients and the loader + hydration helpers decode class instances and
 // typed errors.
-import { Router } from '@effect-trpc/core';
+import { Router } from '@rpc-effect/core';
 import type { DehydratedState } from '@tanstack/react-query';
 import { describe, expect, onTestFinished, test } from 'vite-plus/test';
 import {

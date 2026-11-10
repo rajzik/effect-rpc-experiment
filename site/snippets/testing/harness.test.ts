@@ -1,7 +1,7 @@
 // post.test.ts
 import { Effect } from 'effect';
 import { describe, expect, it } from '@effect/vitest';
-import { assertInstance, testServerAndClient, withTestServer } from '@effect-trpc/test-utils';
+import { assertInstance, testServerAndClient, withTestServer } from '@rpc-effect/test-utils';
 
 import { appRouter, Post, PostNotFound, Unauthorized } from '@/router';
 import { ServerLive } from '@/server';

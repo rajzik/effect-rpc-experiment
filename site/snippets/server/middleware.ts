@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Schema } from 'effect';
-import { query, Router } from '@effect-trpc/core';
-import { createCaller, Handlers, Middleware } from '@effect-trpc/server';
+import { query, Router } from '@rpc-effect/core';
+import { createCaller, Handlers, Middleware } from '@rpc-effect/server';
 
 // #region declare
 class Unauthorized extends Schema.TaggedError<Unauthorized>()('Unauthorized', {}) {}

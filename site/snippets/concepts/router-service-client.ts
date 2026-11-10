@@ -1,5 +1,5 @@
 // The client module: imports the router module only, never the server module.
-import { createClient, httpLink } from '@effect-trpc/client';
+import { createClient, httpLink } from '@rpc-effect/client';
 
 import { Post, PostNotFound } from '@/router';
 import { AppRouter } from './router-service';

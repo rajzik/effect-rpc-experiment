@@ -8,12 +8,12 @@ infrastructure failed. effect-trpc keeps them apart. A client call for a procedu
 type ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted;
 ```
 
-| Error               | `_tag`                           | When                                                                       | Retry? |
-| ------------------- | -------------------------------- | -------------------------------------------------------------------------- | ------ |
-| `E`                 | your tags                        | the handler failed with a declared error; you get the same class back      | no     |
-| `RpcDefect`         | `@effect-trpc/RpcDefect`         | the handler died or threw, or the response could not be decoded            | no     |
-| `RpcTransportError` | `@effect-trpc/RpcTransportError` | network, HTTP status or protocol failure (`cause` is the `RpcClientError`) | yes    |
-| `RpcInterrupted`    | `@effect-trpc/RpcInterrupted`    | the call was aborted or interrupted                                        | no     |
+| Error               | `_tag`                          | When                                                                       | Retry? |
+| ------------------- | ------------------------------- | -------------------------------------------------------------------------- | ------ |
+| `E`                 | your tags                       | the handler failed with a declared error; you get the same class back      | no     |
+| `RpcDefect`         | `@rpc-effect/RpcDefect`         | the handler died or threw, or the response could not be decoded            | no     |
+| `RpcTransportError` | `@rpc-effect/RpcTransportError` | network, HTTP status or protocol failure (`cause` is the `RpcClientError`) | yes    |
+| `RpcInterrupted`    | `@rpc-effect/RpcInterrupted`    | the call was aborted or interrupted                                        | no     |
 
 Domain errors are never disguised as infrastructure errors, and infrastructure errors are never
 disguised as yours. The three infrastructure errors are `Schema.TaggedError`s too, so they can be

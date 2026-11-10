@@ -4,12 +4,12 @@
  *
  * A link turns the router's `RpcGroup` into a connected `effect/rpc` `RpcClient`. Network links
  * wrap an `RpcClient.Protocol` (`layerProtocolHttp`, `layerProtocolSocket`) and must match the
- * server's protocol and serialization (`@effect-trpc/server` defaults: HTTP + NDJSON);
+ * server's protocol and serialization (`@rpc-effect/server` defaults: HTTP + NDJSON);
  * `localLink` runs the handlers in-process with no serialization.
  *
  * @since 0.1.0
  */
-import { ProcedureKind } from '@effect-trpc/core';
+import { ProcedureKind } from '@rpc-effect/core';
 import { Context, Effect, Layer } from 'effect';
 import type { Scope } from 'effect';
 import {
@@ -23,7 +23,7 @@ import { RpcClient, RpcSerialization, RpcServer } from 'effect/rpc';
 import type { Rpc, RpcClientError, RpcGroup, RpcMessage } from 'effect/rpc';
 import { Socket } from 'effect/socket';
 
-const TypeId = '~@effect-trpc/client/Link' as const;
+const TypeId = '~@rpc-effect/client/Link' as const;
 
 /**
  * A transport: turns an `RpcGroup` into a connected `effect/rpc` client.
@@ -144,8 +144,8 @@ const fromProtocol = <E>(protocol: Layer.Layer<RpcClient.Protocol, E>): Link =>
  * import { Layer, Schema } from 'effect';
  * import { FetchHttpClient } from 'effect/http';
  * import { RpcClient, RpcSerialization } from 'effect/rpc';
- * import { query, Router } from '@effect-trpc/core';
- * import { createClient, Link } from '@effect-trpc/client';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createClient, Link } from '@rpc-effect/client';
  *
  * const appRouter = Router.make({ health: query({ success: Schema.Literal('ok') }) });
  *
@@ -255,14 +255,14 @@ export interface HttpLinkOptions {
  *
  * **When to use**
  *
- * Use for browsers and servers talking to an `@effect-trpc/server` endpoint (`toWebHandler`,
+ * Use for browsers and servers talking to an `@rpc-effect/server` endpoint (`toWebHandler`,
  * `layerHttp`, `runServer`). Prefer {@link wsLink} for many concurrent subscriptions over one
  * connection and {@link localLink} for in-process calls.
  *
  * **Details**
  *
  * - The server must use `RpcServer.layerHttp` with `protocol: "http"` and the same
- *   serialization (the `@effect-trpc/server` adapters do).
+ *   serialization (the `@rpc-effect/server` adapters do).
  * - Non-2xx responses and network errors surface as `RpcTransportError`.
  * - `headers` are sent as HTTP headers; a function is evaluated once per request. They reach
  *   server middleware and handlers as `headers`.
@@ -277,8 +277,8 @@ export interface HttpLinkOptions {
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { createClient, httpLink } from '@effect-trpc/client';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createClient, httpLink } from '@rpc-effect/client';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * const appRouter = Router.make({
@@ -357,7 +357,7 @@ const queryTags = <Rpcs extends Rpc.Any>(group: RpcGroup.RpcGroup<Rpcs>): Readon
  *   each call, so calls with different headers still share a POST.
  * - Aborting a call (`signal`, fiber interruption) rejects it at once with `RpcInterrupted`;
  *   the POST goes on for the other calls.
- * - Works with every `@effect-trpc/server` HTTP adapter; no server option is needed.
+ * - Works with every `@rpc-effect/server` HTTP adapter; no server option is needed.
  *
  * **Gotchas**
  *
@@ -376,8 +376,8 @@ const queryTags = <Rpcs extends Rpc.Any>(group: RpcGroup.RpcGroup<Rpcs>): Readon
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { createClient, httpBatchLink } from '@effect-trpc/client';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createClient, httpBatchLink } from '@rpc-effect/client';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * const appRouter = Router.make({
@@ -472,7 +472,7 @@ export interface WsLinkOptions {
  *
  * - The server must use `RpcServer.layerHttp` with `protocol: "websocket"` and the same
  *   serialization, e.g. `layerHttp(router, { protocol: 'websocket', serialization: 'ndjson' })`
- *   from `@effect-trpc/server`.
+ *   from `@rpc-effect/server`.
  * - Rpc headers (`createClient({ headers })`, per-call `headers`) are sent with each rpc message.
  *
  * **Gotchas**
@@ -485,8 +485,8 @@ export interface WsLinkOptions {
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router, subscription } from '@effect-trpc/core';
- * import { createClient, wsLink } from '@effect-trpc/client';
+ * import { query, Router, subscription } from '@rpc-effect/core';
+ * import { createClient, wsLink } from '@rpc-effect/client';
  *
  * const appRouter = Router.make({
  *   health: query({ success: Schema.Literal('ok') }),
@@ -544,7 +544,7 @@ const ignoreMessage = (): Effect.Effect<void> => Effect.void;
  * **When to use**
  *
  * Use in tests, SSR and server-side code that should use the client API. Prefer
- * `createCaller` from `@effect-trpc/server` when you do not need the client API.
+ * `createCaller` from `@rpc-effect/server` when you do not need the client API.
  *
  * **Details**
  *
@@ -559,8 +559,8 @@ const ignoreMessage = (): Effect.Effect<void> => Effect.void;
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { createClient, localLink } from '@effect-trpc/client';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createClient, localLink } from '@rpc-effect/client';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -571,7 +571,7 @@ const ignoreMessage = (): Effect.Effect<void> => Effect.void;
  *   post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
  * });
  *
- * // `Handlers.make` from @effect-trpc/server returns the same kind of layer.
+ * // `Handlers.make` from @rpc-effect/server returns the same kind of layer.
  * const handlers = appRouter.group.toLayer({
  *   'post.byId': ({ id }) =>
  *     id === 1 ? Effect.succeed(new Post({ id, title: 'Hello' })) : Effect.fail(new PostNotFound({ id })),

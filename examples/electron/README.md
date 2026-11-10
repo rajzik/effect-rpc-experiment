@@ -1,6 +1,6 @@
 # Electron example
 
-The task board in Electron with `@effect-trpc/electron`: the server runs in the main process, each
+The task board in Electron with `@rpc-effect/electron`: the server runs in the main process, each
 window is a client connected over its own `MessagePort`. There are no cookies: the main process
 opens one window per user (`ada`, then `guest`) and maps each window's `webContents.id` to its
 user, which `MainRpcServer.senderId(headers)` reads in `resolveUser`.
@@ -12,7 +12,7 @@ user, which `MainRpcServer.senderId(headers)` reads in `resolveUser`.
 - **A sandboxed preload** (`src/preload.ts`, bundled to a single CJS file) that only calls
   `installPreloadBridge`; nothing is exposed on `window`. `contextIsolation` and `sandbox` are on.
 - **`rendererLink()`** in the renderer (`src/renderer/main.tsx`, a Vite app with hash routing) plus
-  `@effect-trpc-examples/shared/ui`.
+  `@rpc-effect-examples/shared/ui`.
 - **Connection lifecycle**: closing or destroying a window ends its server-side subscription.
 
 ## Files worth reading

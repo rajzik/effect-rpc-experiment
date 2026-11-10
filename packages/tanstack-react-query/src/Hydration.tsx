@@ -4,9 +4,9 @@
  *
  * TanStack's own `dehydrate` puts `Schema.Class` instances, `Date`s and `Schema.TaggedError`s into
  * the payload as-is, so they do not survive JSON. These helpers encode the router's queries with
- * the procedures' schemas (`Codecs.success` from `@effect-trpc/core`, per page for infinite
+ * the procedures' schemas (`Codecs.success` from `@rpc-effect/core`, per page for infinite
  * queries; errors as an `Exit`) and decode them back to instances on the client. Queries with
- * other keys pass through unchanged. `@effect-trpc/next` and `@effect-trpc/start` build on them.
+ * other keys pass through unchanged. `@rpc-effect/next` and `@rpc-effect/start` build on them.
  *
  * @since 0.1.0
  */
@@ -18,8 +18,8 @@ import {
   Router,
   RpcTransportError,
   causeToClientError,
-} from '@effect-trpc/core';
-import type { ProcedureInfo } from '@effect-trpc/core';
+} from '@rpc-effect/core';
+import type { ProcedureInfo } from '@rpc-effect/core';
 import {
   dehydrate as tanstackDehydrate,
   defaultShouldDehydrateQuery,
@@ -186,9 +186,9 @@ const encodeError = (
   if (isClientInfrastructureError(error)) {
     // The `cause` of a defect / transport error is server-side detail (stack traces): drop it.
     const safe =
-      error._tag === '@effect-trpc/RpcDefect'
+      error._tag === '@rpc-effect/RpcDefect'
         ? new RpcDefect({ message: error.message, cause: undefined })
-        : error._tag === '@effect-trpc/RpcTransportError'
+        : error._tag === '@rpc-effect/RpcTransportError'
           ? new RpcTransportError({ message: error.message, cause: undefined })
           : error;
     return { error: encodeInfrastructure(safe), kind: 'infrastructure' };
@@ -296,8 +296,8 @@ const ownership = (owner: Owner, queryKey: ReadonlyArray<unknown>): Ownership =>
  * **Example** (Dehydrating a prefetched query on the server)
  *
  * ```ts
- * import type { Client } from '@effect-trpc/client';
- * import { query, Router } from '@effect-trpc/core';
+ * import type { Client } from '@rpc-effect/client';
+ * import { query, Router } from '@rpc-effect/core';
  * import { Schema } from 'effect';
  *
  * class Post extends Schema.Class<Post>('Post')({
@@ -311,7 +311,7 @@ const ownership = (owner: Owner, queryKey: ReadonlyArray<unknown>): Ownership =>
  * const appRouter = Router.make({
  *   post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
  * });
- * import { createRpcOptionsProxy, dehydrate } from '@effect-trpc/tanstack-react-query';
+ * import { createRpcOptionsProxy, dehydrate } from '@rpc-effect/tanstack-react-query';
  * import { QueryClient } from '@tanstack/react-query';
  *
  * declare const client: Client<typeof appRouter>;
@@ -506,7 +506,7 @@ const withIdentityDeserializer = <O extends { defaultOptions?: object | undefine
  * **Example** (Hydrating the browser QueryClient)
  *
  * ```ts
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  * import { Schema } from 'effect';
  *
  * class Post extends Schema.Class<Post>('Post')({
@@ -520,7 +520,7 @@ const withIdentityDeserializer = <O extends { defaultOptions?: object | undefine
  * const appRouter = Router.make({
  *   post: { byId: query({ payload: { id: Schema.Number }, success: Post, error: PostNotFound }) },
  * });
- * import { hydrate } from '@effect-trpc/tanstack-react-query';
+ * import { hydrate } from '@rpc-effect/tanstack-react-query';
  * import { QueryClient, type DehydratedState } from '@tanstack/react-query';
  *
  * declare const payload: string; // JSON.stringify(dehydrate(appRouter, serverQueryClient))
@@ -587,7 +587,7 @@ const makeHydrationBoundary = (owner: Owner): React.FC<RpcHydrationBoundaryProps
  *
  * Use once per router (module scope) in any SSR setup with TanStack Query: dehydrate on the
  * server, render `HydrationBoundary` on the client. With Next.js or TanStack Start, prefer the
- * helpers of `@effect-trpc/next` / `@effect-trpc/start`, which wire this up.
+ * helpers of `@rpc-effect/next` / `@rpc-effect/start`, which wire this up.
  *
  * **Details**
  *
@@ -611,8 +611,8 @@ const makeHydrationBoundary = (owner: Owner): React.FC<RpcHydrationBoundaryProps
  * **Example** (Server loader and client page)
  *
  * ```tsx
- * import type { Client } from '@effect-trpc/client';
- * import { query, Router } from '@effect-trpc/core';
+ * import type { Client } from '@rpc-effect/client';
+ * import { query, Router } from '@rpc-effect/core';
  * import { Schema } from 'effect';
  *
  * class Post extends Schema.Class<Post>('Post')({
@@ -630,7 +630,7 @@ const makeHydrationBoundary = (owner: Owner): React.FC<RpcHydrationBoundaryProps
  *   createHydrationHelpers,
  *   createRpcOptionsProxy,
  *   type RpcOptionsProxy,
- * } from '@effect-trpc/tanstack-react-query';
+ * } from '@rpc-effect/tanstack-react-query';
  * import { QueryClient, useQuery, type DehydratedState } from '@tanstack/react-query';
  *
  * export const { dehydrate, HydrationBoundary } = createHydrationHelpers(appRouter);

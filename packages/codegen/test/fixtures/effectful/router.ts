@@ -1,6 +1,6 @@
 // Router services whose `make` reads a service (`Effect.gen`): schemas are inferred all the same.
 import { Context, Effect, Schema } from 'effect';
-import { Procedure } from '@effect-trpc/core';
+import { Procedure } from '@rpc-effect/core';
 
 import { Database } from './db.js';
 

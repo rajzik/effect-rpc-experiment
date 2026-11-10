@@ -23,7 +23,7 @@ import {
   type Boards,
   type ConsoleErrorGuard,
   type TaskBoardAdapter,
-} from '@effect-trpc-examples/shared/e2e';
+} from '@rpc-effect-examples/shared/e2e';
 import {
   _electron as electron,
   expect,
@@ -185,7 +185,7 @@ export const subscriberCount = async (app: ElectronApplication): Promise<number>
   await app.evaluate(() => {
     const store: { changes: { subscribers: { size: number } } } = Reflect.get(
       globalThis,
-      Symbol.for('@effect-trpc-examples/shared/store'),
+      Symbol.for('@rpc-effect-examples/shared/store'),
     );
     return store.changes.subscribers.size;
   });

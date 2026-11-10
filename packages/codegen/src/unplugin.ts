@@ -12,7 +12,7 @@ import { createGenerator } from './generate.js';
 import type { GenerateResult, Generator } from './generate.js';
 
 /**
- * Options of the codegen bundler plugins (every `@effect-trpc/codegen/<bundler>` entry and the
+ * Options of the codegen bundler plugins (every `@rpc-effect/codegen/<bundler>` entry and the
  * `/loader`).
  *
  * @category models
@@ -62,7 +62,7 @@ const isWatching = (ctx: UnpluginBuildContext): boolean => {
  * **When to use**
  *
  * To build a plugin for a bundler unplugin supports but this package has no entry for, or to
- * test the hooks. Otherwise import the entry of your bundler (`@effect-trpc/codegen/vite`, …).
+ * test the hooks. Otherwise import the entry of your bundler (`@rpc-effect/codegen/vite`, …).
  *
  * **Details**
  *
@@ -78,14 +78,14 @@ const isWatching = (ctx: UnpluginBuildContext): boolean => {
  *
  * **Gotchas**
  *
- * - Turbopack does not run unplugins: use `@effect-trpc/codegen/loader` (or
+ * - Turbopack does not run unplugins: use `@rpc-effect/codegen/loader` (or
  *   `effect-trpc-codegen --watch`) there.
  *
  * **Example** (A plugin for another unplugin target)
  *
  * ```ts
  * import { createUnplugin } from 'unplugin';
- * import { codegenUnpluginFactory } from '@effect-trpc/codegen/unplugin';
+ * import { codegenUnpluginFactory } from '@rpc-effect/codegen/unplugin';
  *
  * const plugin = createUnplugin(codegenUnpluginFactory).unloader({ routers: ['src/router.ts'] });
  * ```
@@ -162,7 +162,7 @@ export const codegenUnpluginFactory: UnpluginFactory<CodegenPluginOptions, false
  * **When to use**
  *
  * When one config builds plugins for several bundlers. Otherwise import the entry of your bundler
- * (`@effect-trpc/codegen/vite`, `/rollup`, `/rolldown`, `/webpack`, `/rspack`, `/rsbuild`,
+ * (`@rpc-effect/codegen/vite`, `/rollup`, `/rolldown`, `/webpack`, `/rspack`, `/rsbuild`,
  * `/esbuild`, `/farm`, `/bun`).
  *
  * **Details**
@@ -177,7 +177,7 @@ export const codegenUnpluginFactory: UnpluginFactory<CodegenPluginOptions, false
  * **Example** (Plugins for two bundlers)
  *
  * ```ts
- * import { unplugin } from '@effect-trpc/codegen/unplugin';
+ * import { unplugin } from '@rpc-effect/codegen/unplugin';
  *
  * const options = { routers: ['src/router.ts'] };
  * export const vitePlugin = unplugin.vite(options);

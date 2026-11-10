@@ -9,7 +9,7 @@
  *
  * @since 0.1.0
  */
-import { Router, RpcTransportError, type ClientError } from '@effect-trpc/core';
+import { Router, RpcTransportError, type ClientError } from '@rpc-effect/core';
 import { Exit } from 'effect';
 import * as React from 'react';
 import { decodeActionResultInternal, type EncodedActionResult } from './serverActions.js';
@@ -193,8 +193,8 @@ const useServerActionFromInput = (
  * ```tsx
  * // app/new-post.tsx — client code
  * 'use client';
- * import { mutation, Router } from '@effect-trpc/core';
- * import { useServerAction, type ServerActionAt } from '@effect-trpc/next';
+ * import { mutation, Router } from '@rpc-effect/core';
+ * import { useServerAction, type ServerActionAt } from '@rpc-effect/next';
  * import { Schema } from 'effect';
  *
  * // server/router.ts (schemas only) in a real app

@@ -1,6 +1,6 @@
 'use client';
-import { appRouter } from '@effect-trpc-examples/shared';
-import { createNextRpcClient } from '@effect-trpc/next';
+import { appRouter } from '@rpc-effect-examples/shared';
+import { createNextRpcClient } from '@rpc-effect/next';
 
 export const { RpcProvider, useRpc, useRpcClient, HydrationBoundary } = createNextRpcClient(
   appRouter,

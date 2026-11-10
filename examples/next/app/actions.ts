@@ -1,6 +1,6 @@
 'use server';
-import { appRouter, type AppRouter } from '@effect-trpc-examples/shared';
-import { createServerActionCaller, type InputAt } from '@effect-trpc/next';
+import { appRouter, type AppRouter } from '@rpc-effect-examples/shared';
+import { createServerActionCaller, type InputAt } from '@rpc-effect/next';
 import { headers } from 'next/headers';
 
 import { ServerLive } from '@/server';

@@ -1,10 +1,10 @@
 # Test harness
 
-`@effect-trpc/test-utils` starts a real server for a router and gives you every way to call it, so a
+`@rpc-effect/test-utils` starts a real server for a router and gives you every way to call it, so a
 test covers routing, serialization, middleware and errors as production does.
 
 ```sh
-pnpm add -D @effect-trpc/test-utils @effect/vitest vitest
+pnpm add -D @rpc-effect/test-utils @effect/vitest vitest
 ```
 
 ## A server and clients, per test

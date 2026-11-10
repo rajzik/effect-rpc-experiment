@@ -1,10 +1,10 @@
 /**
- * Runs a router on Node's `http` module (`@effect-trpc/server/node`).
+ * Runs a router on Node's `http` module (`@rpc-effect/server/node`).
  *
  * `serve` returns a `Layer` for long-running Effect programs and `runServer` returns a `Promise`
  * of a started server for tests and scripts. Both mount `layerHttp` (HTTP protocol, NDJSON by
  * default) on a `NodeHttpServer` from `@effect/platform-node`, an optional peer dependency used
- * only by this subpath, so the main `@effect-trpc/server` entry stays platform-neutral.
+ * only by this subpath, so the main `@rpc-effect/server` entry stays platform-neutral.
  *
  * @since 0.1.0
  */
@@ -15,7 +15,7 @@ import { HttpRouter, HttpServer } from 'effect/http';
 import { NetAddress } from 'effect/net';
 import type { HttpServerError } from 'effect/http';
 import { NodeHttpServer } from '@effect/platform-node';
-import { Router } from '@effect-trpc/core';
+import { Router } from '@rpc-effect/core';
 import type { Handlers } from './Handlers.js';
 import { layerHttp } from './Http.js';
 import type { ServerOptions } from './Http.js';
@@ -115,7 +115,7 @@ const serveFromInput = (
  *
  * Use for a long-running Node process whose only job is serving the router. Prefer
  * {@link runServer} in tests and scripts that need the URL as a Promise, and `layerHttp` from
- * `@effect-trpc/server` when the endpoint shares a server with other routes.
+ * `@rpc-effect/server` when the endpoint shares a server with other routes.
  *
  * **Details**
  *
@@ -130,9 +130,9 @@ const serveFromInput = (
  * ```ts
  * import { Effect, Layer, Schema } from 'effect';
  * import { NodeRuntime } from '@effect/platform-node';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { serve } from '@effect-trpc/server/node';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { serve } from '@rpc-effect/server/node';
  *
  * const appRouter = Router.make({ health: query({ success: Schema.Literal('ok') }) });
  * const HandlersLive = Handlers.make(appRouter, { health: () => Effect.succeed('ok' as const) });
@@ -237,9 +237,9 @@ const runServerFromInput = (
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers } from '@effect-trpc/server';
- * import { runServer } from '@effect-trpc/server/node';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers } from '@rpc-effect/server';
+ * import { runServer } from '@rpc-effect/server/node';
  *
  * const appRouter = Router.make({ health: query({ success: Schema.Literal('ok') }) });
  * const HandlersLive = Handlers.make(appRouter, { health: () => Effect.succeed('ok' as const) });

@@ -3,11 +3,11 @@
  *
  * `rendererLink` opens a `MessageChannel` per client and hands one end to the main process
  * through the preload bridge (`installPreloadBridge`), then speaks `effect/rpc` over the other
- * end with `messagePortLink`. Pass it to `createClient` from `@effect-trpc/client`.
+ * end with `messagePortLink`. Pass it to `createClient` from `@rpc-effect/client`.
  *
  * @since 0.1.0
  */
-import type { Link } from '@effect-trpc/client';
+import type { Link } from '@rpc-effect/client';
 import { messagePortLink } from './MessagePortLink.js';
 import type { MessagePortLinkOptions } from './MessagePortLink.js';
 import { connectMessageType, defaultChannel } from './types.js';
@@ -61,7 +61,7 @@ type ChannelGlobal<Port> = { readonly MessageChannel?: MessageChannelLike<Port> 
  * - `connectTimeout` defaults to `"10 seconds"`: without an acknowledgement from the main
  *   process (missing bridge, channel mismatch, server not started) calls fail with
  *   `RpcTransportError` instead of hanging.
- * - Works with `@effect-trpc/tanstack-react-query` like any other link.
+ * - Works with `@rpc-effect/tanstack-react-query` like any other link.
  *
  * **Gotchas**
  *
@@ -78,9 +78,9 @@ type ChannelGlobal<Port> = { readonly MessageChannel?: MessageChannelLike<Port> 
  * ```ts
  * // renderer.ts (renderer process; the router module is shared with the main process)
  * import { Schema } from 'effect';
- * import { query, Router, subscription } from '@effect-trpc/core';
- * import { createClient, RpcTransportError } from '@effect-trpc/client';
- * import { rendererLink } from '@effect-trpc/electron/renderer';
+ * import { query, Router, subscription } from '@rpc-effect/core';
+ * import { createClient, RpcTransportError } from '@rpc-effect/client';
+ * import { rendererLink } from '@rpc-effect/electron/renderer';
  *
  * class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}
  * class NotFound extends Schema.TaggedError<NotFound>()('NotFound', { id: Schema.String }) {}

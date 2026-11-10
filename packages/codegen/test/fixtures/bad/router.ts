@@ -1,6 +1,6 @@
 // Every procedure here has a schema the generator cannot map.
 import { Context, Effect, Schema } from 'effect';
-import { Procedure } from '@effect-trpc/core';
+import { Procedure } from '@rpc-effect/core';
 
 class Plain {
   constructor(readonly n: number) {}

@@ -1,8 +1,8 @@
 // A router written once as an Effect service (`Procedure` builder + `Context.Service`), plus the
 // equivalent `Router.make` router of plain definitions, shared by `routerService.test(-d).ts`.
 import { Context, Effect, Schema, Stream } from 'effect';
-import { query, Procedure, Router, subscription } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { query, Procedure, Router, subscription } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 
 export class Post extends Schema.Class<Post>('Post')({
   id: Schema.Finite,

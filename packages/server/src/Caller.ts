@@ -5,7 +5,7 @@
  * `RpcTest.makeClient`, so the router's middleware still runs and per-call headers reach it. The
  * result mirrors the router twice: as `Effect`s / `Stream`s at the root and as `Promise`s /
  * `AsyncIterable`s under `$promise`. Use it in tests, scripts, SSR and server-to-server calls;
- * use `@effect-trpc/client` with `localLink` when code must be written against the client API.
+ * use `@rpc-effect/client` with `localLink` when code must be written against the client API.
  *
  * @since 0.1.0
  */
@@ -13,7 +13,7 @@ import { Context, Effect, Exit, Layer, ManagedRuntime, Stream } from 'effect';
 import type { Headers } from 'effect/http';
 import { RpcTest } from 'effect/rpc';
 import type { Rpc, RpcGroup } from 'effect/rpc';
-import { causeToClientError, Router, RpcInterrupted } from '@effect-trpc/core';
+import { causeToClientError, Router, RpcInterrupted } from '@rpc-effect/core';
 import type {
   inferError,
   inferInput,
@@ -21,7 +21,7 @@ import type {
   inferOutput,
   ProcedureDef,
   ProcedureInfo,
-} from '@effect-trpc/core';
+} from '@rpc-effect/core';
 import type { Handlers } from './Handlers.js';
 import { withHooks } from './internal/hooks.js';
 
@@ -37,7 +37,7 @@ import { withHooks } from './internal/hooks.js';
  *
  * ```ts
  * import { Effect } from 'effect';
- * import type { CallOptions } from '@effect-trpc/server';
+ * import type { CallOptions } from '@rpc-effect/server';
  *
  * declare const caller: {
  *   readonly user: {
@@ -233,7 +233,7 @@ interface CallerClientShape {
 }
 
 class CallerClient extends Context.Service<CallerClient, CallerClientShape>()(
-  '@effect-trpc/server/CallerClient',
+  '@rpc-effect/server/CallerClient',
 ) {}
 
 /** Top-level keys of the caller itself; a router may not use them (see `createCaller`). */
@@ -423,7 +423,7 @@ const createCallerFromInput = (
  * **When to use**
  *
  * Use in tests, scripts, server-side rendering and server-to-server calls inside one process.
- * Prefer `createClient(router, { link: localLink({ handlers }) })` from `@effect-trpc/client`
+ * Prefer `createClient(router, { link: localLink({ handlers }) })` from `@rpc-effect/client`
  * when the calling code should use the client API (`$effect`, `withHeaders`,
  * `RpcTransportError`), and {@link toWebHandler} / `layerHttp` to serve real HTTP clients.
  *
@@ -449,8 +449,8 @@ const createCallerFromInput = (
  *
  * ```ts
  * import { Context, Effect, Layer, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { createCaller, Handlers, Middleware } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createCaller, Handlers, Middleware } from '@rpc-effect/server';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {

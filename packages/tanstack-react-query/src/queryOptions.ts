@@ -201,9 +201,9 @@ export interface UnusedSkipTokenRpcQueryOptionsOut<
  * **Example** (A component that narrows the error by `_tag`)
  *
  * ```tsx
- * import { query, Router } from '@effect-trpc/core';
- * import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
- * import { skipToken } from '@effect-trpc/tanstack-react-query';
+ * import { query, Router } from '@rpc-effect/core';
+ * import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
+ * import { skipToken } from '@rpc-effect/tanstack-react-query';
  * import { useQuery } from '@tanstack/react-query';
  * import { Schema } from 'effect';
  *
@@ -247,8 +247,8 @@ export interface UnusedSkipTokenRpcQueryOptionsOut<
  * **Example** (Suspense, `select` and per-request headers)
  *
  * ```tsx
- * import { query, Router } from '@effect-trpc/core';
- * import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import { query, Router } from '@rpc-effect/core';
+ * import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
  * import { useSuspenseQuery } from '@tanstack/react-query';
  * import { Schema } from 'effect';
  *

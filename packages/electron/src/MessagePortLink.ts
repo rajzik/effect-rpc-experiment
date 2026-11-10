@@ -2,7 +2,7 @@
  * Client links over a message port, the client half of `MessagePortServer` / `MainRpcServer`.
  *
  * `messagePortLink` turns a Web-style port (DOM `MessagePort`, Node `worker_threads` port) into
- * an `@effect-trpc/client` `Link`; `messagePortProtocolClient` is the underlying
+ * an `@rpc-effect/client` `Link`; `messagePortProtocolClient` is the underlying
  * `RpcClient.Protocol`. `rendererLink` builds on them for Electron renderers.
  *
  * @since 0.1.0
@@ -11,7 +11,7 @@ import { Duration, Effect, Layer, Queue } from 'effect';
 import type { Scope } from 'effect';
 import { RpcClient, RpcClientError, RpcSerialization } from 'effect/rpc';
 import type { RpcMessage } from 'effect/rpc';
-import { Link } from '@effect-trpc/client';
+import { Link } from '@rpc-effect/client';
 import { closePort, listen, post, readyFrame } from './internal/port.js';
 import type { PortLike } from './types.js';
 
@@ -48,8 +48,8 @@ export interface MessagePortLinkOptions {
   readonly connectTimeout?: Duration.Input | undefined;
 }
 
-const closed: unique symbol = Symbol('@effect-trpc/electron/closed');
-const timedOut: unique symbol = Symbol('@effect-trpc/electron/timedOut');
+const closed: unique symbol = Symbol('@rpc-effect/electron/closed');
+const timedOut: unique symbol = Symbol('@rpc-effect/electron/timedOut');
 
 const transportError = (message: string, cause?: unknown): RpcClientError.RpcClientError =>
   new RpcClientError.RpcClientError({
@@ -79,8 +79,8 @@ const transportError = (message: string, cause?: unknown): RpcClientError.RpcCli
  * // renderer, worker or any process holding a Web-style port
  * import { Layer } from 'effect';
  * import { RpcClient } from 'effect/rpc';
- * import { Link } from '@effect-trpc/client';
- * import { messagePortProtocolClient, type PortLike } from '@effect-trpc/electron/renderer';
+ * import { Link } from '@rpc-effect/client';
+ * import { messagePortProtocolClient, type PortLike } from '@rpc-effect/electron/renderer';
  *
  * declare const port: PortLike;
  *
@@ -259,9 +259,9 @@ const acquirePort = (source: PortSource, used: { value: boolean }): Effect.Effec
  * // worker.ts (worker thread; the parent attached the other end with `MessagePortServer`)
  * import { workerData, type MessagePort } from 'node:worker_threads';
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { createClient } from '@effect-trpc/client';
- * import { messagePortLink } from '@effect-trpc/electron';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createClient } from '@rpc-effect/client';
+ * import { messagePortLink } from '@rpc-effect/electron';
  *
  * const appRouter = Router.make({ ping: query({ success: Schema.String }) });
  * const { port } = workerData as { readonly port: MessagePort };

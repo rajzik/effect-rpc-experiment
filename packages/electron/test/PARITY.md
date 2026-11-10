@@ -1,4 +1,4 @@
-# @effect-trpc/electron — tRPC test parity
+# @rpc-effect/electron — tRPC test parity
 
 tRPC has no Electron adapter or tests. The behaviours below come from tRPC tests over a persistent
 duplex connection (WebSockets) and are ported to the renderer → preload bridge → main-process

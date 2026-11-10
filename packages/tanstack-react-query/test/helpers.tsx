@@ -1,5 +1,5 @@
-import { createClient, localLink, type Client } from '@effect-trpc/client';
-import { testServerAndClient } from '@effect-trpc/test-utils';
+import { createClient, localLink, type Client } from '@rpc-effect/client';
+import { testServerAndClient } from '@rpc-effect/test-utils';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, type RenderResult } from '@testing-library/react';
 import * as React from 'react';

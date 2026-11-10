@@ -1,5 +1,5 @@
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import type { DehydratedState } from '@tanstack/react-query';
 import { Effect, Layer, Schema, Stream } from 'effect';
 

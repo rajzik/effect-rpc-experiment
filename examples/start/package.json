@@ -1,5 +1,5 @@
 {
-  "name": "@effect-trpc-examples/start",
+  "name": "@rpc-effect-examples/start",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,12 +9,12 @@
     "example:test": "playwright test"
   },
   "dependencies": {
-    "@effect-trpc-examples/shared": "workspace:*",
-    "@effect-trpc/client": "workspace:*",
-    "@effect-trpc/core": "workspace:*",
-    "@effect-trpc/server": "workspace:*",
-    "@effect-trpc/start": "workspace:*",
-    "@effect-trpc/tanstack-react-query": "workspace:*",
+    "@rpc-effect-examples/shared": "workspace:*",
+    "@rpc-effect/client": "workspace:*",
+    "@rpc-effect/core": "workspace:*",
+    "@rpc-effect/server": "workspace:*",
+    "@rpc-effect/start": "workspace:*",
+    "@rpc-effect/tanstack-react-query": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",

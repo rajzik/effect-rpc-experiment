@@ -1,6 +1,6 @@
 import { Schema } from 'effect';
-import { mutation, query, Router } from '@effect-trpc/core';
-import type { inferError } from '@effect-trpc/core';
+import { mutation, query, Router } from '@rpc-effect/core';
+import type { inferError } from '@rpc-effect/core';
 
 import { Forbidden, Post, PostNotFound } from '@/router';
 

@@ -1,7 +1,7 @@
-// Shared fixture copied from @effect-trpc/test-utils tests (kept local so e2e owns its inputs).
+// Shared fixture copied from @rpc-effect/test-utils tests (kept local so e2e owns its inputs).
 import { Effect, Schema, Stream } from 'effect';
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 
 export class User extends Schema.Class<User>('User')({
   id: Schema.String,

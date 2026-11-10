@@ -1,7 +1,7 @@
 // Port of trpc/packages/tanstack-react-query/test/utils.test.ts
-import { createClient, localLink } from '@effect-trpc/client';
-import { query, Router } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { createClient, localLink } from '@rpc-effect/client';
+import { query, Router } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import { QueryClient, skipToken } from '@tanstack/react-query';
 import { Effect, Schema } from 'effect';
 import { describe, expect, it } from 'vite-plus/test';

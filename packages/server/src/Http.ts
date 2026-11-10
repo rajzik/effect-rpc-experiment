@@ -4,9 +4,9 @@
  *
  * Both are thin wrappers over `effect/rpc`'s `RpcServer.layerHttp` that always set
  * `disableFatalDefects: true` and default to `protocol: "http"` with NDJSON serialization, which
- * is what `httpLink` from `@effect-trpc/client` expects. The handler layer comes from
+ * is what `httpLink` from `@rpc-effect/client` expects. The handler layer comes from
  * `Handlers.make`, merged with the router's middleware implementations. For a standalone Node
- * server see `@effect-trpc/server/node`.
+ * server see `@rpc-effect/server/node`.
  *
  * @since 0.1.0
  */
@@ -16,7 +16,7 @@ import { HttpRouter } from 'effect/http';
 import type { Headers } from 'effect/http';
 import { RpcSerialization, RpcServer } from 'effect/rpc';
 import type { Rpc, RpcGroup } from 'effect/rpc';
-import { Router } from '@effect-trpc/core';
+import { Router } from '@rpc-effect/core';
 import type { Handlers } from './Handlers.js';
 import { withHooks } from './internal/hooks.js';
 
@@ -66,9 +66,9 @@ export type Serialization = 'json' | 'ndjson' | Layer.Layer<RpcSerialization.Rpc
  *
  * ```ts
  * import { Cause, Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers, toWebHandler } from '@effect-trpc/server';
- * import type { OnErrorInfo } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers, toWebHandler } from '@rpc-effect/server';
+ * import type { OnErrorInfo } from '@rpc-effect/server';
  *
  * class NotFound extends Schema.TaggedError<NotFound>()('NotFound', {}) {}
  * const appRouter = Router.make({ post: query({ success: Schema.String, error: NotFound }) });
@@ -197,7 +197,7 @@ const defaultPath = '/rpc' as const;
  *
  * ```ts
  * import { RpcSerialization } from 'effect/rpc';
- * import { serializationLayer } from '@effect-trpc/server';
+ * import { serializationLayer } from '@rpc-effect/server';
  *
  * const ndjson = serializationLayer(undefined); // RpcSerialization.layerNdjson
  * const json = serializationLayer(undefined, 'json'); // RpcSerialization.layerJson
@@ -254,7 +254,7 @@ const layerHttpFromInput = (
  *
  * Use when the rpc endpoint is one route of a larger Effect HTTP app, or for a WebSocket
  * endpoint (`protocol: "websocket"`, for `wsLink`). Prefer {@link toWebHandler} for a fetch
- * runtime and `runServer` / `serve` from `@effect-trpc/server/node` for a standalone server.
+ * runtime and `runServer` / `serve` from `@rpc-effect/server/node` for a standalone server.
  *
  * **Details**
  *
@@ -276,8 +276,8 @@ const layerHttpFromInput = (
  * import { Effect, Layer, Schema } from 'effect';
  * import { HttpRouter, HttpServerResponse } from 'effect/http';
  * import { NodeHttpServer, NodeRuntime } from '@effect/platform-node';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers, layerHttp } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers, layerHttp } from '@rpc-effect/server';
  *
  * const appRouter = Router.make({ health: query({ success: Schema.Literal('ok') }) });
  * const HandlersLive = Handlers.make(appRouter, { health: () => Effect.succeed('ok' as const) });
@@ -320,8 +320,8 @@ export const layerHttp: {
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers, toHttpLayer } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers, toHttpLayer } from '@rpc-effect/server';
  *
  * const appRouter = Router.make({ ping: query({ success: Schema.String }) });
  * const RpcRoute = toHttpLayer(appRouter, {
@@ -388,7 +388,7 @@ const toWebHandlerFromInput = (
  *
  * Use to expose a router to `httpLink` clients from a platform that speaks `Request` /
  * `Response`. Prefer {@link layerHttp} inside an Effect HTTP app and `runServer` from
- * `@effect-trpc/server/node` for a standalone Node server.
+ * `@rpc-effect/server/node` for a standalone Node server.
  *
  * **Details**
  *
@@ -413,8 +413,8 @@ const toWebHandlerFromInput = (
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import { Handlers, toWebHandler } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers, toWebHandler } from '@rpc-effect/server';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  *

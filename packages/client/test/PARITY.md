@@ -1,4 +1,4 @@
-# @effect-trpc/client — tRPC test parity
+# @rpc-effect/client — tRPC test parity
 
 Client-level tRPC tests (see `docs/trpc-test-inventory.txt`) and where their behaviour is covered.
 Only behaviours that are actually exercised are listed; the notes name the subset that was ported.

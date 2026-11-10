@@ -4,7 +4,7 @@ import { HttpRouter, HttpServer } from 'effect/http';
 import { RpcClient, RpcSerialization } from 'effect/rpc';
 import { Socket } from 'effect/socket';
 import { NodeHttpServer } from '@effect/platform-node';
-import { HttpContext, Procedure, Router } from '@effect-trpc/core';
+import { HttpContext, Procedure, Router } from '@rpc-effect/core';
 import { describe, expect, it } from 'vite-plus/test';
 import { createCaller, Handlers, layerHttp, Middleware, toWebHandler } from '../src/index.js';
 import type { OnErrorInfo } from '../src/index.js';

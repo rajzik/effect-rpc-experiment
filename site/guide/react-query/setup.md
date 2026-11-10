@@ -1,6 +1,6 @@
 # Setup
 
-`@effect-trpc/tanstack-react-query` turns a router into TanStack Query options, modeled on
+`@rpc-effect/tanstack-react-query` turns a router into TanStack Query options, modeled on
 `@trpc/tanstack-react-query`. You keep using `useQuery`, `useMutation` and the rest of TanStack
 Query directly. The package only builds their options, keys and filters, with typed data and typed
 errors.

@@ -1,5 +1,5 @@
 {
-  "name": "@effect-trpc-examples/electron",
+  "name": "@rpc-effect-examples/electron",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,12 +10,12 @@
     "example:test": "pnpm example:build && playwright test"
   },
   "dependencies": {
-    "@effect-trpc-examples/shared": "workspace:*",
-    "@effect-trpc/client": "workspace:*",
-    "@effect-trpc/core": "workspace:*",
-    "@effect-trpc/electron": "workspace:*",
-    "@effect-trpc/server": "workspace:*",
-    "@effect-trpc/tanstack-react-query": "workspace:*",
+    "@rpc-effect-examples/shared": "workspace:*",
+    "@rpc-effect/client": "workspace:*",
+    "@rpc-effect/core": "workspace:*",
+    "@rpc-effect/electron": "workspace:*",
+    "@rpc-effect/server": "workspace:*",
+    "@rpc-effect/tanstack-react-query": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "effect": "catalog:",
     "react": "catalog:",

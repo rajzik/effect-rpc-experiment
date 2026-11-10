@@ -1,12 +1,12 @@
 // Type tests: the Start handler fits TanStack Start's server route handler type; clients and
 // helpers keep output and typed-error types.
-import type { Client, ClientError } from '@effect-trpc/client';
-import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import type { Client, ClientError } from '@rpc-effect/client';
+import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { createFileRoute, type AnyRoute, type Register } from '@tanstack/react-router';
 import type { RouteMethodHandlerFn } from '@tanstack/react-start';
-import { Procedure, Router } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { Procedure, Router } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import { Context, Effect, Schema } from 'effect';
 import { absurd } from 'effect/Function';
 import { describe, expectTypeOf, test } from 'vite-plus/test';
@@ -34,10 +34,10 @@ const describeError = (error: ClientError<PostNotFound>): string => {
   switch (error._tag) {
     case 'PostNotFound':
       return `no post ${error.id}`;
-    case '@effect-trpc/RpcDefect':
-    case '@effect-trpc/RpcTransportError':
+    case '@rpc-effect/RpcDefect':
+    case '@rpc-effect/RpcTransportError':
       return error.message;
-    case '@effect-trpc/RpcInterrupted':
+    case '@rpc-effect/RpcInterrupted':
       return 'cancelled';
     default:
       return absurd(error);

@@ -2,7 +2,7 @@
 // Port of trpc/packages/tanstack-react-query/test/procedureErrors.test.tsx: in effect-trpc the
 // procedure error union is the set of `Schema.TaggedError` classes it declares, so `error` is
 // `ClientError<E>` and can be narrowed by `_tag` / `instanceof`.
-import { RpcDefect, type ClientError } from '@effect-trpc/core';
+import { RpcDefect, type ClientError } from '@rpc-effect/core';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import { describe, expect, expectTypeOf, test } from 'vite-plus/test';
@@ -15,11 +15,11 @@ const describeError = (error: ClientError<PostNotFound | Forbidden>): string => 
       return `not found ${error.id}`;
     case 'Forbidden':
       return `forbidden ${error.reason}`;
-    case '@effect-trpc/RpcDefect':
+    case '@rpc-effect/RpcDefect':
       return `defect ${error.message}`;
-    case '@effect-trpc/RpcTransportError':
+    case '@rpc-effect/RpcTransportError':
       return 'transport';
-    case '@effect-trpc/RpcInterrupted':
+    case '@rpc-effect/RpcInterrupted':
       return 'interrupted';
     default:
       return error satisfies never;
@@ -67,7 +67,7 @@ describe('procedure errors', () => {
 
     const utils = ctx.renderApp(<MyComponent />);
     await waitFor(() => {
-      expect(utils.container.textContent).toBe('@effect-trpc/RpcDefect');
+      expect(utils.container.textContent).toBe('@rpc-effect/RpcDefect');
     });
     const defect = errors.at(-1);
     expect(defect).toBeInstanceOf(RpcDefect);

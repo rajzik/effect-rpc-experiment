@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@effect/vitest';
-import { testWebHandler } from '@effect-trpc/test-utils';
+import { testWebHandler } from '@rpc-effect/test-utils';
 
 import { appRouter } from '@/router';
 import { ServerLive } from '@/server';

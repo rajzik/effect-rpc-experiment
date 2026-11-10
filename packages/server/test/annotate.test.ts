@@ -1,6 +1,6 @@
 // tRPC `.meta()` parity: middleware reads a procedure's annotations from `rpc.annotations`.
 import { Context, Effect, Layer, Schema } from 'effect';
-import { Procedure, Router } from '@effect-trpc/core';
+import { Procedure, Router } from '@rpc-effect/core';
 import { describe, expect, it } from 'vite-plus/test';
 import { createCaller, Handlers, Middleware } from '../src/index.js';
 import { Forbidden, rejection } from './fixtures.js';

@@ -1,5 +1,5 @@
 /**
- * Main-process entry (`@effect-trpc/electron/main`): serves a router to renderers.
+ * Main-process entry (`@rpc-effect/electron/main`): serves a router to renderers.
  *
  * Exports `MainRpcServer` (listens on `ipcMain` for ports forwarded by the preload bridge),
  * the generic `MessagePortServer` and the structural port / IPC types. Import it only in

@@ -1,6 +1,6 @@
 // Type-level guarantees of the options proxy (run by Vitest typecheck).
-import type { Client } from '@effect-trpc/client';
-import type { ClientError } from '@effect-trpc/core';
+import type { Client } from '@rpc-effect/client';
+import type { ClientError } from '@rpc-effect/core';
 import {
   QueryClient,
   useInfiniteQuery,

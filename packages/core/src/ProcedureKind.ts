@@ -1,7 +1,7 @@
 /**
  * The `ProcedureKind` annotation: which tRPC procedure kind an `effect/rpc` rpc was compiled from.
  *
- * `Router.make` annotates every compiled rpc with it, so transports, `@effect-trpc/client` and
+ * `Router.make` annotates every compiled rpc with it, so transports, `@rpc-effect/client` and
  * the TanStack Query bridge can tell queries, mutations and subscriptions apart without the
  * original procedure definition.
  *
@@ -28,7 +28,7 @@ import { Context } from 'effect';
  *
  * ```ts
  * import { Context, Schema } from 'effect';
- * import { mutation, ProcedureKind, query, Router } from '@effect-trpc/core';
+ * import { mutation, ProcedureKind, query, Router } from '@rpc-effect/core';
  *
  * const appRouter = Router.make({
  *   health: query({ success: Schema.Literal('ok') }),
@@ -46,7 +46,7 @@ import { Context } from 'effect';
  * @since 0.1.0
  */
 export const ProcedureKind: Context.Reference<ProcedureKind.Value> =
-  Context.Reference<ProcedureKind.Value>('@effect-trpc/core/ProcedureKind', {
+  Context.Reference<ProcedureKind.Value>('@rpc-effect/core/ProcedureKind', {
     defaultValue: () => 'query',
   });
 
@@ -71,7 +71,7 @@ export declare namespace ProcedureKind {
  * **Example** (Typing a kind-dependent option)
  *
  * ```ts
- * import type { ProcedureKind } from '@effect-trpc/core';
+ * import type { ProcedureKind } from '@rpc-effect/core';
  *
  * const httpMethod = (kind: ProcedureKind): 'GET' | 'POST' => (kind === 'query' ? 'GET' : 'POST');
  * ```

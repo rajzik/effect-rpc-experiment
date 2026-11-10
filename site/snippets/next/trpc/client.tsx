@@ -1,6 +1,6 @@
 // trpc/client.tsx
 'use client';
-import { createNextRpcClient } from '@effect-trpc/next';
+import { createNextRpcClient } from '@rpc-effect/next';
 
 import { appRouter } from '@/router';
 

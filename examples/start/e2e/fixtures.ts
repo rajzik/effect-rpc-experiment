@@ -1,4 +1,4 @@
-import { failOnConsoleErrors, httpBoards, type Boards } from '@effect-trpc-examples/shared/e2e';
+import { failOnConsoleErrors, httpBoards, type Boards } from '@rpc-effect-examples/shared/e2e';
 import { test as base } from '@playwright/test';
 
 import { port } from '../port';

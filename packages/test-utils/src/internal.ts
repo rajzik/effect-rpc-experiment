@@ -8,10 +8,10 @@
  * @since 0.1.0
  */
 import { Layer } from 'effect';
-import type { Router } from '@effect-trpc/core';
-import { createClient, httpLink } from '@effect-trpc/client';
-import type { Client, CreateClientOptions, HeadersOption } from '@effect-trpc/client';
-import type { Caller, Handlers } from '@effect-trpc/server';
+import type { Router } from '@rpc-effect/core';
+import { createClient, httpLink } from '@rpc-effect/client';
+import type { Client, CreateClientOptions, HeadersOption } from '@rpc-effect/client';
+import type { Caller, Handlers } from '@rpc-effect/server';
 
 /** @internal Default route of the rpc endpoint (the server's default). */
 export const DEFAULT_PATH = '/rpc' as const;
@@ -27,7 +27,7 @@ export const DEFAULT_PATH = '/rpc' as const;
  * **Example** (Sending a raw rpc request)
  *
  * ```ts
- * import type { TestFetch } from '@effect-trpc/test-utils';
+ * import type { TestFetch } from '@rpc-effect/test-utils';
  *
  * declare const fetchRpc: TestFetch; // e.g. `ctx.fetch` or `web.fetch`
  *

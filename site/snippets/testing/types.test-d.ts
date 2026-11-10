@@ -1,8 +1,8 @@
 // errors.test-d.ts — type tests run with `vitest --typecheck` (or `vp test`).
 import { describe, expectTypeOf, it } from '@effect/vitest';
-import type { ClientError } from '@effect-trpc/core';
-import type { Client } from '@effect-trpc/client';
-import type { inferProxyError } from '@effect-trpc/tanstack-react-query';
+import type { ClientError } from '@rpc-effect/core';
+import type { Client } from '@rpc-effect/client';
+import type { inferProxyError } from '@rpc-effect/tanstack-react-query';
 
 import type { AppRouter, Forbidden, Post, PostNotFound, Unauthorized } from '@/router';
 

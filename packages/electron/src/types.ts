@@ -1,7 +1,7 @@
 /**
  * Structural views of the Electron, DOM and Node objects the Electron transport talks to.
  *
- * `@effect-trpc/electron` never imports `electron` at runtime. Its public functions accept these
+ * `@rpc-effect/electron` never imports `electron` at runtime. Its public functions accept these
  * minimal interfaces instead, which Electron's real `ipcMain`, `IpcMainEvent`, `ipcRenderer`,
  * `MessagePortMain`, DOM `MessagePort` / `window` / `MessageChannel` and Node's
  * `worker_threads` ports all satisfy (proven by `test/electron.test-d.ts`). This keeps the
@@ -35,7 +35,7 @@
  * ```ts
  * // main.ts (main process)
  * import { ipcMain } from 'electron';
- * import { defaultChannel } from '@effect-trpc/electron/main';
+ * import { defaultChannel } from '@rpc-effect/electron/main';
  *
  * // 1 while a `MainRpcServer` runs on the default channel, 0 after `server.dispose()`.
  * console.log(ipcMain.listenerCount(defaultChannel));
@@ -70,7 +70,7 @@ export const defaultChannel = 'effect-trpc' as const;
  * // preload.ts (preload script, isolated world): what `installPreloadBridge` does, plus an
  * // origin check. Prefer `installPreloadBridge` unless you need the extra rule.
  * import { ipcRenderer } from 'electron';
- * import { connectMessageType, defaultChannel } from '@effect-trpc/electron/preload';
+ * import { connectMessageType, defaultChannel } from '@rpc-effect/electron/preload';
  *
  * window.addEventListener('message', (event) => {
  *   if (event.source !== window || location.protocol !== 'app:') return;

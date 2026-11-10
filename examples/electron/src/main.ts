@@ -6,10 +6,10 @@
  * that opened it (`MainRpcServer.senderId(headers)`), and `resolveUser` maps that id to the user
  * the window was opened for. The page cannot choose or spoof it.
  */
-import { createCaller } from '@effect-trpc/server';
-import { MainRpcServer } from '@effect-trpc/electron/main';
-import { appRouter } from '@effect-trpc-examples/shared';
-import { makeServerLive } from '@effect-trpc-examples/shared/server';
+import { createCaller } from '@rpc-effect/server';
+import { MainRpcServer } from '@rpc-effect/electron/main';
+import { appRouter } from '@rpc-effect-examples/shared';
+import { makeServerLive } from '@rpc-effect-examples/shared/server';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { pathToFileURL } from 'node:url';
 

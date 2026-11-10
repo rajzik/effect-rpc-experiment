@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { skipToken } from '@tanstack/react-query';
-import { useSubscription } from '@effect-trpc/tanstack-react-query';
+import { useSubscription } from '@rpc-effect/tanstack-react-query';
 
 import { rpc as staticRpc } from './no-context';
 import { useRpc } from './rpc';

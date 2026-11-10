@@ -152,9 +152,9 @@ export interface RpcSubscriptionOptionsOut<TOutput, TError, TFeatureFlags extend
  * **Example** (Subscribing outside React)
  *
  * ```ts
- * import type { Client } from '@effect-trpc/client';
- * import { Router, subscription } from '@effect-trpc/core';
- * import { createRpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import type { Client } from '@rpc-effect/client';
+ * import { Router, subscription } from '@rpc-effect/core';
+ * import { createRpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
  * import { Schema } from 'effect';
  *
  * const appRouter = Router.make({

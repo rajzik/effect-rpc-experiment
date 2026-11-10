@@ -85,7 +85,7 @@ const makeStore = (): Store => {
   return { list, byId, create, toggle, changes, reset: Ref.set(tasks, seedTasks()) };
 };
 
-const key = Symbol.for('@effect-trpc-examples/shared/store');
+const key = Symbol.for('@rpc-effect-examples/shared/store');
 
 /** The process-wide store. */
 export const store: Store = Reflect.get(globalThis, key) ?? makeStore();

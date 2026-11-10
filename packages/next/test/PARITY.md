@@ -1,4 +1,4 @@
-# @effect-trpc/next — tRPC test parity
+# @rpc-effect/next — tRPC test parity
 
 Next.js-related tRPC tests (paths as listed in `docs/trpc-test-inventory.txt`) and the local test
 files that port their behaviour. One row per tRPC file; local files are relative to `test/`.

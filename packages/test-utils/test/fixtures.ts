@@ -1,6 +1,6 @@
 import { Effect, Schema, Stream } from 'effect';
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 
 export class User extends Schema.Class<User>('User')({
   id: Schema.String,

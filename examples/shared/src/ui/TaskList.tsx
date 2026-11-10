@@ -4,7 +4,7 @@
  * "Load more" button.
  */
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
 import type { ReactNode } from 'react';
 
 import type { AppRouter, Task } from '../domain';

@@ -1,6 +1,6 @@
 import { Context, Effect, Schema } from 'effect';
-import { Procedure } from '@effect-trpc/core';
-import type { inferOutput, Router } from '@effect-trpc/core';
+import { Procedure } from '@rpc-effect/core';
+import type { inferOutput, Router } from '@rpc-effect/core';
 
 import { Forbidden } from '@/router';
 import { Database } from './router-service';

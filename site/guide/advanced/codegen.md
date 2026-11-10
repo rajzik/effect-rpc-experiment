@@ -1,13 +1,13 @@
 # Schemas from handler types
 
 Routers written with the `Procedure` builder can leave out `.output(...)` and `.error(...)`: the
-handler types define the contract. [`@effect-trpc/codegen`](/api/codegen) turns those types into
+handler types define the contract. [`@rpc-effect/codegen`](/api/codegen) turns those types into
 schemas, so values cross the wire as real `Post` instances and typed errors stay typed.
 
 ## Install and run
 
 ```sh
-pnpm add -D @effect-trpc/codegen   # needs typescript@7 (a peer dependency)
+pnpm add -D @rpc-effect/codegen   # needs typescript@7 (a peer dependency)
 
 pnpm effect-trpc-codegen src/router.ts            # once
 pnpm effect-trpc-codegen --watch src/router.ts    # next to the dev server
@@ -23,17 +23,17 @@ The generator is an [unplugin](https://unplugin.unjs.io) too. Every entry takes 
 and fails the build on generator errors. In Vite dev errors are warnings, and every change
 regenerates.
 
-| Bundler                                                | Import                                                |
-| ------------------------------------------------------ | ----------------------------------------------------- |
-| Vite (Vitest, TanStack Start, electron-vite, Astro, …) | `@effect-trpc/codegen/vite`                           |
-| Rollup, Rolldown                                       | `@effect-trpc/codegen/rollup`, `/rolldown`            |
-| webpack (Next.js with `--webpack`), Rspack, Rsbuild    | `@effect-trpc/codegen/webpack`, `/rspack`, `/rsbuild` |
-| esbuild, Farm, Bun                                     | `@effect-trpc/codegen/esbuild`, `/farm`, `/bun`       |
-| Turbopack (Next.js default)                            | `@effect-trpc/codegen/loader`                         |
+| Bundler                                                | Import                                               |
+| ------------------------------------------------------ | ---------------------------------------------------- |
+| Vite (Vitest, TanStack Start, electron-vite, Astro, …) | `@rpc-effect/codegen/vite`                           |
+| Rollup, Rolldown                                       | `@rpc-effect/codegen/rollup`, `/rolldown`            |
+| webpack (Next.js with `--webpack`), Rspack, Rsbuild    | `@rpc-effect/codegen/webpack`, `/rspack`, `/rsbuild` |
+| esbuild, Farm, Bun                                     | `@rpc-effect/codegen/esbuild`, `/farm`, `/bun`       |
+| Turbopack (Next.js default)                            | `@rpc-effect/codegen/loader`                         |
 
 ```ts
 // vite.config.ts
-import { effectTrpcCodegen } from '@effect-trpc/codegen/vite';
+import { effectTrpcCodegen } from '@rpc-effect/codegen/vite';
 
 export default { plugins: [effectTrpcCodegen({ routers: ['src/router.ts'] })] };
 ```
@@ -49,7 +49,7 @@ const config: NextConfig = {
     rules: {
       '**/server/router.ts': {
         loaders: [
-          { loader: '@effect-trpc/codegen/loader', options: { routers: ['src/server/router.ts'] } },
+          { loader: '@rpc-effect/codegen/loader', options: { routers: ['src/server/router.ts'] } },
         ],
       },
     },

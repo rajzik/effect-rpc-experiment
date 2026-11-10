@@ -1,5 +1,5 @@
 // app/api/rpc/[[...rpc]]/route.ts
-import { createRouteHandler } from '@effect-trpc/next';
+import { createRouteHandler } from '@rpc-effect/next';
 
 import { appRouter } from '@/router';
 import { ServerLive } from '@/server';

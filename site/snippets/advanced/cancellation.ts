@@ -1,6 +1,6 @@
 import { Duration, Effect, Fiber } from 'effect';
-import { createClient, httpLink } from '@effect-trpc/client';
-import { isClientInfrastructureError } from '@effect-trpc/core';
+import { createClient, httpLink } from '@rpc-effect/client';
+import { isClientInfrastructureError } from '@rpc-effect/core';
 
 import { appRouter } from '@/router';
 
@@ -11,7 +11,7 @@ const client = createClient(appRouter, { link: httpLink({ url: 'https://api.exam
 try {
   await client.post.byId({ id: 1 }, { signal: AbortSignal.timeout(2_000) });
 } catch (error) {
-  if (isClientInfrastructureError(error) && error._tag === '@effect-trpc/RpcInterrupted') {
+  if (isClientInfrastructureError(error) && error._tag === '@rpc-effect/RpcInterrupted') {
     console.log('timed out; the handler on the server was interrupted too');
   }
 }

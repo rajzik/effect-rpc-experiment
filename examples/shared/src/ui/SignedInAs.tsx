@@ -1,7 +1,7 @@
 'use client';
 /** Shows who the session belongs to. */
 import { useQuery } from '@tanstack/react-query';
-import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
 
 import type { AppRouter } from '../domain';
 import { sessionOptions } from './options';

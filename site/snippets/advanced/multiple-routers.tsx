@@ -1,10 +1,10 @@
 // Two routers, one QueryClient: each router gets a key prefix.
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { Effect, Schema } from 'effect';
-import { query, Router } from '@effect-trpc/core';
-import { createClient, httpLink } from '@effect-trpc/client';
-import { Handlers } from '@effect-trpc/server';
-import { createHydrationHelpers, createRpcContext } from '@effect-trpc/tanstack-react-query';
+import { query, Router } from '@rpc-effect/core';
+import { createClient, httpLink } from '@rpc-effect/client';
+import { Handlers } from '@rpc-effect/server';
+import { createHydrationHelpers, createRpcContext } from '@rpc-effect/tanstack-react-query';
 import type { ReactNode } from 'react';
 
 // #region routers

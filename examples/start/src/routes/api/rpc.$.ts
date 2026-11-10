@@ -1,5 +1,5 @@
-import { appRouter } from '@effect-trpc-examples/shared';
-import { createStartHandler } from '@effect-trpc/start';
+import { appRouter } from '@rpc-effect-examples/shared';
+import { createStartHandler } from '@rpc-effect/start';
 import { createFileRoute } from '@tanstack/react-router';
 
 import { ServerLive } from '../../rpc/server';

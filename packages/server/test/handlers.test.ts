@@ -1,7 +1,7 @@
 import { Context, Effect, Exit, Layer, Schema, Stream } from 'effect';
 import type { Scope } from 'effect';
 import { RpcTest } from 'effect/rpc';
-import { causeToClientError, query, Router, RpcDefect } from '@effect-trpc/core';
+import { causeToClientError, query, Router, RpcDefect } from '@rpc-effect/core';
 import { describe, expect, it } from 'vite-plus/test';
 import { Handlers } from '../src/index.js';
 import { ada, appRouter, getCause, makeServer, NotFound, Unauthorized, User } from './fixtures.js';

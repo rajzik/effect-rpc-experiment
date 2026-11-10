@@ -3,13 +3,13 @@
 // decoded on the client.
 import { Context, Effect, Layer, Schema, Stream } from 'effect';
 import { afterAll, beforeAll, describe, expect, expectTypeOf, it } from 'vite-plus/test';
-import type { ClientError } from '@effect-trpc/core';
-import { Procedure } from '@effect-trpc/core';
-import type { Router } from '@effect-trpc/core';
-import { createClient, httpLink } from '@effect-trpc/client';
-import type { Client } from '@effect-trpc/client';
-import { Handlers, toWebHandler } from '@effect-trpc/server';
-import type { WebHandler } from '@effect-trpc/server';
+import type { ClientError } from '@rpc-effect/core';
+import { Procedure } from '@rpc-effect/core';
+import type { Router } from '@rpc-effect/core';
+import { createClient, httpLink } from '@rpc-effect/client';
+import type { Client } from '@rpc-effect/client';
+import { Handlers, toWebHandler } from '@rpc-effect/server';
+import type { WebHandler } from '@rpc-effect/server';
 
 class Post extends Schema.Class<Post>('Post')({
   id: Schema.Finite,

@@ -1,6 +1,6 @@
 // Helpers to speak the effect/rpc HTTP wire protocol by hand (what an RpcClient sends).
 import { Exit } from 'effect';
-import { Codecs, Router } from '@effect-trpc/core';
+import { Codecs, Router } from '@rpc-effect/core';
 import type { WebHandler } from '../src/index.js';
 import { appRouter } from './fixtures.js';
 

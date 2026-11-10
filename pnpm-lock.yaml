@@ -124,22 +124,22 @@ importers:
 
   examples/electron:
     dependencies:
-      '@effect-trpc-examples/shared':
+      '@rpc-effect-examples/shared':
         specifier: workspace:*
         version: link:../shared
-      '@effect-trpc/client':
+      '@rpc-effect/client':
         specifier: workspace:*
         version: link:../../packages/client
-      '@effect-trpc/core':
+      '@rpc-effect/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@effect-trpc/electron':
+      '@rpc-effect/electron':
         specifier: workspace:*
         version: link:../../packages/electron
-      '@effect-trpc/server':
+      '@rpc-effect/server':
         specifier: workspace:*
         version: link:../../packages/server
-      '@effect-trpc/tanstack-react-query':
+      '@rpc-effect/tanstack-react-query':
         specifier: workspace:*
         version: link:../../packages/tanstack-react-query
       '@tanstack/react-query':
@@ -173,22 +173,22 @@ importers:
 
   examples/next:
     dependencies:
-      '@effect-trpc-examples/shared':
+      '@rpc-effect-examples/shared':
         specifier: workspace:*
         version: link:../shared
-      '@effect-trpc/client':
+      '@rpc-effect/client':
         specifier: workspace:*
         version: link:../../packages/client
-      '@effect-trpc/core':
+      '@rpc-effect/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@effect-trpc/next':
+      '@rpc-effect/next':
         specifier: workspace:*
         version: link:../../packages/next
-      '@effect-trpc/server':
+      '@rpc-effect/server':
         specifier: workspace:*
         version: link:../../packages/server
-      '@effect-trpc/tanstack-react-query':
+      '@rpc-effect/tanstack-react-query':
         specifier: workspace:*
         version: link:../../packages/tanstack-react-query
       '@tanstack/react-query':
@@ -222,16 +222,16 @@ importers:
 
   examples/shared:
     dependencies:
-      '@effect-trpc/client':
+      '@rpc-effect/client':
         specifier: workspace:*
         version: link:../../packages/client
-      '@effect-trpc/core':
+      '@rpc-effect/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@effect-trpc/server':
+      '@rpc-effect/server':
         specifier: workspace:*
         version: link:../../packages/server
-      '@effect-trpc/tanstack-react-query':
+      '@rpc-effect/tanstack-react-query':
         specifier: workspace:*
         version: link:../../packages/tanstack-react-query
       '@tanstack/react-query':
@@ -244,12 +244,12 @@ importers:
         specifier: 'catalog:'
         version: 19.3.0
     devDependencies:
-      '@effect-trpc/test-utils':
-        specifier: workspace:*
-        version: link:../../packages/test-utils
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.64.1
+      '@rpc-effect/test-utils':
+        specifier: workspace:*
+        version: link:../../packages/test-utils
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
@@ -259,22 +259,22 @@ importers:
 
   examples/start:
     dependencies:
-      '@effect-trpc-examples/shared':
+      '@rpc-effect-examples/shared':
         specifier: workspace:*
         version: link:../shared
-      '@effect-trpc/client':
+      '@rpc-effect/client':
         specifier: workspace:*
         version: link:../../packages/client
-      '@effect-trpc/core':
+      '@rpc-effect/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@effect-trpc/server':
+      '@rpc-effect/server':
         specifier: workspace:*
         version: link:../../packages/server
-      '@effect-trpc/start':
+      '@rpc-effect/start':
         specifier: workspace:*
         version: link:../../packages/start
-      '@effect-trpc/tanstack-react-query':
+      '@rpc-effect/tanstack-react-query':
         specifier: workspace:*
         version: link:../../packages/tanstack-react-query
       '@tanstack/react-query':
@@ -311,7 +311,7 @@ importers:
 
   packages/client:
     dependencies:
-      '@effect-trpc/core':
+      '@rpc-effect/core':
         specifier: workspace:*
         version: link:../core
       effect:
@@ -328,13 +328,13 @@ importers:
         specifier: 'catalog:'
         version: 3.4.0(esbuild@0.21.5)(rollup@4.67.5)(vite@5.4.21(@types/node@24.19.1)(lightningcss@1.33.0))
     devDependencies:
-      '@effect-trpc/client':
+      '@rpc-effect/client':
         specifier: workspace:*
         version: link:../client
-      '@effect-trpc/core':
+      '@rpc-effect/core':
         specifier: workspace:*
         version: link:../core
-      '@effect-trpc/server':
+      '@rpc-effect/server':
         specifier: workspace:*
         version: link:../server
       '@types/node':
@@ -364,33 +364,33 @@ importers:
 
   packages/e2e:
     devDependencies:
-      '@effect-trpc/client':
-        specifier: workspace:*
-        version: link:../client
-      '@effect-trpc/core':
-        specifier: workspace:*
-        version: link:../core
-      '@effect-trpc/electron':
-        specifier: workspace:*
-        version: link:../electron
-      '@effect-trpc/next':
-        specifier: workspace:*
-        version: link:../next
-      '@effect-trpc/server':
-        specifier: workspace:*
-        version: link:../server
-      '@effect-trpc/start':
-        specifier: workspace:*
-        version: link:../start
-      '@effect-trpc/tanstack-react-query':
-        specifier: workspace:*
-        version: link:../tanstack-react-query
-      '@effect-trpc/test-utils':
-        specifier: workspace:*
-        version: link:../test-utils
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.7(effect@4.0.7)(redis@6.3.0)
+      '@rpc-effect/client':
+        specifier: workspace:*
+        version: link:../client
+      '@rpc-effect/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rpc-effect/electron':
+        specifier: workspace:*
+        version: link:../electron
+      '@rpc-effect/next':
+        specifier: workspace:*
+        version: link:../next
+      '@rpc-effect/server':
+        specifier: workspace:*
+        version: link:../server
+      '@rpc-effect/start':
+        specifier: workspace:*
+        version: link:../start
+      '@rpc-effect/tanstack-react-query':
+        specifier: workspace:*
+        version: link:../tanstack-react-query
+      '@rpc-effect/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.104.1(react@19.3.0)
@@ -421,53 +421,53 @@ importers:
 
   packages/electron:
     dependencies:
-      '@effect-trpc/client':
+      '@rpc-effect/client':
         specifier: workspace:*
         version: link:../client
-      '@effect-trpc/core':
+      '@rpc-effect/core':
         specifier: workspace:*
         version: link:../core
-      '@effect-trpc/server':
+      '@rpc-effect/server':
         specifier: workspace:*
         version: link:../server
       effect:
         specifier: 'catalog:'
         version: 4.0.7
     devDependencies:
-      '@effect-trpc/test-utils':
-        specifier: workspace:*
-        version: link:../test-utils
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.7(effect@4.0.7)(vitest@5.0.5)
+      '@rpc-effect/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       electron:
         specifier: 'catalog:'
         version: 44.5.1
 
   packages/next:
     dependencies:
-      '@effect-trpc/client':
+      '@rpc-effect/client':
         specifier: workspace:*
         version: link:../client
-      '@effect-trpc/core':
+      '@rpc-effect/core':
         specifier: workspace:*
         version: link:../core
-      '@effect-trpc/server':
+      '@rpc-effect/server':
         specifier: workspace:*
         version: link:../server
-      '@effect-trpc/tanstack-react-query':
+      '@rpc-effect/tanstack-react-query':
         specifier: workspace:*
         version: link:../tanstack-react-query
       effect:
         specifier: 'catalog:'
         version: 4.0.7
     devDependencies:
-      '@effect-trpc/test-utils':
-        specifier: workspace:*
-        version: link:../test-utils
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.7(effect@4.0.7)(vitest@5.0.5)
+      '@rpc-effect/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.104.1(react@19.3.0)
@@ -492,7 +492,7 @@ importers:
 
   packages/server:
     dependencies:
-      '@effect-trpc/core':
+      '@rpc-effect/core':
         specifier: workspace:*
         version: link:../core
       effect:
@@ -505,28 +505,28 @@ importers:
 
   packages/start:
     dependencies:
-      '@effect-trpc/client':
+      '@rpc-effect/client':
         specifier: workspace:*
         version: link:../client
-      '@effect-trpc/core':
+      '@rpc-effect/core':
         specifier: workspace:*
         version: link:../core
-      '@effect-trpc/server':
+      '@rpc-effect/server':
         specifier: workspace:*
         version: link:../server
-      '@effect-trpc/tanstack-react-query':
+      '@rpc-effect/tanstack-react-query':
         specifier: workspace:*
         version: link:../tanstack-react-query
       effect:
         specifier: 'catalog:'
         version: 4.0.7
     devDependencies:
-      '@effect-trpc/test-utils':
-        specifier: workspace:*
-        version: link:../test-utils
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.7(effect@4.0.7)(vitest@5.0.5)
+      '@rpc-effect/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.104.1(react@19.3.0)
@@ -548,25 +548,25 @@ importers:
 
   packages/tanstack-react-query:
     dependencies:
-      '@effect-trpc/client':
+      '@rpc-effect/client':
         specifier: workspace:*
         version: link:../client
-      '@effect-trpc/core':
+      '@rpc-effect/core':
         specifier: workspace:*
         version: link:../core
       effect:
         specifier: 'catalog:'
         version: 4.0.7
     devDependencies:
-      '@effect-trpc/server':
-        specifier: workspace:*
-        version: link:../server
-      '@effect-trpc/test-utils':
-        specifier: workspace:*
-        version: link:../test-utils
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.7(effect@4.0.7)(vitest@5.0.5)
+      '@rpc-effect/server':
+        specifier: workspace:*
+        version: link:../server
+      '@rpc-effect/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.104.1(react@19.3.0)
@@ -594,51 +594,27 @@ importers:
 
   packages/test-utils:
     dependencies:
-      '@effect-trpc/client':
-        specifier: workspace:*
-        version: link:../client
-      '@effect-trpc/core':
-        specifier: workspace:*
-        version: link:../core
-      '@effect-trpc/server':
-        specifier: workspace:*
-        version: link:../server
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.7(effect@4.0.7)(redis@6.3.0)
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.7(effect@4.0.7)(vitest@5.0.5)
+      '@rpc-effect/client':
+        specifier: workspace:*
+        version: link:../client
+      '@rpc-effect/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rpc-effect/server':
+        specifier: workspace:*
+        version: link:../server
       effect:
         specifier: 'catalog:'
         version: 4.0.7
 
   site:
     devDependencies:
-      '@effect-trpc/client':
-        specifier: workspace:*
-        version: link:../packages/client
-      '@effect-trpc/core':
-        specifier: workspace:*
-        version: link:../packages/core
-      '@effect-trpc/electron':
-        specifier: workspace:*
-        version: link:../packages/electron
-      '@effect-trpc/next':
-        specifier: workspace:*
-        version: link:../packages/next
-      '@effect-trpc/server':
-        specifier: workspace:*
-        version: link:../packages/server
-      '@effect-trpc/start':
-        specifier: workspace:*
-        version: link:../packages/start
-      '@effect-trpc/tanstack-react-query':
-        specifier: workspace:*
-        version: link:../packages/tanstack-react-query
-      '@effect-trpc/test-utils':
-        specifier: workspace:*
-        version: link:../packages/test-utils
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.7(effect@4.0.7)(redis@6.3.0)
@@ -651,6 +627,30 @@ importers:
       '@fontsource/jetbrains-mono':
         specifier: 'catalog:'
         version: 5.3.0
+      '@rpc-effect/client':
+        specifier: workspace:*
+        version: link:../packages/client
+      '@rpc-effect/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@rpc-effect/electron':
+        specifier: workspace:*
+        version: link:../packages/electron
+      '@rpc-effect/next':
+        specifier: workspace:*
+        version: link:../packages/next
+      '@rpc-effect/server':
+        specifier: workspace:*
+        version: link:../packages/server
+      '@rpc-effect/start':
+        specifier: workspace:*
+        version: link:../packages/start
+      '@rpc-effect/tanstack-react-query':
+        specifier: workspace:*
+        version: link:../packages/tanstack-react-query
+      '@rpc-effect/test-utils':
+        specifier: workspace:*
+        version: link:../packages/test-utils
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.104.1(react@19.3.0)

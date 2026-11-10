@@ -82,8 +82,8 @@ export interface RpcMutationOptionsOut<
  * **Example** (Create, then invalidate every `post.*` query)
  *
  * ```tsx
- * import { mutation, query, Router } from '@effect-trpc/core';
- * import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import { mutation, query, Router } from '@rpc-effect/core';
+ * import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
  * import { useMutation, useQueryClient } from '@tanstack/react-query';
  * import { Schema } from 'effect';
  *
@@ -117,8 +117,8 @@ export interface RpcMutationOptionsOut<
  * **Example** (Optimistic update through the data-tagged key)
  *
  * ```tsx
- * import { mutation, query, Router } from '@effect-trpc/core';
- * import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+ * import { mutation, query, Router } from '@rpc-effect/core';
+ * import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
  * import { useMutation, useQueryClient } from '@tanstack/react-query';
  * import { Schema } from 'effect';
  *

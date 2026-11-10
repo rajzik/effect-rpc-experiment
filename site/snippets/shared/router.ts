@@ -2,7 +2,7 @@
 // in your app it is the module shared by the server and the client.
 import { Context, Schema } from 'effect';
 import { RpcMiddleware } from 'effect/rpc';
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
 
 // Domain data: a Schema.Class arrives on the client as a real `Post` instance.
 export class Post extends Schema.Class<Post>('Post')({

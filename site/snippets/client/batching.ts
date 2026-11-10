@@ -1,4 +1,4 @@
-import { createClient, httpBatchLink } from '@effect-trpc/client';
+import { createClient, httpBatchLink } from '@rpc-effect/client';
 
 import { appRouter } from '@/router';
 

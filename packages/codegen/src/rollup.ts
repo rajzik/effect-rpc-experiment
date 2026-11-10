@@ -1,5 +1,5 @@
 /**
- * The schema generator as a Rollup plugin (see `@effect-trpc/codegen/unplugin`).
+ * The schema generator as a Rollup plugin (see `@rpc-effect/codegen/unplugin`).
  *
  * @since 0.1.0
  */
@@ -26,7 +26,7 @@ import { unplugin } from './unplugin.js';
  *
  * ```ts
  * // rollup.config.mjs
- * import { effectTrpcCodegen } from '@effect-trpc/codegen/rollup';
+ * import { effectTrpcCodegen } from '@rpc-effect/codegen/rollup';
  *
  * export default {
  *   input: 'src/main.ts',

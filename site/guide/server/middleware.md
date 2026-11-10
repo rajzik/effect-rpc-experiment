@@ -1,6 +1,6 @@
 # Middleware and context
 
-Middleware is `effect/rpc`'s `RpcMiddleware`. `Middleware.make` in `@effect-trpc/server` is an alias
+Middleware is `effect/rpc`'s `RpcMiddleware`. `Middleware.make` in `@rpc-effect/server` is an alias
 of `RpcMiddleware.Service`, so either works. A middleware wraps the handler's Effect. It can:
 
 - fail with a typed `error`, which is added to every procedure it is attached to;

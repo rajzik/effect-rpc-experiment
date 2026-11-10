@@ -1,16 +1,16 @@
 /**
  * Serves an effect-trpc router from a Next.js App Router route handler (`route.ts`).
  *
- * {@link createRouteHandler} wraps `@effect-trpc/server`'s `toWebHandler` (an `effect/rpc` HTTP
+ * {@link createRouteHandler} wraps `@rpc-effect/server`'s `toWebHandler` (an `effect/rpc` HTTP
  * server) in the `GET` / `POST` exports Next expects. Browser clients created with
  * `createNextRpcClient` (or any `httpLink`) call it; server components usually skip it and run
  * the router in-process through `createRscHelpers`. Server-only.
  *
  * @since 0.1.0
  */
-import { Router } from '@effect-trpc/core';
-import { toWebHandler } from '@effect-trpc/server';
-import type { WebHandler, WebHandlerOptions } from '@effect-trpc/server';
+import { Router } from '@rpc-effect/core';
+import { toWebHandler } from '@rpc-effect/server';
+import type { WebHandler, WebHandlerOptions } from '@rpc-effect/server';
 
 /**
  * Options of {@link createRouteHandler}: `handlers`, `serialization` and `onError` of
@@ -226,9 +226,9 @@ const createRouteHandlerFromInput = (
  *
  * ```ts
  * // app/api/rpc/[[...rpc]]/route.ts
- * import { query, Router } from '@effect-trpc/core';
- * import { createRouteHandler } from '@effect-trpc/next';
- * import { Handlers } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createRouteHandler } from '@rpc-effect/next';
+ * import { Handlers } from '@rpc-effect/server';
  * import { Effect, Schema } from 'effect';
  *
  * // server/router.ts in a real app (schemas only, shared with client components)
@@ -258,9 +258,9 @@ const createRouteHandlerFromInput = (
  *
  * ```ts
  * // app/rpc/[...rpc]/route.ts, with `basePath: '/docs'` in next.config
- * import { query, Router } from '@effect-trpc/core';
- * import { createRouteHandler } from '@effect-trpc/next';
- * import { Handlers } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createRouteHandler } from '@rpc-effect/next';
+ * import { Handlers } from '@rpc-effect/server';
  * import { Effect, Schema } from 'effect';
  *
  * const appRouter = Router.make({ health: query({ success: Schema.String }) });

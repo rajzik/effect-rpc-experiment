@@ -3,7 +3,7 @@
 // invalid handler result fails to encode; both surface to the caller as a defect (Die), never
 // as the procedure's typed error, and the server keeps serving.
 import { Exit } from 'effect';
-import { causeToClientError, RpcDefect } from '@effect-trpc/core';
+import { causeToClientError, RpcDefect } from '@rpc-effect/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test';
 import { createCaller, toWebHandler } from '../src/index.js';
 import type { Caller, WebHandler } from '../src/index.js';

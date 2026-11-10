@@ -2,13 +2,13 @@
  * Type-level helpers that look up a procedure of a router by its dot-joined path.
  *
  * Server actions are addressed by path strings (`actions('post.create')`,
- * `useServerAction(action, { path: 'post.create' })`), so `@effect-trpc/next` derives the input,
+ * `useServerAction(action, { path: 'post.create' })`), so `@rpc-effect/next` derives the input,
  * output and typed error of a path from the router's compiled `effect/rpc` rpcs. Use these types
  * to annotate the `'use server'` functions that wrap actions.
  *
  * @since 0.1.0
  */
-import type { Codecs, ProcedureDef, Router } from '@effect-trpc/core';
+import type { Codecs, ProcedureDef, Router } from '@rpc-effect/core';
 import type { Rpc, RpcSchema } from 'effect/rpc';
 
 type RecordOf<R> = R extends Router<infer Rec> ? Rec : R;

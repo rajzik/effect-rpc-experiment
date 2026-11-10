@@ -1,6 +1,6 @@
 // Port of tRPC tests/server/middlewares.test.ts: middleware chaining, context, errors.
 import { Context, Effect, Layer, Schema } from 'effect';
-import { mutation, query, Router } from '@effect-trpc/core';
+import { mutation, query, Router } from '@rpc-effect/core';
 import { describe, expect, it } from 'vite-plus/test';
 import { createCaller, Handlers, Middleware } from '../src/index.js';
 import { rejection } from './fixtures.js';

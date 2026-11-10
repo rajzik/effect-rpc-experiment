@@ -1,5 +1,5 @@
-import { createClient, httpLink, localLink, wsLink } from '@effect-trpc/client';
-import { toWebHandler } from '@effect-trpc/server';
+import { createClient, httpLink, localLink, wsLink } from '@rpc-effect/client';
+import { toWebHandler } from '@rpc-effect/server';
 
 import { appRouter } from '@/router';
 import { ServerLive } from '@/server';

@@ -2,9 +2,9 @@
 // the schemas, so there is no separate `Handlers.make`.
 import { Context, Effect, Layer, Schema, Stream } from 'effect';
 import { NodeRuntime } from '@effect/platform-node';
-import { Procedure } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
-import { serve } from '@effect-trpc/server/node';
+import { Procedure } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
+import { serve } from '@rpc-effect/server/node';
 
 import { Auth, CurrentUser, Forbidden, Post, PostNotFound, PostPage } from '@/router';
 import { AuthLive } from '@/server'; // the Auth middleware implementation

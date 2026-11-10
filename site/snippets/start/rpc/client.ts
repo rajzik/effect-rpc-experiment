@@ -1,5 +1,5 @@
 // src/rpc/client.ts
-import { createIsomorphicClient, createStartHelpers } from '@effect-trpc/start';
+import { createIsomorphicClient, createStartHelpers } from '@rpc-effect/start';
 
 import { appRouter } from '@/router';
 import { ServerLive } from '@/server';

@@ -1,6 +1,6 @@
 // A server function that calls a procedure in-process.
 import { createServerFn } from '@tanstack/react-start';
-import { createServerClient } from '@effect-trpc/start';
+import { createServerClient } from '@rpc-effect/start';
 
 import { appRouter } from '@/router';
 import { ServerLive } from '@/server';

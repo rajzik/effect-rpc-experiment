@@ -2,27 +2,27 @@
  * React Server Components helpers for the App Router + TanStack Query (tRPC's `trpc/server.tsx`).
  *
  * {@link createRscHelpers} gives server components a per-request `QueryClient`, the
- * `@effect-trpc/tanstack-react-query` options proxy (`rpc`), a fire-and-forget `prefetch`, and
+ * `@rpc-effect/tanstack-react-query` options proxy (`rpc`), a fire-and-forget `prefetch`, and
  * `HydrateClient`, which dehydrates the request's cache with the procedures' schemas and renders
  * the client `HydrationBoundary` from `createNextRpcClient`. By default the router runs
  * in-process (`localLink`), with no HTTP hop. Server-only.
  *
  * @since 0.1.0
  */
-import { createClient, localLink } from '@effect-trpc/client';
-import type { Client, HeadersOption } from '@effect-trpc/client';
-import { Router, RpcTransportError } from '@effect-trpc/core';
-import type { Caller } from '@effect-trpc/server';
+import { createClient, localLink } from '@rpc-effect/client';
+import type { Client, HeadersOption } from '@rpc-effect/client';
+import { Router, RpcTransportError } from '@rpc-effect/core';
+import type { Caller } from '@rpc-effect/server';
 import {
   createHydrationHelpers,
   createRpcOptionsProxy,
   QueryKeys,
-} from '@effect-trpc/tanstack-react-query';
+} from '@rpc-effect/tanstack-react-query';
 import type {
   DefaultFeatureFlags,
   RpcDehydrateOptions,
   RpcOptionsProxy,
-} from '@effect-trpc/tanstack-react-query';
+} from '@rpc-effect/tanstack-react-query';
 import type { DehydratedState, QueryClient } from '@tanstack/react-query';
 import { Effect, Stream } from 'effect';
 import type { Layer } from 'effect';
@@ -273,7 +273,7 @@ const callerFromClient = <R extends Router.Any>(router: R, client: Client<R>): C
  * - `getQueryClient` is `cache(makeQueryClient)`: one query client per request inside an RSC
  *   render. `cache` defaults to `React.cache` (React 19); without it every call creates a new
  *   client.
- * - `rpc` is the `@effect-trpc/tanstack-react-query` options proxy bound to `getQueryClient`, the
+ * - `rpc` is the `@rpc-effect/tanstack-react-query` options proxy bound to `getQueryClient`, the
  *   same API as `useRpc()` on the client.
  * - `prefetch(options)` is fire and forget (`void`); thanks to `makeQueryClient`'s
  *   `shouldDehydrateQuery`, pending queries stream to the client.
@@ -303,9 +303,9 @@ const callerFromClient = <R extends Router.Any>(router: R, client: Client<R>): C
  *
  * ```tsx
  * // trpc/server.tsx — server only (add `import 'server-only'` in the app)
- * import { query, Router } from '@effect-trpc/core';
- * import { createNextRpcClient, createRscHelpers } from '@effect-trpc/next';
- * import { Handlers } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createNextRpcClient, createRscHelpers } from '@rpc-effect/next';
+ * import { Handlers } from '@rpc-effect/server';
  * import { Effect, Schema } from 'effect';
  *
  * // In the app: `import { headers } from 'next/headers'`.
@@ -335,9 +335,9 @@ const callerFromClient = <R extends Router.Any>(router: R, client: Client<R>): C
  *
  * ```tsx
  * // app/page.tsx — server component
- * import { query, Router } from '@effect-trpc/core';
- * import { createNextRpcClient, createRscHelpers } from '@effect-trpc/next';
- * import { Handlers } from '@effect-trpc/server';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createNextRpcClient, createRscHelpers } from '@rpc-effect/next';
+ * import { Handlers } from '@rpc-effect/server';
  * import { useSuspenseQuery } from '@tanstack/react-query';
  * import { Effect, Schema } from 'effect';
  *
@@ -417,9 +417,9 @@ export function createRscHelpers<
  *
  * ```tsx
  * // trpc/server.tsx — server only
- * import { createClient, httpLink } from '@effect-trpc/client';
- * import { query, Router } from '@effect-trpc/core';
- * import { createNextRpcClient, createRscHelpers } from '@effect-trpc/next';
+ * import { createClient, httpLink } from '@rpc-effect/client';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createNextRpcClient, createRscHelpers } from '@rpc-effect/next';
  * import { Schema } from 'effect';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
@@ -465,9 +465,9 @@ export function createRscHelpers<
  * **Example** (RSC helpers of a router service)
  *
  * ```tsx
- * import { Procedure } from '@effect-trpc/core';
- * import { createRscHelpers } from '@effect-trpc/next';
- * import { Handlers } from '@effect-trpc/server';
+ * import { Procedure } from '@rpc-effect/core';
+ * import { createRscHelpers } from '@rpc-effect/next';
+ * import { Handlers } from '@rpc-effect/server';
  * import { Context, Effect, Schema } from 'effect';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
@@ -517,9 +517,9 @@ export function createRscHelpers<
  * **Example** (RSC helpers of a router service over HTTP)
  *
  * ```tsx
- * import { createClient, httpLink } from '@effect-trpc/client';
- * import { Procedure } from '@effect-trpc/core';
- * import { createRscHelpers } from '@effect-trpc/next';
+ * import { createClient, httpLink } from '@rpc-effect/client';
+ * import { Procedure } from '@rpc-effect/core';
+ * import { createRscHelpers } from '@rpc-effect/next';
  * import { Context, Effect, Schema } from 'effect';
  *
  * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {

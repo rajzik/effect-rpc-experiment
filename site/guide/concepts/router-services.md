@@ -45,7 +45,7 @@ through a **contract**, because only the server has the services:
   no server layers, yet it needs the runtime schemas to decode a `Post` or a `PostNotFound`.
 - The contract is a schema-only `Router.make` router with the same tags, schemas and middleware, and
   no handlers. It is normally the `router.client.gen.ts` that
-  [`@effect-trpc/codegen`](../advanced/codegen) writes from the class (it reads `Effect.gen` makes),
+  [`@rpc-effect/codegen`](../advanced/codegen) writes from the class (it reads `Effect.gen` makes),
   with a compile-time check that it still matches the class.
 - If you write the contract by hand, add that check yourself (below). The server serves the
   contract's procedures, middleware included: a contract that misses `.middleware(Auth)` serves the
@@ -165,7 +165,7 @@ Leave out `.output(...)` and `.error(...)` and the types come from the handler. 
 <<< @/snippets/concepts/router-service-inferred.ts#written [router.ts]
 
 Types alone don't put a `Post` on the wire: the server needs a schema to encode it and the client
-one to decode it. [`@effect-trpc/codegen`](../advanced/codegen) reads each handler's inferred
+one to decode it. [`@rpc-effect/codegen`](../advanced/codegen) reads each handler's inferred
 `Effect<A, E>` with the TypeScript 7 checker and writes two modules next to the router:
 
 <<< @/snippets/concepts/router-service-inferred.gen.ts#generated [router.gen.ts]
@@ -214,7 +214,7 @@ The router from the [quick start](../quick-start), written in this style, is in
   live layers (`DatabaseLive`, API keys) stay on the server. Keep anything secret out of the
   handler body and out of the module's imports. If the handlers must not ship at all, give
   clients the handler-free `router.client.gen.ts` that
-  [`@effect-trpc/codegen`](../advanced/codegen) writes, or use `Router.make` with `query({...})`
+  [`@rpc-effect/codegen`](../advanced/codegen) writes, or use `Router.make` with `query({...})`
   and keep `Handlers.make` in a server-only module.
 - A pure `make` runs once per class for the synchronous APIs. A subclass
   (`class B extends AppRouter {}`) gets its own evaluation. A `make` that fails is not cached.

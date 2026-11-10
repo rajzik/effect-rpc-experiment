@@ -1,6 +1,6 @@
 import { Layer, Schema } from 'effect';
-import { Router } from '@effect-trpc/core';
-import { Handlers, toWebHandler } from '@effect-trpc/server';
+import { Router } from '@rpc-effect/core';
+import { Handlers, toWebHandler } from '@rpc-effect/server';
 
 import { Forbidden, Post, PostNotFound } from '@/router';
 import { AppConfig, AppRouter as SourceAppRouter } from './router-service-effectful-inferred';

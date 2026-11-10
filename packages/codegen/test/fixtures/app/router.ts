@@ -1,6 +1,6 @@
 // A router written without `.output` / `.error`: everything below is inferred.
 import { Context, Effect, Schema, Stream } from 'effect';
-import { Procedure, query, Router } from '@effect-trpc/core';
+import { Procedure, query, Router } from '@rpc-effect/core';
 
 import { AdminRouter } from './admin.js';
 import { db } from './db.js';

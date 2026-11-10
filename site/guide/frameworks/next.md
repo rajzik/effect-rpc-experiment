@@ -1,6 +1,6 @@
 # Next.js
 
-`@effect-trpc/next` wires a router into the App Router: a route handler, a client provider, server
+`@rpc-effect/next` wires a router into the App Router: a route handler, a client provider, server
 component helpers (prefetch, hydration, an in-process caller) and server actions with typed errors.
 It follows tRPC's Next.js setup, file for file.
 

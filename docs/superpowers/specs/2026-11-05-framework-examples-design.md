@@ -63,7 +63,7 @@ Testing: Playwright against production builds (user's choice) over build + HTTP 
 
 ```
 examples/
-  shared/        # @effect-trpc-examples/shared — router, handlers, auth middleware, seed data,
+  shared/        # @rpc-effect-examples/shared — router, handlers, auth middleware, seed data,
                  #   Playwright scenario helpers (page objects) reused by the three suites
   next/          # Next.js App Router app + e2e/*.spec.ts
   start/         # TanStack Start app + e2e/*.spec.ts

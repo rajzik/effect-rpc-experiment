@@ -1,6 +1,6 @@
 import { Schema } from 'effect';
-import { query, Router } from '@effect-trpc/core';
-import { createClient, httpLink } from '@effect-trpc/client';
+import { query, Router } from '@rpc-effect/core';
+import { createClient, httpLink } from '@rpc-effect/client';
 
 import { Forbidden, Post, PostNotFound } from '@/router';
 

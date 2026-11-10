@@ -4,14 +4,14 @@
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, describe, expect, expectTypeOf, it } from 'vite-plus/test';
-import type { ClientError } from '@effect-trpc/core';
-import { RpcDefect, RpcInterrupted, RpcTransportError } from '@effect-trpc/core';
+import type { ClientError } from '@rpc-effect/core';
+import { RpcDefect, RpcInterrupted, RpcTransportError } from '@rpc-effect/core';
 import {
   createHydrationHelpers,
   createRpcContext,
   createRpcOptionsProxy,
-} from '@effect-trpc/tanstack-react-query';
-import { testServerAndClient, type TestServerAndClient } from '@effect-trpc/test-utils';
+} from '@rpc-effect/tanstack-react-query';
+import { testServerAndClient, type TestServerAndClient } from '@rpc-effect/test-utils';
 import * as React from 'react';
 import { appRouter, HandlersLive, NotFound, User, type AppRouter } from './fixtures.js';
 

@@ -1,8 +1,8 @@
 'use client';
 /** The "new task" form: a "Title" textbox and a "Create" button. */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { exitToClientError, type ClientError } from '@effect-trpc/core';
-import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import { exitToClientError, type ClientError } from '@rpc-effect/core';
+import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
 import { Option, type Exit } from 'effect';
 import { useState, type FormEvent } from 'react';
 

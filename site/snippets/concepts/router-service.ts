@@ -1,6 +1,6 @@
 // The router module: shared by the server and the client. It holds no live layers.
 import { Context, Effect, Schema, Stream } from 'effect';
-import { Procedure } from '@effect-trpc/core';
+import { Procedure } from '@rpc-effect/core';
 
 import { Post, PostNotFound } from '@/router';
 

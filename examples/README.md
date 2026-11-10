@@ -2,15 +2,15 @@
 
 Three small apps that run the same task board through the framework adapters, each tested in a
 real browser (or a real Electron window) against its **production build**. They are the proof that
-`@effect-trpc/next`, `@effect-trpc/start` and `@effect-trpc/electron` work inside running apps, not
+`@rpc-effect/next`, `@rpc-effect/start` and `@rpc-effect/electron` work inside running apps, not
 only in unit tests. Nothing here is published.
 
-| App                      | Adapter                 | Shows                                                                                                                         |
-| ------------------------ | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| [`next`](./next)         | `@effect-trpc/next`     | route handler, RSC prefetch + hydration, server action, cookie session through all of them                                    |
-| [`start`](./start)       | `@effect-trpc/start`    | server route, isomorphic client, SSR loader prefetch + hydration, cookie session                                              |
-| [`electron`](./electron) | `@effect-trpc/electron` | server in the main process, `MessagePort` per window, one window per user (identified by `webContents.id`), sandboxed preload |
-| [`shared`](./shared)     | (none)                  | the task board itself: domain, handlers, UI, and the Playwright helpers the three suites share                                |
+| App                      | Adapter                | Shows                                                                                                                         |
+| ------------------------ | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| [`next`](./next)         | `@rpc-effect/next`     | route handler, RSC prefetch + hydration, server action, cookie session through all of them                                    |
+| [`start`](./start)       | `@rpc-effect/start`    | server route, isomorphic client, SSR loader prefetch + hydration, cookie session                                              |
+| [`electron`](./electron) | `@rpc-effect/electron` | server in the main process, `MessagePort` per window, one window per user (identified by `webContents.id`), sandboxed preload |
+| [`shared`](./shared)     | (none)                 | the task board itself: domain, handlers, UI, and the Playwright helpers the three suites share                                |
 
 ## The task board
 
@@ -50,14 +50,14 @@ one job per app.
 
 ## How `shared` is organised
 
-`@effect-trpc-examples/shared` is consumed from source (no build):
+`@rpc-effect-examples/shared` is consumed from source (no build):
 
-| Entry                                 | Contents                                                                                                   |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `@effect-trpc-examples/shared`        | `appRouter`, `Task`, `User`, the typed errors and the `Auth` middleware declaration (safe for browsers)    |
-| `@effect-trpc-examples/shared/server` | `makeServerLive({ resolveUser })` (handlers + `Auth`), `cookieUser`, the in-memory store                   |
-| `@effect-trpc-examples/shared/ui`     | the React components (`TaskList`, `TaskDetail`, `NewTaskForm`, `LiveFeed`, `SignedInAs`) and query options |
-| `@effect-trpc-examples/shared/e2e`    | `sharedScenarios`, the `TaskBoardPage` page object, `httpBoards`, `failOnConsoleErrors`, `resetData`       |
+| Entry                                | Contents                                                                                                   |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `@rpc-effect-examples/shared`        | `appRouter`, `Task`, `User`, the typed errors and the `Auth` middleware declaration (safe for browsers)    |
+| `@rpc-effect-examples/shared/server` | `makeServerLive({ resolveUser })` (handlers + `Auth`), `cookieUser`, the in-memory store                   |
+| `@rpc-effect-examples/shared/ui`     | the React components (`TaskList`, `TaskDetail`, `NewTaskForm`, `LiveFeed`, `SignedInAs`) and query options |
+| `@rpc-effect-examples/shared/e2e`    | `sharedScenarios`, the `TaskBoardPage` page object, `httpBoards`, `failOnConsoleErrors`, `resetData`       |
 
 An app only decides how a request names its user (`resolveUser`), how it wires the adapter, and how
 its routes render the shared components. `examples/shared` has its own Vitest tests (`pnpm -C

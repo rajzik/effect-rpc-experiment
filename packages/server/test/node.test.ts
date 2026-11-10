@@ -2,7 +2,7 @@ import { Cause, Effect, Exit, Fiber, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServer, HttpServerResponse } from 'effect/http';
 import { RpcSerialization } from 'effect/rpc';
 import { NodeHttpServer } from '@effect/platform-node';
-import { causeToClientError } from '@effect-trpc/core';
+import { causeToClientError } from '@rpc-effect/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test';
 import { layerHttp } from '../src/index.js';
 import { runServer } from '../src/node.js';

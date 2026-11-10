@@ -6,28 +6,28 @@ errors and context work (typed errors and services instead of `TRPCError` and `c
 
 ## Concepts
 
-| tRPC                                         | effect-trpc                                                                     |
-| -------------------------------------------- | ------------------------------------------------------------------------------- |
-| `initTRPC.create()`, `t.procedure`           | `query`, `mutation`, `subscription` from `@effect-trpc/core`                    |
-| `.input(zod)`                                | `payload: { … }` or a schema                                                    |
-| output inferred from the resolver            | `success` schema (encoded on the wire, decoded on the client)                   |
-| `throw new TRPCError({ code: 'NOT_FOUND' })` | `Effect.fail(new PostNotFound({ id }))`, declared in `error`                    |
-| `t.router({ … })`                            | `Router.make({ … })`                                                            |
-| resolvers inline in the router               | `Handlers.make(router, { … })` in a server-only module                          |
-| `createContext` + `ctx`                      | middleware that `provides` services; `Handlers.withContext`                     |
-| `createContext` reading `req`                | `HttpContext.request`, inside `withContext`'s effect or a handler               |
-| `ctx.res` headers, cookies, `responseMeta`   | `HttpContext.setHeader`, `appendHeader`, `setCookie` (no status)                |
-| `meta`, `.meta({ … })`                       | `.annotate(Key, value)`, read as `Context.get(rpc.annotations, Key)`            |
-| `onError({ error, path, input, ctx })`       | `onError({ path, cause, headers })` option of the adapters                      |
-| `t.middleware(…)`, `.use(…)`                 | `RpcMiddleware` + `.middleware(M)`                                              |
-| `createCallerFactory`                        | `createCaller(router, { handlers })`                                            |
-| fetch / standalone adapters                  | `toWebHandler`, `serve` / `runServer`                                           |
-| superjson transformer                        | nothing: Effect Schema encodes `Date`, classes, `BigInt`                        |
-| `createTRPCClient` + links                   | `createClient(router, { link })`                                                |
-| `httpBatchLink`                              | `httpBatchLink` (queries only)                                                  |
-| `TRPCClientError`, `error.data.code`         | `ClientError<E>`, narrow on `_tag`                                              |
-| `@trpc/tanstack-react-query`                 | `@effect-trpc/tanstack-react-query` ([differences](../react-query/differences)) |
-| `@trpc/next`, RSC helpers                    | `@effect-trpc/next`                                                             |
+| tRPC                                         | effect-trpc                                                                    |
+| -------------------------------------------- | ------------------------------------------------------------------------------ |
+| `initTRPC.create()`, `t.procedure`           | `query`, `mutation`, `subscription` from `@rpc-effect/core`                    |
+| `.input(zod)`                                | `payload: { … }` or a schema                                                   |
+| output inferred from the resolver            | `success` schema (encoded on the wire, decoded on the client)                  |
+| `throw new TRPCError({ code: 'NOT_FOUND' })` | `Effect.fail(new PostNotFound({ id }))`, declared in `error`                   |
+| `t.router({ … })`                            | `Router.make({ … })`                                                           |
+| resolvers inline in the router               | `Handlers.make(router, { … })` in a server-only module                         |
+| `createContext` + `ctx`                      | middleware that `provides` services; `Handlers.withContext`                    |
+| `createContext` reading `req`                | `HttpContext.request`, inside `withContext`'s effect or a handler              |
+| `ctx.res` headers, cookies, `responseMeta`   | `HttpContext.setHeader`, `appendHeader`, `setCookie` (no status)               |
+| `meta`, `.meta({ … })`                       | `.annotate(Key, value)`, read as `Context.get(rpc.annotations, Key)`           |
+| `onError({ error, path, input, ctx })`       | `onError({ path, cause, headers })` option of the adapters                     |
+| `t.middleware(…)`, `.use(…)`                 | `RpcMiddleware` + `.middleware(M)`                                             |
+| `createCallerFactory`                        | `createCaller(router, { handlers })`                                           |
+| fetch / standalone adapters                  | `toWebHandler`, `serve` / `runServer`                                          |
+| superjson transformer                        | nothing: Effect Schema encodes `Date`, classes, `BigInt`                       |
+| `createTRPCClient` + links                   | `createClient(router, { link })`                                               |
+| `httpBatchLink`                              | `httpBatchLink` (queries only)                                                 |
+| `TRPCClientError`, `error.data.code`         | `ClientError<E>`, narrow on `_tag`                                             |
+| `@trpc/tanstack-react-query`                 | `@rpc-effect/tanstack-react-query` ([differences](../react-query/differences)) |
+| `@trpc/next`, RSC helpers                    | `@rpc-effect/next`                                                             |
 
 ## Step by step
 

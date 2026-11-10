@@ -1,4 +1,4 @@
-# @effect-trpc/electron
+# @rpc-effect/electron
 
 Typed RPC between Electron's main process and its renderers for
 [effect-trpc](../../README.md) routers. Effect RPC runs over a `MessagePort` per renderer: the
@@ -30,19 +30,19 @@ satisfy. So it loads in a sandboxed renderer and in plain Node, where tests driv
 - A Node worker thread or another message-port peer should call (or serve) a router:
   `MessagePortServer` + `messagePortLink`.
 
-Use a sibling instead when the server is reachable over the network (`@effect-trpc/client`
-`httpLink` / `wsLink` with `@effect-trpc/server`), when you only need an in-process call
-(`createCaller` in `@effect-trpc/server`), or for tests against a real HTTP server
-(`@effect-trpc/test-utils`).
+Use a sibling instead when the server is reachable over the network (`@rpc-effect/client`
+`httpLink` / `wsLink` with `@rpc-effect/server`), when you only need an in-process call
+(`createCaller` in `@rpc-effect/server`), or for tests against a real HTTP server
+(`@rpc-effect/test-utils`).
 
 **Entry points**
 
-| Import path                      | Process               | Exports                                                                                                                         | Source                                                              |
-| -------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `@effect-trpc/electron/main`     | main                  | `MainRpcServer` (`run`, `layer`, `make`, `senderId`, `senderIdHeader`), `senderIdHeader`, `MessagePortServer`, `defaultChannel` | `src/main.ts` → `src/MainRpcServer.ts`, `src/MessagePortServer.ts`  |
-| `@effect-trpc/electron/preload`  | preload (no Effect)   | `installPreloadBridge`, `connectMessageType`, `defaultChannel`                                                                  | `src/preload.ts` → `src/PreloadBridge.ts`                           |
-| `@effect-trpc/electron/renderer` | renderer              | `rendererLink`, `messagePortLink`, `messagePortProtocolClient`, `connectMessageType`, `defaultChannel`                          | `src/renderer.ts` → `src/RendererLink.ts`, `src/MessagePortLink.ts` |
-| `@effect-trpc/electron`          | tests, workers, tools | everything above                                                                                                                | `src/index.ts`                                                      |
+| Import path                     | Process               | Exports                                                                                                                         | Source                                                              |
+| ------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `@rpc-effect/electron/main`     | main                  | `MainRpcServer` (`run`, `layer`, `make`, `senderId`, `senderIdHeader`), `senderIdHeader`, `MessagePortServer`, `defaultChannel` | `src/main.ts` → `src/MainRpcServer.ts`, `src/MessagePortServer.ts`  |
+| `@rpc-effect/electron/preload`  | preload (no Effect)   | `installPreloadBridge`, `connectMessageType`, `defaultChannel`                                                                  | `src/preload.ts` → `src/PreloadBridge.ts`                           |
+| `@rpc-effect/electron/renderer` | renderer              | `rendererLink`, `messagePortLink`, `messagePortProtocolClient`, `connectMessageType`, `defaultChannel`                          | `src/renderer.ts` → `src/RendererLink.ts`, `src/MessagePortLink.ts` |
+| `@rpc-effect/electron`          | tests, workers, tools | everything above                                                                                                                | `src/index.ts`                                                      |
 
 Every entry also exports the structural types it needs (`IpcMainLike`, `PortLike`, `WindowLike`, …)
 from `src/types.ts`.
@@ -56,7 +56,7 @@ from `src/types.ts`.
    `BrowserWindow` with `contextIsolation: true` and the preload script.
 3. `preload.ts`: `installPreloadBridge({ ipcRenderer })`. Nothing else, no `contextBridge`.
 4. `renderer.ts`: `createClient(appRouter, { link: rendererLink() })`, then use the client directly
-   or through `@effect-trpc/tanstack-react-query`.
+   or through `@rpc-effect/tanstack-react-query`.
 
 **Invariants**
 
@@ -79,7 +79,7 @@ from `src/types.ts`.
 - Don't expose `ipcRenderer` or an API with `contextBridge` → call `installPreloadBridge` in the
   preload; the page only posts a port to its own window.
 - Don't set `contextIsolation: false` → keep the default `true`.
-- Don't import `@effect-trpc/electron` or `/main` in the preload → import `/preload` (no Effect,
+- Don't import `@rpc-effect/electron` or `/main` in the preload → import `/preload` (no Effect,
   bundles small for `sandbox: true`).
 - Don't load the window before `await MainRpcServer.run(...)` → `ipcMain` drops ports posted
   before the listener exists, and calls fail with `RpcTransportError` after `connectTimeout`.
@@ -125,7 +125,7 @@ node scripts/verify-jsdoc.mjs electron
 ## Install
 
 ```sh
-pnpm add @effect-trpc/electron @effect-trpc/client @effect-trpc/server @effect-trpc/core effect
+pnpm add @rpc-effect/electron @rpc-effect/client @rpc-effect/server @rpc-effect/core effect
 ```
 
 ## Setup (three files)
@@ -136,7 +136,7 @@ handlers:
 ```ts
 // shared/router.ts
 import { Schema } from 'effect';
-import { query, Router, subscription } from '@effect-trpc/core';
+import { query, Router, subscription } from '@rpc-effect/core';
 
 export class User extends Schema.Class<User>('User')({ id: Schema.String, name: Schema.String }) {}
 export class NotFound extends Schema.TaggedError<NotFound>()('NotFound', { id: Schema.String }) {}
@@ -152,8 +152,8 @@ export const appRouter = Router.make({
 ```ts
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { Effect, Schedule, Stream } from 'effect';
-import { Handlers } from '@effect-trpc/server';
-import { MainRpcServer } from '@effect-trpc/electron/main';
+import { Handlers } from '@rpc-effect/server';
+import { MainRpcServer } from '@rpc-effect/electron/main';
 import { appRouter, NotFound, User } from './shared/router.js';
 
 const HandlersLive = Handlers.make(appRouter, {
@@ -194,7 +194,7 @@ app
 
 ```ts
 import { ipcRenderer } from 'electron';
-import { installPreloadBridge } from '@effect-trpc/electron/preload';
+import { installPreloadBridge } from '@rpc-effect/electron/preload';
 
 installPreloadBridge({ ipcRenderer });
 ```
@@ -202,8 +202,8 @@ installPreloadBridge({ ipcRenderer });
 **renderer.tsx**:
 
 ```tsx
-import { createClient } from '@effect-trpc/client';
-import { rendererLink } from '@effect-trpc/electron/renderer';
+import { createClient } from '@rpc-effect/client';
+import { rendererLink } from '@rpc-effect/electron/renderer';
 import { appRouter } from './shared/router.js';
 
 export const client = createClient(appRouter, { link: rendererLink() });
@@ -212,7 +212,7 @@ const user = await client.user.byId({ id: '1' }); // User instance, rejects with
 for await (const now of client.clock()) console.log(now); // subscription
 ```
 
-The client plugs into `@effect-trpc/tanstack-react-query` like any other link.
+The client plugs into `@rpc-effect/tanstack-react-query` like any other link.
 
 ## How it works
 
@@ -276,9 +276,9 @@ All of them accept `serialization` (default `RpcSerialization.json`). Binary ser
 
 ## Entry points
 
-| import                           | contents                                                                 |
-| -------------------------------- | ------------------------------------------------------------------------ |
-| `@effect-trpc/electron/main`     | `MainRpcServer`, `MessagePortServer`, main-process types                 |
-| `@effect-trpc/electron/preload`  | `installPreloadBridge` only (no Effect: small sandboxed preload bundles) |
-| `@effect-trpc/electron/renderer` | `rendererLink`, `messagePortLink`, `messagePortProtocolClient`           |
-| `@effect-trpc/electron`          | everything                                                               |
+| import                          | contents                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------ |
+| `@rpc-effect/electron/main`     | `MainRpcServer`, `MessagePortServer`, main-process types                 |
+| `@rpc-effect/electron/preload`  | `installPreloadBridge` only (no Effect: small sandboxed preload bundles) |
+| `@rpc-effect/electron/renderer` | `rendererLink`, `messagePortLink`, `messagePortProtocolClient`           |
+| `@rpc-effect/electron`          | everything                                                               |

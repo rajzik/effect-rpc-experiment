@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import { Effect, Queue, Schema, Stream } from 'effect';
 
 export class Post extends Schema.Class<Post>('Post')({

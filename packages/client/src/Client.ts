@@ -1,12 +1,12 @@
 /**
- * Creates typed clients for `@effect-trpc/core` routers: a tRPC-style Promise client and an
+ * Creates typed clients for `@rpc-effect/core` routers: a tRPC-style Promise client and an
  * Effect client (`client.$effect`).
  *
  * `createClient(router, { link })` returns a proxy mirroring the router record. Each call is
  * routed by the procedure's tag through the link's `effect/rpc` `RpcClient`; results are
  * decoded with the procedure's schemas, so `Schema.Class` values arrive as instances. Promise
- * calls reject with `ClientError<E>` (from `@effect-trpc/core`); Effect calls fail with
- * `E | RpcTransportError`. `@effect-trpc/tanstack-react-query` builds its query options on top of
+ * calls reject with `ClientError<E>` (from `@rpc-effect/core`); Effect calls fail with
+ * `E | RpcTransportError`. `@rpc-effect/tanstack-react-query` builds its query options on top of
  * this client.
  *
  * @since 0.1.0
@@ -17,14 +17,14 @@ import {
   Router,
   RpcInterrupted,
   RpcTransportError,
-} from '@effect-trpc/core';
+} from '@rpc-effect/core';
 import type {
   ClientError,
   inferError,
   inferOutput,
   ProcedureDef,
   ProcedureInfo,
-} from '@effect-trpc/core';
+} from '@rpc-effect/core';
 import { Context, Effect, Exit, Layer, ManagedRuntime, Option, Stream } from 'effect';
 import type { Schema, Scope } from 'effect';
 import { Headers } from 'effect/http';
@@ -41,7 +41,7 @@ import type { HeadersOption, Link } from './Link.js';
  * **Example** (Aborting a call and sending a trace header)
  *
  * ```ts
- * import type { ProcedureCallOptions } from '@effect-trpc/client';
+ * import type { ProcedureCallOptions } from '@rpc-effect/client';
  *
  * const controller = new AbortController();
  * const options: ProcedureCallOptions = {
@@ -99,8 +99,8 @@ export type inferClientInput<D extends ProcedureDef.Any> =
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
- * import type { inferClientError } from '@effect-trpc/client';
+ * import { query, Router } from '@rpc-effect/core';
+ * import type { inferClientError } from '@rpc-effect/client';
  *
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
  *   id: Schema.Number,
@@ -363,7 +363,7 @@ type AnyCall = (
 
 type AnyRpcClient = { readonly [tag: string]: AnyCall | undefined };
 
-const RpcClientService = Context.Service<AnyRpcClient>('@effect-trpc/client/RpcClient');
+const RpcClientService = Context.Service<AnyRpcClient>('@rpc-effect/client/RpcClient');
 
 interface Shared {
   readonly router: Router.Any;
@@ -657,7 +657,7 @@ const createClientFromInput = (
  * **Details**
  *
  * - `router` is a `Router.make` router or a router service class (see `RouterService` in
- *   `@effect-trpc/core`); a service is turned into its router with `Router.from` (its `make`
+ *   `@rpc-effect/core`); a service is turned into its router with `Router.from` (its `make`
  *   runs once per process). The client's type is then `Client<Router.Of<typeof AppRouter>>`.
  * - The link is connected lazily on the first call (once, shared by every call and by
  *   `withHeaders` clients) and kept until `client.dispose()`.
@@ -687,8 +687,8 @@ const createClientFromInput = (
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router, subscription } from '@effect-trpc/core';
- * import { createClient, httpLink, type Client } from '@effect-trpc/client';
+ * import { query, Router, subscription } from '@rpc-effect/core';
+ * import { createClient, httpLink, type Client } from '@rpc-effect/client';
  *
  * class Post extends Schema.Class<Post>('Post')({
  *   id: Schema.Number,
@@ -731,8 +731,8 @@ const createClientFromInput = (
  * import { Effect, Schema } from 'effect';
  * import { Headers } from 'effect/http';
  * import { RpcMiddleware } from 'effect/rpc';
- * import { query, Router } from '@effect-trpc/core';
- * import { createClient, httpLink } from '@effect-trpc/client';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { createClient, httpLink } from '@rpc-effect/client';
  *
  * class Unauthorized extends Schema.TaggedError<Unauthorized>()('Unauthorized', {}) {}
  * class Token extends RpcMiddleware.Service<Token>()('Token', {
@@ -758,8 +758,8 @@ const createClientFromInput = (
  *
  * ```ts
  * import { Context, Effect, Schema } from 'effect';
- * import { Procedure, Router } from '@effect-trpc/core';
- * import { createClient, httpLink, type Client } from '@effect-trpc/client';
+ * import { Procedure, Router } from '@rpc-effect/core';
+ * import { createClient, httpLink, type Client } from '@rpc-effect/client';
  *
  * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
  *   make: Effect.succeed({

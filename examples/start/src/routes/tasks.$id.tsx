@@ -1,4 +1,4 @@
-import { TaskDetail, taskDetailOptions } from '@effect-trpc-examples/shared/ui';
+import { TaskDetail, taskDetailOptions } from '@rpc-effect-examples/shared/ui';
 import { createFileRoute, Link } from '@tanstack/react-router';
 
 import { rpc, useRpc } from '../rpc/client';

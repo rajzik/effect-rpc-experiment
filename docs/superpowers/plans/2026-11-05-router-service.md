@@ -30,7 +30,7 @@ special cases.
   is a compile error at every entry point; an async `make` is a clear runtime error.
 - `make` is evaluated once per class per process (memoized), whichever APIs use it.
 - Package boundaries: `Procedure`, `Router.fromService`, `Router.isService` and the normalizer in
-  `@effect-trpc/core`; `Handlers.fromService`, `Handlers.fromProcedures` in `@effect-trpc/server`.
+  `@rpc-effect/core`; `Handlers.fromService`, `Handlers.fromProcedures` in `@rpc-effect/server`.
 - Names exactly: `Procedure`, `Router.fromService`, `Router.isService`, `Handlers.fromService`,
   `Handlers.fromProcedures`.
 - Repo rules (AGENTS.md): Effect-style JSDoc with compiling examples on every export; `.test-d.ts`

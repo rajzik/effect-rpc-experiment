@@ -1,5 +1,5 @@
 /**
- * The schema generator as a esbuild plugin (see `@effect-trpc/codegen/unplugin`).
+ * The schema generator as a esbuild plugin (see `@rpc-effect/codegen/unplugin`).
  *
  * @since 0.1.0
  */
@@ -26,7 +26,7 @@ import { unplugin } from './unplugin.js';
  *
  * ```ts
  * import { build } from 'esbuild';
- * import { effectTrpcCodegen } from '@effect-trpc/codegen/esbuild';
+ * import { effectTrpcCodegen } from '@rpc-effect/codegen/esbuild';
  *
  * await build({
  *   entryPoints: ['src/main.ts'],

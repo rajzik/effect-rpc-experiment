@@ -1,7 +1,7 @@
 // Type tests: Next.js route handler compatibility, server action input/output/error types.
-import { Procedure, Router } from '@effect-trpc/core';
-import type { ClientError, RpcDefect, RpcInterrupted, RpcTransportError } from '@effect-trpc/core';
-import { Handlers } from '@effect-trpc/server';
+import { Procedure, Router } from '@rpc-effect/core';
+import type { ClientError, RpcDefect, RpcInterrupted, RpcTransportError } from '@rpc-effect/core';
+import { Handlers } from '@rpc-effect/server';
 import { Context, Effect, Schema } from 'effect';
 import type { Exit } from 'effect';
 import type { NextRequest } from 'next/server.js'; // NodeNext ESM: next has no `exports` map

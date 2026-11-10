@@ -1,6 +1,6 @@
-import type { Client } from '@effect-trpc/client';
-import type { Router } from '@effect-trpc/core';
-import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import type { Client } from '@rpc-effect/client';
+import type { Router } from '@rpc-effect/core';
+import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { describe, expectTypeOf, it } from 'vite-plus/test';
 import {

@@ -1,5 +1,5 @@
 /**
- * `@effect-trpc/start` — TanStack Start integration: a server route handler, an isomorphic client
+ * `@rpc-effect/start` — TanStack Start integration: a server route handler, an isomorphic client
  * and loader / hydration helpers for TanStack Query.
  *
  * Server-only: `createStartHandler` (`src/routes/api/rpc.$.ts`) and `createServerClient`

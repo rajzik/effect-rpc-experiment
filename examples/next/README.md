@@ -1,6 +1,6 @@
 # Next.js example
 
-The task board on Next.js (App Router) with `@effect-trpc/next`. The session is an httpOnly
+The task board on Next.js (App Router) with `@rpc-effect/next`. The session is an httpOnly
 `session` cookie set by `/sign-in?user=<name>`.
 
 ## What it demonstrates
@@ -13,7 +13,7 @@ The task board on Next.js (App Router) with `@effect-trpc/next`. The session is 
 - **Server action**: `app/actions.ts` wraps `createServerActionCaller`; `app/board.tsx` submits new
   tasks through it with `useServerAction`, and a guest gets the typed `Forbidden` back.
 - **Shared components**: `app/board.tsx` and `app/tasks/[id]/page.tsx` render
-  `@effect-trpc-examples/shared/ui`.
+  `@rpc-effect-examples/shared/ui`.
 
 ## Files worth reading
 

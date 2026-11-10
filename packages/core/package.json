@@ -1,5 +1,5 @@
 {
-  "name": "@effect-trpc/core",
+  "name": "@rpc-effect/core",
   "version": "0.0.0",
   "files": [
     "dist"

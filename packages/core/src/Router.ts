@@ -2,8 +2,8 @@
  * Compiles nested records of procedure definitions into a tRPC-style `Router`.
  *
  * A router is a thin, frozen wrapper around an `effect/rpc` `RpcGroup` whose tags are the
- * dot-joined record paths (`"post.byId"`). `@effect-trpc/server` implements `router.group`,
- * `@effect-trpc/client` builds a nested proxy from `router.procedures`, and the type helpers here
+ * dot-joined record paths (`"post.byId"`). `@rpc-effect/server` implements `router.group`,
+ * `@rpc-effect/client` builds a nested proxy from `router.procedures`, and the type helpers here
  * (`inferRouterInputs`, `Router.Paths`, ...) give tRPC-style inference over the whole tree.
  *
  * A router can also be written as an Effect `Context.Service` whose `make` returns the record (a
@@ -23,10 +23,10 @@ import { Procedure, withInferredSchemas } from './ProcedureBuilder.js';
 import type { ProcedureWithHandler } from './ProcedureBuilder.js';
 import type { ProcedureKind } from './ProcedureKind.js';
 
-const TypeId = '~@effect-trpc/core/Router' as const;
+const TypeId = '~@rpc-effect/core/Router' as const;
 
 /** The static key of the schemas `Router.withSchemas` sets on the router service it returns. */
-const SchemasTypeId = '~@effect-trpc/core/Router/schemas' as const;
+const SchemasTypeId = '~@rpc-effect/core/Router/schemas' as const;
 
 /** Router keys that would break proxy-based clients (thenable detection, `Function.prototype`). */
 const reservedKeys: ReadonlySet<string> = new Set(['then', 'call', 'apply']);
@@ -44,7 +44,7 @@ const reservedKeys: ReadonlySet<string> = new Set(['then', 'call', 'apply']);
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { mutation, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -86,8 +86,8 @@ export interface ProcedureInfo {
  * **When to use**
  *
  * Create one with {@link Router.make} and export its type for clients
- * (`export type AppRouter = typeof appRouter`). Pass the router itself to `@effect-trpc/server`
- * (`Handlers.make`, `createCaller`, `toWebHandler`) and `@effect-trpc/client` (`createClient`).
+ * (`export type AppRouter = typeof appRouter`). Pass the router itself to `@rpc-effect/server`
+ * (`Handlers.make`, `createCaller`, `toWebHandler`) and `@rpc-effect/client` (`createClient`).
  *
  * **Details**
  *
@@ -99,7 +99,7 @@ export interface ProcedureInfo {
  *
  * ```ts
  * import { Effect, Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  *
@@ -346,8 +346,8 @@ export declare namespace Router {
  *
  * ```ts
  * import { Context, Effect, Schema } from 'effect';
- * import { Procedure, Router } from '@effect-trpc/core';
- * import type { RouterService } from '@effect-trpc/core';
+ * import { Procedure, Router } from '@rpc-effect/core';
+ * import type { RouterService } from '@rpc-effect/core';
  *
  * export class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
  *   make: Effect.succeed({
@@ -498,12 +498,12 @@ type MapRouter<Rec, F extends 'input' | 'output' | 'error'> = {
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { mutation, query, Router } from '@rpc-effect/core';
  * import type {
  *   inferRouterErrors,
  *   inferRouterInputs,
  *   inferRouterOutputs,
- * } from '@effect-trpc/core';
+ * } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -536,12 +536,12 @@ export type inferRouterInputs<R> = MapRouter<RecordOf<R>, 'input'>;
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { mutation, query, Router } from '@rpc-effect/core';
  * import type {
  *   inferRouterErrors,
  *   inferRouterInputs,
  *   inferRouterOutputs,
- * } from '@effect-trpc/core';
+ * } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -573,12 +573,12 @@ export type inferRouterOutputs<R> = MapRouter<RecordOf<R>, 'output'>;
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { mutation, query, Router } from '@rpc-effect/core';
  * import type {
  *   inferRouterErrors,
  *   inferRouterInputs,
  *   inferRouterOutputs,
- * } from '@effect-trpc/core';
+ * } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -623,7 +623,7 @@ type RpcsOf<Rec, Prefix extends string> = {
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { mutation, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -673,7 +673,7 @@ const isPlainRecord = (u: unknown): u is AnyServiceShape => {
  *
  * ```ts
  * import { Context, Effect, Schema } from 'effect';
- * import { Procedure, Router } from '@effect-trpc/core';
+ * import { Procedure, Router } from '@rpc-effect/core';
  *
  * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
  *   make: Effect.succeed({
@@ -843,7 +843,7 @@ const resolve = (record: AnyServiceShape, builder: Builder): Effect.Effect<Route
  *
  * ```ts
  * import { Context, Effect, Schema } from 'effect';
- * import { Procedure, Router } from '@effect-trpc/core';
+ * import { Procedure, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  *
@@ -879,7 +879,7 @@ const fromService = <S extends RouterService.Pure>(service: S): Router.Of<S> =>
  *
  * Use for a router service whose `make` reads services (a {@link RouterService.Any} that is not
  * {@link RouterService.Pure}), which {@link fromService} cannot build synchronously.
- * `Handlers.fromService` (from `@effect-trpc/server`) calls it for you; call it yourself when you
+ * `Handlers.fromService` (from `@rpc-effect/server`) calls it for you; call it yourself when you
  * provide the services and need the router or the service value.
  *
  * **Details**
@@ -901,7 +901,7 @@ const fromService = <S extends RouterService.Pure>(service: S): Router.Of<S> =>
  *
  * ```ts
  * import { Context, Effect, Schema } from 'effect';
- * import { Procedure, Router } from '@effect-trpc/core';
+ * import { Procedure, Router } from '@rpc-effect/core';
  *
  * class Database extends Context.Service<
  *   Database,
@@ -964,7 +964,7 @@ const buildService = <S extends RouterService.Any>(
  *
  * ```ts
  * import { Context, Effect, Schema } from 'effect';
- * import { Procedure, query, Router } from '@effect-trpc/core';
+ * import { Procedure, query, Router } from '@rpc-effect/core';
  *
  * class AppRouter extends Context.Service<AppRouter>()('AppRouter', {
  *   make: Effect.succeed({
@@ -1106,7 +1106,7 @@ const compile = (record: Router.Shape): Router<Router.Shape> => {
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { mutation, query, Router, subscription } from '@effect-trpc/core';
+ * import { mutation, query, Router, subscription } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -1181,7 +1181,7 @@ const patchRecord = (
 
 /**
  * Overlays the given schemas on the inferred procedures of a router or router service: the
- * module the schema generator (`@effect-trpc/codegen`) writes for a router written without
+ * module the schema generator (`@rpc-effect/codegen`) writes for a router written without
  * `.output` / `.error`.
  *
  * **When to use**
@@ -1212,8 +1212,8 @@ const patchRecord = (
  *
  * ```ts
  * import { Context, Effect, Schema } from 'effect';
- * import { Procedure, Router } from '@effect-trpc/core';
- * import type { inferOutput } from '@effect-trpc/core';
+ * import { Procedure, Router } from '@rpc-effect/core';
+ * import type { inferOutput } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Finite, title: Schema.String }) {}
  *
@@ -1274,7 +1274,7 @@ const withSchemas: {
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  *
  * const healthRouter = Router.make({ health: query({ success: Schema.Literal('ok') }) });
  * const postRouter = Router.make({ post: { count: query({ success: Schema.Number }) } });
@@ -1316,7 +1316,7 @@ const merge = <A extends Router.Shape, B extends Router.Shape>(
  *
  * ```ts
  * import { Option, Schema } from 'effect';
- * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { mutation, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -1364,7 +1364,7 @@ const getByPath = (
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { Codecs, mutation, query, Router } from '@effect-trpc/core';
+ * import { Codecs, mutation, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {
@@ -1429,7 +1429,7 @@ const declaredPaths = (router: Router.Any): ReadonlySet<string> => {
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  *
  * const appRouter = Router.make({ post: { byId: query({ success: Schema.String }) } });
  *
@@ -1494,7 +1494,7 @@ const introspectionKeys: ReadonlySet<string> = new Set([
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { query, Router } from '@effect-trpc/core';
+ * import { query, Router } from '@rpc-effect/core';
  *
  * const appRouter = Router.make({
  *   toJSON: query({ success: Schema.String }),
@@ -1549,7 +1549,7 @@ const childPath = (
  *
  * ```ts
  * import { Schema } from 'effect';
- * import { mutation, query, Router } from '@effect-trpc/core';
+ * import { mutation, query, Router } from '@rpc-effect/core';
  *
  * class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
  * class PostNotFound extends Schema.TaggedError<PostNotFound>()('PostNotFound', {

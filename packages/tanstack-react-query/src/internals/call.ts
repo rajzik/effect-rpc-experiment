@@ -6,7 +6,7 @@
  *
  * @since 0.1.0
  */
-import type { ProcedureCallOptions } from '@effect-trpc/client';
+import type { ProcedureCallOptions } from '@rpc-effect/client';
 
 /**
  * Calls the procedure at `path` with the Promise client: queries and mutations return a

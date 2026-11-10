@@ -1,5 +1,5 @@
 // trpc/server.tsx — import 'server-only' at the top in your app.
-import { createRscHelpers } from '@effect-trpc/next';
+import { createRscHelpers } from '@rpc-effect/next';
 import { headers } from 'next/headers';
 
 import { appRouter } from '@/router';

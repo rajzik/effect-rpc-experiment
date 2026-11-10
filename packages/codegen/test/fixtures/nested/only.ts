@@ -1,6 +1,6 @@
 // The module's only router service: its make returns nested plain records, no top-level procedure.
 import { Context, Effect, Schema } from 'effect';
-import { Procedure } from '@effect-trpc/core';
+import { Procedure } from '@rpc-effect/core';
 
 export class NestedRouter extends Context.Service<NestedRouter>()('NestedRouter', {
   make: Effect.succeed({

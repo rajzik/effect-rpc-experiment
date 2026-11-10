@@ -1,7 +1,7 @@
 // A miniature TanStack Start app, written like the README (and like the files the Start / Router
 // generator produces), wired with real `@tanstack/react-router` APIs. Used by `readme.test.ts`
 // and `start.test-d.tsx`.
-import type { ClientError } from '@effect-trpc/client';
+import type { ClientError } from '@rpc-effect/client';
 import {
   QueryClientProvider,
   useQuery,
@@ -79,10 +79,10 @@ export const describeError = (error: ClientError<PostNotFound>): string => {
   switch (error._tag) {
     case 'PostNotFound':
       return `No post #${error.id}`;
-    case '@effect-trpc/RpcDefect':
-    case '@effect-trpc/RpcTransportError':
+    case '@rpc-effect/RpcDefect':
+    case '@rpc-effect/RpcTransportError':
       return error.message;
-    case '@effect-trpc/RpcInterrupted':
+    case '@rpc-effect/RpcInterrupted':
       return 'Cancelled';
     default:
       return absurd(error);

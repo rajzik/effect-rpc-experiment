@@ -1,7 +1,7 @@
 'use client';
 /** One task's page: its details, or the typed error when it does not exist. */
 import { useQuery } from '@tanstack/react-query';
-import type { RpcOptionsProxy } from '@effect-trpc/tanstack-react-query';
+import type { RpcOptionsProxy } from '@rpc-effect/tanstack-react-query';
 
 import type { AppRouter } from '../domain';
 import { ErrorAlert } from './errors';

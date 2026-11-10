@@ -1,7 +1,7 @@
 import { Effect, Stream } from 'effect';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
 import type { MessagePort } from 'node:worker_threads';
-import { createClient, RpcDefect, RpcInterrupted, RpcTransportError } from '@effect-trpc/client';
+import { createClient, RpcDefect, RpcInterrupted, RpcTransportError } from '@rpc-effect/client';
 import { MainRpcServer, rendererLink } from '../src/index.js';
 import { FakeWindow, makeIpcRenderer, MessageChannel, openPorts, tick } from './fakes.js';
 import { appRouter, createdAt, NotFound, User } from './fixtures.js';

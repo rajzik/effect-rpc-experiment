@@ -67,7 +67,7 @@ function source(file) {
 
 /** Resolves a relative module specifier (`./X.js`) from `fromFile` to a `.ts`/`.tsx` file. */
 function resolveModule(fromFile, specifier) {
-  const workspace = /^@effect-trpc\/([^/]+)(?:\/(.+))?$/.exec(specifier);
+  const workspace = /^@rpc-effect\/([^/]+)(?:\/(.+))?$/.exec(specifier);
   if (workspace) {
     return resolveModule(
       join(packagesDir, workspace[1], 'src', 'x.ts'),
@@ -104,7 +104,7 @@ function entryExports(entryFile) {
   const reExport = /export\s+(type\s+)?\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/g;
   for (const m of text.matchAll(reExport)) {
     // Third-party re-exports (`skipToken` from @tanstack/react-query) are listed, not documented.
-    const external = /^(\.|@effect-trpc\/)/.test(m[3]) ? undefined : m[3];
+    const external = /^(\.|@rpc-effect\/)/.test(m[3]) ? undefined : m[3];
     const file = external ? entryFile : resolveModule(entryFile, m[3]);
     for (const raw of m[2].split(',')) {
       const part = raw
@@ -147,7 +147,7 @@ function importsOf(file) {
   const text = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const out = [];
   for (const m of text.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/g)) {
-    if (!/^(\.|@effect-trpc\/)/.test(m[2])) continue;
+    if (!/^(\.|@rpc-effect\/)/.test(m[2])) continue;
     const from = resolveModule(file, m[2]);
     for (const raw of m[1].split(',')) {
       const part = raw.trim().replace(/^type\s+/, '');
@@ -343,7 +343,7 @@ function itemOf(entry) {
   const { decls } = source(entry.file);
   const own = decls.filter((d) => d.name === entry.original && d.depth === 0);
   if (own.length === 0) {
-    // A barrel re-exporting another barrel (`export { ClientError } from '@effect-trpc/core'`).
+    // A barrel re-exporting another barrel (`export { ClientError } from '@rpc-effect/core'`).
     // Or a module re-exporting a name it imported (`import type { ErrorAt } from './types.js'`).
     const next =
       entryExports(entry.file).find((e) => e.name === entry.original) ??

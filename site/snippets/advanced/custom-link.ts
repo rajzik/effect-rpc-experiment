@@ -1,7 +1,7 @@
 import { Effect, Layer, Schedule } from 'effect';
 import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http';
 import { RpcClient, RpcSerialization } from 'effect/rpc';
-import { createClient, Link } from '@effect-trpc/client';
+import { createClient, Link } from '@rpc-effect/client';
 
 import { appRouter } from '@/router';
 

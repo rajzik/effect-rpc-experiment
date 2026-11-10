@@ -24,9 +24,9 @@ describe('ClientError', () => {
   });
 
   it('infrastructure errors have literal tags', () => {
-    expectTypeOf<RpcDefect['_tag']>().toEqualTypeOf<'@effect-trpc/RpcDefect'>();
-    expectTypeOf<RpcTransportError['_tag']>().toEqualTypeOf<'@effect-trpc/RpcTransportError'>();
-    expectTypeOf<RpcInterrupted['_tag']>().toEqualTypeOf<'@effect-trpc/RpcInterrupted'>();
+    expectTypeOf<RpcDefect['_tag']>().toEqualTypeOf<'@rpc-effect/RpcDefect'>();
+    expectTypeOf<RpcTransportError['_tag']>().toEqualTypeOf<'@rpc-effect/RpcTransportError'>();
+    expectTypeOf<RpcInterrupted['_tag']>().toEqualTypeOf<'@rpc-effect/RpcInterrupted'>();
     expectTypeOf<RpcDefect['message']>().toEqualTypeOf<string>();
   });
 

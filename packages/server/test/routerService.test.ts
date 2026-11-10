@@ -2,7 +2,7 @@ import { Cause, Context, Effect, Exit, Layer, Schema, Stream } from 'effect';
 import { FetchHttpClient, HttpRouter, HttpServer } from 'effect/http';
 import { RpcClient, RpcSerialization } from 'effect/rpc';
 import { NodeHttpServer } from '@effect/platform-node';
-import { Procedure, query, Router } from '@effect-trpc/core';
+import { Procedure, query, Router } from '@rpc-effect/core';
 import { describe, expect, it } from 'vite-plus/test';
 import { createCaller, Handlers, layerHttp, toWebHandler } from '../src/index.js';
 import { runServer } from '../src/node.js';

@@ -1,11 +1,11 @@
 /**
- * Serves `@effect-trpc/core` routers with Effect v4: handlers, HTTP adapters, an in-process
+ * Serves `@rpc-effect/core` routers with Effect v4: handlers, HTTP adapters, an in-process
  * caller and middleware.
  *
  * Implement a router with `Handlers.make`, merge in the `Middleware` implementations, then serve
  * the layer with `toWebHandler` (fetch runtimes), `layerHttp` (Effect HTTP apps) or
- * `@effect-trpc/server/node` (`serve` / `runServer`), or call it in-process with `createCaller`.
- * Clients come from `@effect-trpc/client`.
+ * `@rpc-effect/server/node` (`serve` / `runServer`), or call it in-process with `createCaller`.
+ * Clients come from `@rpc-effect/client`.
  *
  * @since 0.1.0
  */

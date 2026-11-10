@@ -1,4 +1,4 @@
-# @effect-trpc/core
+# @rpc-effect/core
 
 tRPC-style routers and procedures for [Effect](https://effect.website) v4, compiled to a plain
 [`effect/rpc`](https://effect.website) `RpcGroup`. This package holds the shared, transport-free
@@ -24,8 +24,8 @@ pieces of effect-trpc:
   `Schema.Class` and `Schema.TaggedError` instances survive any JSON boundary (SSR hydration,
   server actions, caches).
 
-Servers, clients and the TanStack Query bridge live in `@effect-trpc/server`,
-`@effect-trpc/client` and `@effect-trpc/tanstack-react-query`.
+Servers, clients and the TanStack Query bridge live in `@rpc-effect/server`,
+`@rpc-effect/client` and `@rpc-effect/tanstack-react-query`.
 
 ## For AI agents
 
@@ -39,30 +39,30 @@ Servers, clients and the TanStack Query bridge live in `@effect-trpc/server`,
 - you need the client error model (`ClientError<E>`, `causeToClientError`) or JSON codecs
   (`Codecs`) for a compiled rpc, without any transport.
 
-Use a sibling instead to serve a router (`@effect-trpc/server`: `Handlers.make`, `toWebHandler`,
-`createCaller`, `@effect-trpc/server/node`), to call one (`@effect-trpc/client`: `createClient`
-with `httpLink`), for React Query (`@effect-trpc/tanstack-react-query`) or for test harnesses
-(`@effect-trpc/test-utils`).
+Use a sibling instead to serve a router (`@rpc-effect/server`: `Handlers.make`, `toWebHandler`,
+`createCaller`, `@rpc-effect/server/node`), to call one (`@rpc-effect/client`: `createClient`
+with `httpLink`), for React Query (`@rpc-effect/tanstack-react-query`) or for test harnesses
+(`@rpc-effect/test-utils`).
 
 **Entry points**
 
-| Import path         | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Source                                   |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `@effect-trpc/core` | `query`, `mutation`, `subscription`, `isProcedureDef`, `ProcedureDef`, `PayloadInput`, `NormalizePayload`, `inferInput` / `inferOutput` / `inferError` / `inferKind`                                                                                                                                                                                                                                                                                     | `src/Procedure.ts`                       |
-| `@effect-trpc/core` | `Procedure` (`input`, `output`, `error`, `inferred`, `middleware`, `annotate`, `query`, `mutation`, `subscription`, `hasHandler`; types `Procedure.HandlerContext`, `Procedure.HandlerRequirements`, `Procedure.Builder`, `Procedure.Infer`, `Procedure.InferredSuccess`), `ProcedureWithHandler`                                                                                                                                                        | `src/ProcedureBuilder.ts`                |
-| `@effect-trpc/core` | `Router` (`make`, `merge`, `from`, `fromService`, `buildService`, `getByPath`, `getRpc`, `isPath`, `childPath`, `isRouter`, `isService`; types `Router.Input`, `Router.Of`, `Router.Shape`, `Router.ServiceShape`), `RouterService` (`RouterService.Any`, `RouterService.Pure`, `RouterService.MakeError`, `RouterService.MakeServices`, `RouterService.WithSchemas`), `ProcedureInfo`, `inferRouterInputs` / `inferRouterOutputs` / `inferRouterErrors` | `src/Router.ts`                          |
-| `@effect-trpc/core` | `ProcedureKind` (annotation key + `"query" \| "mutation" \| "subscription"` type)                                                                                                                                                                                                                                                                                                                                                                        | `src/ProcedureKind.ts`                   |
-| `@effect-trpc/core` | `HttpContext` (`request`, `setHeader`, `appendHeader`, `setCookie`)                                                                                                                                                                                                                                                                                                                                                                                      | `src/HttpContext.ts`                     |
-| `@effect-trpc/core` | `ClientError`, `ClientInfrastructureError`, `RpcDefect`, `RpcTransportError`, `RpcInterrupted`, `causeToClientError`, `exitToClientError`, guards                                                                                                                                                                                                                                                                                                        | `src/ClientError.ts`                     |
-| `@effect-trpc/core` | `Codecs` namespace (`payload`, `success`, `error`, `exit`, `encode*Sync` / `decode*Sync`)                                                                                                                                                                                                                                                                                                                                                                | `src/Codecs.ts` (barrel: `src/index.ts`) |
+| Import path        | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Source                                   |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `@rpc-effect/core` | `query`, `mutation`, `subscription`, `isProcedureDef`, `ProcedureDef`, `PayloadInput`, `NormalizePayload`, `inferInput` / `inferOutput` / `inferError` / `inferKind`                                                                                                                                                                                                                                                                                     | `src/Procedure.ts`                       |
+| `@rpc-effect/core` | `Procedure` (`input`, `output`, `error`, `inferred`, `middleware`, `annotate`, `query`, `mutation`, `subscription`, `hasHandler`; types `Procedure.HandlerContext`, `Procedure.HandlerRequirements`, `Procedure.Builder`, `Procedure.Infer`, `Procedure.InferredSuccess`), `ProcedureWithHandler`                                                                                                                                                        | `src/ProcedureBuilder.ts`                |
+| `@rpc-effect/core` | `Router` (`make`, `merge`, `from`, `fromService`, `buildService`, `getByPath`, `getRpc`, `isPath`, `childPath`, `isRouter`, `isService`; types `Router.Input`, `Router.Of`, `Router.Shape`, `Router.ServiceShape`), `RouterService` (`RouterService.Any`, `RouterService.Pure`, `RouterService.MakeError`, `RouterService.MakeServices`, `RouterService.WithSchemas`), `ProcedureInfo`, `inferRouterInputs` / `inferRouterOutputs` / `inferRouterErrors` | `src/Router.ts`                          |
+| `@rpc-effect/core` | `ProcedureKind` (annotation key + `"query" \| "mutation" \| "subscription"` type)                                                                                                                                                                                                                                                                                                                                                                        | `src/ProcedureKind.ts`                   |
+| `@rpc-effect/core` | `HttpContext` (`request`, `setHeader`, `appendHeader`, `setCookie`)                                                                                                                                                                                                                                                                                                                                                                                      | `src/HttpContext.ts`                     |
+| `@rpc-effect/core` | `ClientError`, `ClientInfrastructureError`, `RpcDefect`, `RpcTransportError`, `RpcInterrupted`, `causeToClientError`, `exitToClientError`, guards                                                                                                                                                                                                                                                                                                        | `src/ClientError.ts`                     |
+| `@rpc-effect/core` | `Codecs` namespace (`payload`, `success`, `error`, `exit`, `encode*Sync` / `decode*Sync`)                                                                                                                                                                                                                                                                                                                                                                | `src/Codecs.ts` (barrel: `src/index.ts`) |
 
 **Golden path** — define a router, implement `router.group` with plain `effect/rpc`, classify
-failures (apps normally use `@effect-trpc/server` + `@effect-trpc/client` for the last two steps):
+failures (apps normally use `@rpc-effect/server` + `@rpc-effect/client` for the last two steps):
 
 ```ts
 import { Effect, Exit, Schema } from 'effect';
 import { RpcTest } from 'effect/rpc';
-import { causeToClientError, isClientInfrastructureError, query, Router } from '@effect-trpc/core';
+import { causeToClientError, isClientInfrastructureError, query, Router } from '@rpc-effect/core';
 
 // Domain data is a Schema.Class, typed errors are Schema.TaggedError classes.
 class Post extends Schema.Class<Post>('Post')({ id: Schema.Number, title: Schema.String }) {}
@@ -100,7 +100,7 @@ console.log(await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(H
 **Invariants**
 
 - Typed errors are `Schema.TaggedError` classes (discriminated by `_tag`); domain data is `Schema.Class`.
-- `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; infrastructure tags are `@effect-trpc/RpcDefect`, `@effect-trpc/RpcTransportError`, `@effect-trpc/RpcInterrupted`.
+- `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; infrastructure tags are `@rpc-effect/RpcDefect`, `@rpc-effect/RpcTransportError`, `@rpc-effect/RpcInterrupted`.
 - A declared failure reaches the client as the same class instance; it is never wrapped in an infrastructure error.
 - `causeToClientError` precedence: typed failure > defect (`RpcDefect`) > interruption (`RpcInterrupted`); `Fail(RpcClientError)` → `RpcTransportError`.
 - Tags are the record paths joined by `"."`; keys are non-empty, contain no `"."` and are not `then`, `call` or `apply` (`Router.make` throws).
@@ -112,7 +112,7 @@ console.log(await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(H
 - `Router.withSchemas(source, schemas)` re-creates the named procedures with handlers with the given `{ output?, error? }` (the source is unchanged); unknown paths and schema-only definitions are compile errors and throw `no procedure "<path>"` / `"<path>" has no handler` if forced. Over a router it returns a router (serve with `Handlers.fromProcedures`). Over a router service (pure or effectful) it returns a router service with the **same key and `make`** (its value is the source's) whose router gets the schemas when it is built: nothing runs at the call, and a forced stale path throws when it is built (serve with `Handlers.fromService`; `Router.from(wrapped)` for a pure one).
 - Without `.output(...)` a builder is in **inference mode**: `inferOutput` is the handler's success type (the success schema type is `Schema.declare<A>`, or `Schema.Void` for `void`), and the handler may fail with anything unless `.error(...)` was set. The runtime output schema stays `Schema.Void`: a handler value other than `undefined` dies with a defect naming the fix, until the schema generator writes `.inferred({ output, error })` into a generated copy of the router. `.inferred` sets the schemas, keeps the output checked and lets undeclared failures through (they reach the client as `RpcDefect`); it is what `Router.withSchemas` applies, not for hand-written code.
 - `.middleware(M)` on a builder procedure and `router.middleware(M)` keep the handler (value and type); `query({...})` definitions have no `handler` key (`Procedure.hasHandler` is `false`).
-- A router service's `make` is an `Effect` **value**. When it is `Effect<Record, never, never>` the service satisfies `RouterService.Pure` and every API takes the class. A `make` that reads services or may fail is only a `RouterService.Any`: it is a compile error at `Router.from`, `Router.fromService`, `Router.make` and every API taking `Router.Input` (`createClient`, `toWebHandler`, `serve`, `createCaller`, adapters, the test harness); those take the contract (a schema-only `Router.make` router, normally `router.client.gen.ts`) and the class is served with `Handlers.fromService` (`@effect-trpc/server`), which builds it with `Router.buildService`. Forcing the class, or a `make` that is asynchronous or fails, throws `Cannot build a router from the router service "<key>": make must be synchronous, read no services and not fail: give this API the contract (router.client.gen.ts) and serve the class with Handlers.fromService`, with the Effect failure as `cause`. Errors in the record itself (a stale `Router.withSchemas` path, an invalid key, a service that nests itself) throw their own message.
+- A router service's `make` is an `Effect` **value**. When it is `Effect<Record, never, never>` the service satisfies `RouterService.Pure` and every API takes the class. A `make` that reads services or may fail is only a `RouterService.Any`: it is a compile error at `Router.from`, `Router.fromService`, `Router.make` and every API taking `Router.Input` (`createClient`, `toWebHandler`, `serve`, `createCaller`, adapters, the test harness); those take the contract (a schema-only `Router.make` router, normally `router.client.gen.ts`) and the class is served with `Handlers.fromService` (`@rpc-effect/server`), which builds it with `Router.buildService`. Forcing the class, or a `make` that is asynchronous or fails, throws `Cannot build a router from the router service "<key>": make must be synchronous, read no services and not fail: give this API the contract (router.client.gen.ts) and serve the class with Handlers.fromService`, with the Effect failure as `cause`. Errors in the record itself (a stale `Router.withSchemas` path, an invalid key, a service that nests itself) throw their own message.
 - `Router.fromService` is memoized per class: `make` runs once per process, and `Router.from`, `Router.fromService` and `Router.make({ x: Svc })` all return the same router for `Svc`.
 - `Router.make` has two overloads: a service-free `Router.Shape` record returns `Router<Rec>` (unchanged, so generic code over `Rec extends Router.Shape` keeps compiling); a `Router.ServiceShape` record (router services at any depth) returns the router with the services resolved.
 - `Router.make` resolves router-service entries (at any depth of plain records, and inside a service's own `make`) to routers: `router.record` and its type hold an ordinary nested router there. Records without services are stored as-is.
@@ -144,7 +144,7 @@ console.log(await Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(H
 - Don't branch on "router or service" in your own adapter → call `Router.from(input)` once at the entry.
 - Don't set headers or cookies per element of a subscription → each call registers a response hook that lives as long as the stream; set them once, before the first element (later ones are dropped with `ndjson`).
 - Don't use `appendHeader('set-cookie', …)` → `setCookie`.
-- Don't expect `HttpContext.request` to be `Some` under `createCaller` / `localLink` → handle `None`; it is `Some` only behind the HTTP adapters of `@effect-trpc/server`.
+- Don't expect `HttpContext.request` to be `Some` under `createCaller` / `localLink` → handle `None`; it is `Some` only behind the HTTP adapters of `@rpc-effect/server`.
 - Don't read `.annotate` values on the client or from a codegen client router → they are server-side metadata for middleware (`rpc.annotations`).
 
 **Where to look**
@@ -176,7 +176,7 @@ node scripts/verify-jsdoc.mjs core
 ## Install
 
 ```bash
-pnpm add @effect-trpc/core effect
+pnpm add @rpc-effect/core effect
 ```
 
 ## Defining a router
@@ -184,8 +184,8 @@ pnpm add @effect-trpc/core effect
 ```ts
 import { Effect, Schema, Stream } from 'effect';
 import { RpcMiddleware } from 'effect/rpc';
-import { mutation, query, Router, subscription } from '@effect-trpc/core';
-import type { inferError, inferInput, inferOutput } from '@effect-trpc/core';
+import { mutation, query, Router, subscription } from '@rpc-effect/core';
+import type { inferError, inferInput, inferOutput } from '@rpc-effect/core';
 
 // Output: a Schema.Class — clients receive real instances (methods, Date fields).
 export class Post extends Schema.Class<Post>('Post')({
@@ -256,7 +256,7 @@ const HandlersLive = appRouter.group.toLayer({
 const AuthLive = Layer.succeed(Auth)(Auth.of((effect) => effect));
 ```
 
-(`@effect-trpc/server` adds nested handler records, HTTP/fetch adapters and an in-process caller.)
+(`@rpc-effect/server` adds nested handler records, HTTP/fetch adapters and an in-process caller.)
 
 ### Procedures with handlers (`Procedure`)
 
@@ -266,7 +266,7 @@ is optional and returns a new, frozen builder; the terminal (`query`, `mutation`
 
 ```ts
 import { Context, Effect, Schema, Stream } from 'effect';
-import { Procedure, Router } from '@effect-trpc/core';
+import { Procedure, Router } from '@rpc-effect/core';
 
 class Database extends Context.Service<
   Database,
@@ -331,7 +331,7 @@ type ById = inferOutput<typeof inferredRouter.record.byId>; // Post
 ```
 
 The types are only half of it: the schemas that send a `Post` (and decode `PostNotFound` on the
-client) come from [`@effect-trpc/codegen`](../codegen/README.md), which reads the handler types
+client) come from [`@rpc-effect/codegen`](../codegen/README.md), which reads the handler types
 with the TypeScript 7 checker and writes `router.gen.ts` (`Router.withSchemas(router, { byId:
 { output: Post, error: PostNotFound } })`: serve it) and `router.client.gen.ts` (the schema-only
 contract: give it to clients). Without them, a handler value other than `undefined` dies with a
@@ -353,8 +353,8 @@ is served with `Handlers.fromService`; sync APIs take its contract, see below). 
 
 ```ts
 import { Context, Effect, Schema } from 'effect';
-import { Procedure, query, Router } from '@effect-trpc/core';
-import type { inferRouterInputs } from '@effect-trpc/core';
+import { Procedure, query, Router } from '@rpc-effect/core';
+import type { inferRouterInputs } from '@rpc-effect/core';
 
 export class AdminRouter extends Context.Service<AdminRouter>()('AdminRouter', {
   make: Effect.succeed({ count: Procedure.output(Schema.Finite).query(() => Effect.succeed(1)) }),
@@ -431,7 +431,7 @@ it from the compiled rpc:
 ```ts
 import { Context, Effect, Layer, Schema } from 'effect';
 import { RpcMiddleware } from 'effect/rpc';
-import { Procedure, query, Router } from '@effect-trpc/core';
+import { Procedure, query, Router } from '@rpc-effect/core';
 
 class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {}) {}
 class CurrentUser extends Context.Service<CurrentUser, { readonly roles: ReadonlyArray<string> }>()(
@@ -478,7 +478,7 @@ calls do nothing:
 
 ```ts
 import { Effect, Option, Schema } from 'effect';
-import { HttpContext, Procedure, Router } from '@effect-trpc/core';
+import { HttpContext, Procedure, Router } from '@rpc-effect/core';
 
 export const appRouter = Router.make({
   login: Procedure.input({ token: Schema.String }).mutation(({ token }) =>
@@ -506,7 +506,7 @@ Gotchas: with `ndjson` (the default) headers and cookies apply only if set befor
 chunk (the `Exit` of a query or mutation, the first element of a subscription), so set them once and
 up front, not per stream element; calls batched into one HTTP request share one response; over
 WebSocket the setters do nothing; an invalid header or cookie is a defect everywhere. In
-`@effect-trpc/server`, `Handlers.withContext` adds services computed per call and the HTTP adapters
+`@rpc-effect/server`, `Handlers.withContext` adds services computed per call and the HTTP adapters
 take an `onError` option.
 
 ## The ClientError model
@@ -517,12 +517,12 @@ A client call for a procedure with error type `E` can fail with exactly:
 type ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted;
 ```
 
-| Error               | `_tag`                           | When                                                                             |
-| ------------------- | -------------------------------- | -------------------------------------------------------------------------------- |
-| `E`                 | your tags                        | the handler failed with a declared error — the **same instance** (decoded class) |
-| `RpcDefect`         | `@effect-trpc/RpcDefect`         | the handler died / threw, or a response could not be decoded (`cause` = defect)  |
-| `RpcTransportError` | `@effect-trpc/RpcTransportError` | network / HTTP / protocol failure (`cause` = the `effect/rpc` `RpcClientError`)  |
-| `RpcInterrupted`    | `@effect-trpc/RpcInterrupted`    | the call was aborted or interrupted                                              |
+| Error               | `_tag`                          | When                                                                             |
+| ------------------- | ------------------------------- | -------------------------------------------------------------------------------- |
+| `E`                 | your tags                       | the handler failed with a declared error — the **same instance** (decoded class) |
+| `RpcDefect`         | `@rpc-effect/RpcDefect`         | the handler died / threw, or a response could not be decoded (`cause` = defect)  |
+| `RpcTransportError` | `@rpc-effect/RpcTransportError` | network / HTTP / protocol failure (`cause` = the `effect/rpc` `RpcClientError`)  |
+| `RpcInterrupted`    | `@rpc-effect/RpcInterrupted`    | the call was aborted or interrupted                                              |
 
 Domain errors are never disguised as infrastructure errors and vice versa. All three
 infrastructure errors are `Schema.TaggedError`s (their `cause` uses `Schema.Defect`), so they can
@@ -531,7 +531,7 @@ be serialized too.
 ```ts
 import { Exit } from 'effect';
 import { RpcTest } from 'effect/rpc';
-import { causeToClientError, isClientInfrastructureError } from '@effect-trpc/core';
+import { causeToClientError, isClientInfrastructureError } from '@rpc-effect/core';
 
 const program = Effect.gen(function* () {
   const client = yield* RpcTest.makeClient(appRouter.group); // in-memory client
@@ -561,7 +561,7 @@ await Effect.runPromise(
 `Codecs` derives `Schema.toCodecJson` codecs from a compiled rpc (memoized per rpc):
 
 ```ts
-import { Codecs, Router } from '@effect-trpc/core';
+import { Codecs, Router } from '@rpc-effect/core';
 
 const rpc = Router.getRpc(appRouter, 'post.byId'); // Rpc<"post.byId", ...>
 

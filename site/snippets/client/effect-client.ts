@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Schedule, Stream } from 'effect';
-import { createClient, httpLink, type Client } from '@effect-trpc/client';
-import { RpcTransportError } from '@effect-trpc/core';
+import { createClient, httpLink, type Client } from '@rpc-effect/client';
+import { RpcTransportError } from '@rpc-effect/core';
 
 import { appRouter, type AppRouter } from '@/router';
 

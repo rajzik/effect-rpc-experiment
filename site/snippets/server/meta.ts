@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Schema } from 'effect';
-import { Procedure, query, Router } from '@effect-trpc/core';
-import { createCaller, Handlers, Middleware } from '@effect-trpc/server';
+import { Procedure, query, Router } from '@rpc-effect/core';
+import { createCaller, Handlers, Middleware } from '@rpc-effect/server';
 
 // #region declare
 class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {}) {}

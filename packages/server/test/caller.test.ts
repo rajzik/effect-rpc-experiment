@@ -1,5 +1,5 @@
 import { Effect, Exit, Fiber, Layer, Schema, Stream } from 'effect';
-import { query, Router, RpcDefect, RpcInterrupted } from '@effect-trpc/core';
+import { query, Router, RpcDefect, RpcInterrupted } from '@rpc-effect/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test';
 import { createCaller, Handlers } from '../src/index.js';
 import type { Caller } from '../src/index.js';
