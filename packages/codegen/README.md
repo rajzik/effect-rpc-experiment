@@ -180,8 +180,9 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
   `router.client.gen.ts` there and serve the class from `router.gen.ts` with `Handlers.fromService`.
 - Using a value declared in `make` (`const cfg = yield* AppConfig`, or a local schema) inside a
   schema: reported as `<name> is declared in make`; declare the schema at module level.
-- A recursive type that is not an exported interface / type alias: the hoisted declaration needs
-  its name (`declare it as an exported interface or type`).
+- A recursive type that is not an exported interface / type alias, or an anonymous object type
+  argument of a generic one (`Tree<{ id: number }>`): the hoisted declaration needs its name
+  (`declare it as an exported interface or type`).
 - Building router records dynamically (spreads, function calls): the generator reads the router
   statically and reports `cannot read this router entry statically`.
 - A schema class its package does not export from any import path (an internal module of a
