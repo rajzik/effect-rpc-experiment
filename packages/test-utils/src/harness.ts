@@ -15,7 +15,14 @@ import type { Client } from '@rpc-effect/client';
 import { createCaller, toWebHandler } from '@rpc-effect/server';
 import type { Caller, WebHandler } from '@rpc-effect/server';
 import { runServer } from '@rpc-effect/server/node';
-import { callerLayer, DEFAULT_PATH, makeHttpClient, onceDispose, toRequest } from './internal.js';
+import {
+  callerLayer,
+  DEFAULT_PATH,
+  makeHttpClient,
+  onceDispose,
+  releaseOnThrow,
+  toRequest,
+} from './internal.js';
 import type { TestFetch, TestHarnessOptions } from './internal.js';
 
 /**
@@ -258,9 +265,15 @@ const testServerAndClientFor = async <R extends Router.Any, LE = never>(
     if (web.status === 'rejected') throw web.reason;
   }
   const { url, port } = server.value;
-  const client = makeHttpClient(router, url, options);
-  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `handlers` / `middleware` options accept any layer error
-  const caller = createCaller(router, { handlers: callerLayer(options) });
+  const client = await releaseOnThrow(
+    () => makeHttpClient(router, url, options),
+    onceDispose([web.value.dispose, server.value.dispose]),
+  );
+  const caller = await releaseOnThrow(
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- the public `handlers` / `middleware` options accept any layer error
+    () => createCaller(router, { handlers: callerLayer(options) }),
+    onceDispose([client.dispose, web.value.dispose, server.value.dispose]),
+  );
   const handler = web.value.handler;
   const dispose = onceDispose([
     client.dispose,
@@ -309,7 +322,8 @@ const testServerAndClientFromInput = (
  * - `ctx.fetch` accepts a `Request` or `(url, init)`; relative urls resolve against `ctx.url`.
  * - Each adapter (server, web handler, caller) builds the handler layer separately.
  * - If the server or web handler fails to start, whichever half started is disposed and the
- *   first failure is rethrown.
+ *   first failure is rethrown. If the client or caller cannot be created (a reserved top-level
+ *   key), everything already started is disposed and that error is rethrown.
  *
  * **Gotchas**
  *
@@ -478,7 +492,10 @@ const testWebHandlerFor = async <R extends Router.Any, LE = never>(
   });
   const url = `http://localhost${path}`;
   const fetch: TestFetch = (input, init) => web.handler(toRequest(url, input, init));
-  const client = makeHttpClient(router, url, options, fetch);
+  const client = await releaseOnThrow(
+    () => makeHttpClient(router, url, options, fetch),
+    web.dispose,
+  );
   const dispose = onceDispose([client.dispose, web.dispose]);
   return {
     handler: web.handler,
@@ -515,6 +532,8 @@ const testWebHandlerFromInput = (
  * - `url` is the virtual `http://localhost<path>` (default `http://localhost/rpc`).
  * - `handler` is the raw `Request` → `Response` function; `fetch` resolves relative urls
  *   against `url` before calling it.
+ * - If the client cannot be created (a reserved top-level key), the web handler is disposed and
+ *   that error is rethrown.
  *
  * **Example** (Testing over the fetch handler)
  *
