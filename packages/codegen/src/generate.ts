@@ -1016,7 +1016,11 @@ const findRouters = (ctx: Ctx, sf: SourceFile, errors: Array<string>): Array<Fou
 // --- Copying schema expressions for the client module -------------------------------------
 
 /** Copies an expression of the router module into the client module, with what it references. */
-const copyExpression = (gen: ModuleGen, expr: Node, copied: Map<string, string>): string => {
+const copyExpression = (
+  gen: ModuleGen,
+  expr: Node,
+  copied: Map<string, { readonly pos: number; readonly text: string }>,
+): string => {
   const { checker } = gen.ctx;
   const sf = expr.getSourceFile();
   const start = expr.getStart(sf);
@@ -1096,9 +1100,9 @@ const copyExpression = (gen: ModuleGen, expr: Node, copied: Map<string, string>)
       decl.initializer !== undefined
     ) {
       if (copied.has(identifier.text)) return;
-      copied.set(identifier.text, ''); // reserve (cycles)
+      copied.set(identifier.text, { pos: decl.pos, text: '' }); // reserve (cycles)
       const text = copyExpression(gen, decl.initializer, copied);
-      copied.set(identifier.text, `const ${identifier.text} = ${text};`);
+      copied.set(identifier.text, { pos: decl.pos, text: `const ${identifier.text} = ${text};` });
       return;
     }
     if (isClassDeclaration(decl))
@@ -1133,7 +1137,7 @@ const emitModules = (
   const server = newModule(ctx, sf, 'server');
   const client = newModule(ctx, sf, 'client');
   const reports: Array<ProcedureReport> = [];
-  const copied = new Map<string, string>();
+  const copied = new Map<string, { readonly pos: number; readonly text: string }>();
   const startErrors = errors.length;
 
   const fail = (node: Node, error: unknown): void => {
@@ -1329,7 +1333,12 @@ const emitModules = (
       '// The client contract: schemas only, no handlers and no import of the router module.',
     client.imports.render(),
     '',
-    ...[...copied.values()].filter((v) => v !== ''),
+    // The router module's order, which its checker accepted: each declaration follows what it
+    // reads when it is created (a cycle reads lazily, through `Schema.suspend`).
+    ...[...copied.values()]
+      .filter((v) => v.text !== '')
+      .toSorted((a, b) => a.pos - b.pos)
+      .map((v) => v.text),
     ...client.hoisted,
     ...(copied.size + client.hoisted.length > 0 ? [''] : []),
     ...clientExports,
