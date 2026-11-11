@@ -67,6 +67,9 @@ hydration that keeps `Schema.Class` / `TaggedError` instances.
 - Typed failures and defects are encoded in the response `Exit` with status `200`.
 - `rpc(queryClient)` is memoized per `QueryClient`; `RpcProvider` needs `client` and
   `queryClient` props (and `keyPrefix` with the `{ keyPrefix: true }` flag).
+- `hydration.routerOptions` payload `{ queryState, otherState }`: only the rpc queries are
+  Schema-encoded into the `queryState` JSON string; other queries and mutations go unchanged to
+  Start's serializer.
 - Relative browser-client urls are resolved with `getBaseUrl()`: `serverOrigin` → `PUBLIC_URL` /
   `URL` → `https://$VERCEL_URL` → `http://localhost:$PORT` on the server.
 - `router` is a `Router.Input` (a `Router.make` router or a router service class); types use
@@ -105,7 +108,8 @@ hydration that keeps `Schema.Class` / `TaggedError` instances.
 - Clients (`isServer` switching, `httpLink`, subscriptions, SSR url resolution):
   `test/client.test.ts`.
 - Helpers (loader `ensureQueryData`, typed errors, dehydrate/hydrate, infinite queries,
-  `keyPrefix`): `test/helpers.test.ts`.
+  `keyPrefix`): `test/helpers.test.ts`; `routerOptions` with non-rpc queries:
+  `test/routerOptions.test.ts`.
 - Router services (`typeof AppRouter`) in every function: `test/routerService.test.ts` /
   `test/routerService.test-d.ts`.
 - This README wired with real `@tanstack/react-router` objects (`router.load()` → `dehydrate` →
@@ -285,7 +289,8 @@ your rpc router:
 - `hydrate` decodes it back into instances. Methods still work, `createdAt` is a `Date`, and a
   failed query's error is a `PostNotFound`.
 
-Queries with other keys are passed through unchanged.
+Queries with other keys are passed through unchanged to Start's own serializer, so their `Date`
+or `bigint` values survive.
 
 The payload covers what the loaders put in the cache (the `ensureQueryData` pattern below). If
 you also want the ssr-query integration (for example to stream queries started during render),

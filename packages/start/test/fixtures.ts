@@ -156,16 +156,19 @@ export const exitOf = (frames: ReadonlyArray<Frame>): unknown =>
 export const tagOf = (value: unknown): unknown =>
   typeof value === 'object' && value !== null && '_tag' in value ? value._tag : undefined;
 
-/** Parses a JSON payload of the router's SSR hand-off (`{ queryState: string }`). */
-export const parseRouterPayload = (json: string): { readonly queryState: string } => {
+/** Parses a JSON payload of the router's SSR hand-off (`{ queryState: string, otherState }`). */
+export const parseRouterPayload = (
+  json: string,
+): { readonly queryState: string; readonly otherState: unknown } => {
   const payload: unknown = JSON.parse(json);
   if (
     typeof payload !== 'object' ||
     payload === null ||
     !('queryState' in payload) ||
-    typeof payload.queryState !== 'string'
+    typeof payload.queryState !== 'string' ||
+    !('otherState' in payload)
   ) {
     throw new Error(`not a router payload: ${json}`);
   }
-  return { queryState: payload.queryState };
+  return { queryState: payload.queryState, otherState: payload.otherState };
 };
