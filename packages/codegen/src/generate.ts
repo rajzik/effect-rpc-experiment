@@ -310,57 +310,6 @@ const membersOf = (type: Type): ReadonlyArray<Type> =>
 const isBool = (ctx: Ctx, type: Type): boolean =>
   /^(true|false)$/.test(ctx.checker.typeToString(type));
 
-/** Imports of one generated module, keyed by module specifier. */
-class Imports {
-  private readonly named = new Map<string, Map<string, string>>(); // spec -> local -> imported
-  private readonly typeNamed = new Map<string, Map<string, string>>();
-  private readonly namespaces = new Map<string, string>(); // spec -> local
-  private readonly defaults = new Map<string, string>();
-
-  add(spec: string, imported: string, local: string, typeOnly = false): void {
-    const table = typeOnly ? this.typeNamed : this.named;
-    const entries = table.get(spec) ?? new Map<string, string>();
-    entries.set(local, imported);
-    table.set(spec, entries);
-  }
-  addNamespace(spec: string, local: string): void {
-    this.namespaces.set(spec, local);
-  }
-  addDefault(spec: string, local: string): void {
-    this.defaults.set(spec, local);
-  }
-  render(): string {
-    const lines: Array<string> = [];
-    const specs = new Set([
-      ...this.named.keys(),
-      ...this.typeNamed.keys(),
-      ...this.namespaces.keys(),
-      ...this.defaults.keys(),
-    ]);
-    for (const spec of [...specs].toSorted()) {
-      const ns = this.namespaces.get(spec);
-      if (ns !== undefined) lines.push(`import * as ${ns} from '${spec}';`);
-      const def = this.defaults.get(spec);
-      const named = [...(this.named.get(spec) ?? new Map<string, string>())]
-        .toSorted(([a], [b]) => a.localeCompare(b))
-        .map(([local, imported]) => (local === imported ? local : `${imported} as ${local}`));
-      if (def !== undefined || named.length > 0) {
-        const parts = [def, named.length > 0 ? `{ ${named.join(', ')} }` : undefined].filter(
-          (p) => p !== undefined,
-        );
-        lines.push(`import ${parts.join(', ')} from '${spec}';`);
-      }
-      const typeNamed = [...(this.typeNamed.get(spec) ?? new Map<string, string>())]
-        .filter(([local]) => !(this.named.get(spec)?.has(local) ?? false))
-        .toSorted(([a], [b]) => a.localeCompare(b))
-        .map(([local, imported]) => (local === imported ? local : `${imported} as ${local}`));
-      if (typeNamed.length > 0)
-        lines.push(`import type { ${typeNamed.join(', ')} } from '${spec}';`);
-    }
-    return lines.join('\n');
-  }
-}
-
 /** The extension style of a module's relative imports (`.ts`, `.js` or none). */
 const extensionStyle = (sf: SourceFile): string => {
   for (const statement of sf.statements) {
@@ -409,114 +358,328 @@ const findImportOf = (
   return undefined;
 };
 
+/**
+ * Everything one generated module references, and the local names it uses: its imports, the
+ * symbols it imports (values and type-only), and the declarations of the router module it copies
+ * (the client module). Imported symbols and hoisted recursive schemas share one name counter.
+ */
+class References {
+  private readonly named = new Map<string, Map<string, string>>(); // spec -> local -> imported
+  private readonly typeNamed = new Map<string, Map<string, string>>();
+  private readonly namespaces = new Map<string, string>(); // spec -> local
+  private readonly defaults = new Map<string, string>();
+  /** Imported symbols (symbol id -> local name), as values and type-only. */
+  private readonly aliases = new Map<number, string>();
+  private readonly typeAliases = new Map<number, string>();
+  /** Bindings of copied expressions (declaration or import -> local name); names are unique. */
+  private readonly bindings = new Map<string, string>();
+  /** Copied declarations (local name -> source position and text; `''` while being copied). */
+  private readonly copied = new Map<string, { readonly pos: number; readonly text: string }>();
+  private counter = 0;
+  private readonly ctx: Ctx;
+  private readonly routerFile: SourceFile;
+  private readonly side: 'server' | 'client';
+  private readonly outDir: string;
+  private readonly ext: string;
+
+  constructor(ctx: Ctx, routerFile: SourceFile, side: 'server' | 'client') {
+    this.ctx = ctx;
+    this.routerFile = routerFile;
+    this.side = side;
+    this.outDir = path.dirname(routerFile.fileName);
+    this.ext = extensionStyle(routerFile);
+  }
+
+  /** A fresh name (`__i0`, `__r1`, ...). */
+  name(prefix: string): string {
+    return `${prefix}${this.counter++}`;
+  }
+
+  /** A reference to a declared symbol (a schema class, or a named type) from the generated module. */
+  symbol(symbol: TsSymbol, typeOnly: boolean): string {
+    const aliases = typeOnly ? this.typeAliases : this.aliases;
+    const cached = aliases.get(symbol.id);
+    if (cached !== undefined) return cached;
+    const local = this.name('__i');
+    const { spec, imported } = this.importOf(symbol);
+    this.add(spec, imported, local, typeOnly);
+    aliases.set(symbol.id, local);
+    return local;
+  }
+
+  /** `name` of `@rpc-effect/core` (a procedure constructor), as `__name`. */
+  core(name: string): string {
+    const local = `__${name}`;
+    this.add('@rpc-effect/core', name, local);
+    return local;
+  }
+
+  /** The router module's export `name`: the server module imports the router module only here. */
+  source(name: string): string {
+    const local = `__source_${name}`;
+    this.add(relativeSpec(this.outDir, this.routerFile.fileName, this.ext), name, local);
+    return local;
+  }
+
+  /** The type of the server module's export `name` (the client module's contract check). */
+  serverType(name: string): string {
+    const local = `__Server_${name}`;
+    const base = path.basename(this.routerFile.fileName).replace(/\.[cm]?tsx?$/, '');
+    this.add(`./${base}.gen${this.ext}`, name, local, true);
+    return local;
+  }
+
+  /** Copies an expression of the router module into the client module, with what it references. */
+  copy(expr: Node): string {
+    const { checker, program, project } = this.ctx;
+    const sf = expr.getSourceFile();
+    const start = expr.getStart(sf);
+    const end = expr.end;
+    const renames: Array<readonly [number, number, string]> = [];
+    /** The local name of a binding (`key`): its own, unless a different binding already has it. */
+    const bind = (key: string, identifier: Node & { readonly text: string }): string => {
+      let name = this.bindings.get(key);
+      if (name === undefined) {
+        const taken = new Set(this.bindings.values());
+        name = identifier.text;
+        for (let n = 2; taken.has(name); n++) name = `${identifier.text}_${n}`;
+        this.bindings.set(key, name);
+      }
+      if (name !== identifier.text) renames.push([identifier.getStart(sf), identifier.end, name]);
+      return name;
+    };
+    const visit = (node: Node): void => {
+      if (isPropertyAccessExpression(node)) {
+        visit(node.expression);
+        return;
+      }
+      if (isPropertyAssignment(node)) {
+        visit(node.initializer);
+        return;
+      }
+      if (isIdentifier(node)) {
+        resolveIdentifier(node);
+        return;
+      }
+      node.forEachChild((child) => {
+        visit(child);
+      });
+    };
+    const resolveIdentifier = (identifier: Node & { readonly text: string }): void => {
+      const symbol = checker.getSymbolAtLocation(identifier);
+      if (symbol === undefined) return;
+      const decl = symbol.declarations[0]?.resolve(project);
+      if (decl === undefined) return;
+      const declSf = decl.getSourceFile();
+      if (
+        program.isSourceFileDefaultLibrary(declSf) ||
+        program.isSourceFileFromExternalLibrary(declSf)
+      ) {
+        if (!(symbol.flags & SymbolFlags.Alias)) return;
+      }
+      // Declared inside the copied expression (a parameter, a local): nothing to bring along.
+      if (declSf.fileName === sf.fileName && decl.pos >= start && decl.end <= end) return;
+      if (isInMake(decl))
+        throw new Unmappable(
+          `${identifier.text} is declared in make: schemas must not depend on values declared in make (declare the schema at module level)`,
+        );
+      if (isImportSpecifier(decl) || isImportClause(decl) || isNamespaceImport(decl)) {
+        let importDecl: Node = decl;
+        while (!isImportDeclaration(importDecl)) importDecl = importDecl.parent;
+        if (!isStringLiteral(importDecl.moduleSpecifier)) return;
+        const written = importDecl.moduleSpecifier.text;
+        const fromDir = path.dirname(declSf.fileName);
+        const spec = this.respec(written, fromDir);
+        if (
+          written.startsWith('.') &&
+          path.resolve(fromDir, written).replace(/\.[cm]?[jt]sx?$/, '.ts') ===
+            this.routerFile.fileName
+        )
+          throw new Unmappable(
+            `${identifier.text} comes from the router module: move it to a module the client can import`,
+          );
+        if (isNamespaceImport(decl))
+          this.namespaces.set(spec, bind(`${spec} * ${identifier.text}`, identifier));
+        else if (isImportClause(decl))
+          this.defaults.set(spec, bind(`${spec} default ${identifier.text}`, identifier));
+        else {
+          const imported =
+            decl.propertyName !== undefined &&
+            (isIdentifier(decl.propertyName) || isStringLiteral(decl.propertyName))
+              ? decl.propertyName.text
+              : decl.name.text;
+          this.add(spec, imported, bind(`${spec} {${imported}} ${identifier.text}`, identifier));
+        }
+        return;
+      }
+      if (
+        isVariableDeclaration(decl) &&
+        isVariableStatement(decl.parent.parent) &&
+        decl.initializer !== undefined
+      ) {
+        const name = bind(`${declSf.fileName}:${decl.pos}`, identifier);
+        if (this.copied.has(name)) return;
+        this.copied.set(name, { pos: decl.pos, text: '' }); // reserve (cycles)
+        const text = this.copy(decl.initializer);
+        this.copied.set(name, { pos: decl.pos, text: `const ${name} = ${text};` });
+        return;
+      }
+      if (isClassDeclaration(decl))
+        throw new Unmappable(
+          `${identifier.text} is a class declared next to the router: move it to a module the client can import`,
+        );
+      throw new Unmappable(`cannot copy ${identifier.text} into the client module`);
+    };
+    visit(expr);
+    let text = '';
+    let at = start;
+    for (const [from, to, name] of renames) {
+      text += sf.text.slice(at, from) + name;
+      at = to;
+    }
+    return text + sf.text.slice(at, end);
+  }
+
+  /**
+   * The module's imports (by module specifier), then the copied declarations and `hoisted` (the
+   * recursive schemas), then a blank line when there are any.
+   */
+  render(hoisted: ReadonlyArray<string>): Array<string> {
+    this.add('@rpc-effect/core', 'Router', '__Router');
+    this.add('effect', 'Schema', S);
+    const lines: Array<string> = [];
+    const specs = new Set([
+      ...this.named.keys(),
+      ...this.typeNamed.keys(),
+      ...this.namespaces.keys(),
+      ...this.defaults.keys(),
+    ]);
+    for (const spec of [...specs].toSorted()) {
+      const ns = this.namespaces.get(spec);
+      if (ns !== undefined) lines.push(`import * as ${ns} from '${spec}';`);
+      const def = this.defaults.get(spec);
+      const named = [...(this.named.get(spec) ?? new Map<string, string>())]
+        .toSorted(([a], [b]) => a.localeCompare(b))
+        .map(([local, imported]) => (local === imported ? local : `${imported} as ${local}`));
+      if (def !== undefined || named.length > 0) {
+        const parts = [def, named.length > 0 ? `{ ${named.join(', ')} }` : undefined].filter(
+          (p) => p !== undefined,
+        );
+        lines.push(`import ${parts.join(', ')} from '${spec}';`);
+      }
+      const typeNamed = [...(this.typeNamed.get(spec) ?? new Map<string, string>())]
+        .filter(([local]) => !(this.named.get(spec)?.has(local) ?? false))
+        .toSorted(([a], [b]) => a.localeCompare(b))
+        .map(([local, imported]) => (local === imported ? local : `${imported} as ${local}`));
+      if (typeNamed.length > 0)
+        lines.push(`import type { ${typeNamed.join(', ')} } from '${spec}';`);
+    }
+    return [
+      lines.join('\n'),
+      '',
+      // The router module's order, which its checker accepted: each declaration follows what it
+      // reads when it is created (a cycle reads lazily, through `Schema.suspend`).
+      ...[...this.copied.values()]
+        .filter((v) => v.text !== '')
+        .toSorted((a, b) => a.pos - b.pos)
+        .map((v) => v.text),
+      ...hoisted,
+      ...(this.copied.size + hoisted.length > 0 ? [''] : []),
+    ];
+  }
+
+  private add(spec: string, imported: string, local: string, typeOnly = false): void {
+    const table = typeOnly ? this.typeNamed : this.named;
+    const entries = table.get(spec) ?? new Map<string, string>();
+    entries.set(local, imported);
+    table.set(spec, entries);
+  }
+
+  /** A module specifier written in a module of `fromDir`, as the generated module writes it. */
+  private respec(spec: string, fromDir: string): string {
+    return spec.startsWith('.')
+      ? relativeSpec(
+          this.outDir,
+          path.resolve(fromDir, spec),
+          spec.match(/\.[cm]?[jt]sx?$/)?.[0] ?? '',
+        )
+      : spec;
+  }
+
+  /**
+   * Where the generated module imports a symbol from: the router module's own import of it, else
+   * its package import, else (the same package) its declaring module.
+   */
+  private importOf(symbol: TsSymbol): { readonly spec: string; readonly imported: string } {
+    const { checker, program, cwd } = this.ctx;
+    const found = findImportOf(this.ctx, this.routerFile, symbol);
+    if (found !== undefined)
+      return { spec: this.respec(found.spec, this.outDir), imported: found.imported };
+    const decl = symbol.valueDeclaration ?? symbol.declarations[0];
+    const declFile = decl === undefined ? undefined : program.getSourceFile(decl.path);
+    if (declFile === undefined)
+      throw new Unmappable(`cannot locate the declaration of ${symbol.name}`);
+    const fromPackage = this.packageImportOf(symbol);
+    if (fromPackage !== undefined) return fromPackage;
+    if (declFile.fileName.includes(`${path.sep}node_modules${path.sep}`))
+      throw new Unmappable(
+        `${symbol.name} is not exported by its package (no import path reaches it): import it in the router module`,
+      );
+    if (this.side === 'client' && declFile.fileName === this.routerFile.fileName)
+      throw new Unmappable(
+        `${symbol.name} is declared in the router module: move it to a module the client can import`,
+      );
+    const fileSymbol = checker.getSymbolAtLocation(declFile);
+    const exported =
+      fileSymbol !== undefined &&
+      checker.getExportsOfModule(fileSymbol).some((s) => s.name === symbol.name);
+    if (!exported)
+      throw new Unmappable(
+        `${symbol.name} is not exported from ${path.relative(cwd, declFile.fileName)}`,
+      );
+    return { spec: relativeSpec(this.outDir, declFile.fileName, this.ext), imported: symbol.name };
+  }
+
+  /**
+   * The package import of a symbol declared in another package (a workspace package or a
+   * `node_modules` dependency), as the checker would write it in the router module: it follows
+   * symlinks back to the package name, `exports` subpaths, barrels and tsconfig `paths`, exactly
+   * like declaration emit. `undefined` when the checker names it relatively (same package) or not
+   * at all.
+   */
+  private packageImportOf(
+    symbol: TsSymbol,
+  ): { readonly spec: string; readonly imported: string } | undefined {
+    const { checker } = this.ctx;
+    const type = checker.getDeclaredTypeOfSymbol(symbol);
+    const text = checker.typeToString(type, this.routerFile, NodeBuilderFlags.NoTruncation);
+    const match = /^import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)(?:<.*)?$/s.exec(text);
+    const spec = match?.[1];
+    const imported = match?.[2];
+    if (spec === undefined || imported === undefined) return undefined;
+    if (spec.startsWith('.') || path.isAbsolute(spec)) return undefined;
+    return { spec, imported };
+  }
+}
+
 interface ModuleGen {
   readonly ctx: Ctx;
   readonly routerFile: SourceFile;
-  readonly outDir: string;
-  readonly ext: string;
-  readonly side: 'server' | 'client';
-  readonly imports: Imports;
+  readonly refs: References;
   readonly hoisted: Array<string>;
-  readonly aliases: Map<number, string>;
-  readonly counter: { next: number };
   readonly recursion: Map<number, { name: string; used: boolean; typeRef: string }>;
   /** Recursive types already hoisted (type id -> declaration name): each is declared once. */
   readonly hoistedNames: Map<number, string>;
-  /** Type-only imports already added (symbol id -> local name). */
-  readonly typeAliases: Map<number, string>;
-  /** Bindings of copied expressions (declaration or import -> local name); names are unique. */
-  readonly bindings: Map<string, string>;
 }
 
 const newModule = (ctx: Ctx, routerFile: SourceFile, side: 'server' | 'client'): ModuleGen => ({
   ctx,
   routerFile,
-  outDir: path.dirname(routerFile.fileName),
-  ext: extensionStyle(routerFile),
-  side,
-  imports: new Imports(),
+  refs: new References(ctx, routerFile, side),
   hoisted: [],
-  aliases: new Map(),
-  counter: { next: 0 },
   recursion: new Map(),
   hoistedNames: new Map(),
-  typeAliases: new Map(),
-  bindings: new Map(),
 });
-
-/**
- * The package import of a symbol declared in another package (a workspace package or a
- * `node_modules` dependency), as the checker would write it in the router module: it follows
- * symlinks back to the package name, `exports` subpaths, barrels and tsconfig `paths`, exactly
- * like declaration emit. `undefined` when the checker names it relatively (same package) or not
- * at all.
- */
-const packageImportOf = (
-  gen: ModuleGen,
-  symbol: TsSymbol,
-): { readonly spec: string; readonly imported: string } | undefined => {
-  const type = gen.ctx.checker.getDeclaredTypeOfSymbol(symbol);
-  const text = gen.ctx.checker.typeToString(type, gen.routerFile, NodeBuilderFlags.NoTruncation);
-  const match = /^import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)(?:<.*)?$/s.exec(text);
-  const spec = match?.[1];
-  const imported = match?.[2];
-  if (spec === undefined || imported === undefined) return undefined;
-  if (spec.startsWith('.') || path.isAbsolute(spec)) return undefined;
-  return { spec, imported };
-};
-
-/** A reference to a declared symbol (a schema class, or a named type) from the generated module. */
-const importSymbol = (gen: ModuleGen, symbol: TsSymbol, typeOnly: boolean): string => {
-  const cached = (typeOnly ? gen.typeAliases : gen.aliases).get(symbol.id);
-  if (cached !== undefined) return cached;
-  const local = `__i${gen.counter.next++}`;
-  const found = findImportOf(gen.ctx, gen.routerFile, symbol);
-  if (found !== undefined) {
-    const spec = found.spec.startsWith('.')
-      ? relativeSpec(
-          gen.outDir,
-          path.resolve(gen.outDir, found.spec),
-          found.spec.match(/\.[cm]?[jt]sx?$/)?.[0] ?? '',
-        )
-      : found.spec;
-    gen.imports.add(spec, found.imported, local, typeOnly);
-  } else {
-    const decl = symbol.valueDeclaration ?? symbol.declarations[0];
-    const declFile = decl === undefined ? undefined : gen.ctx.program.getSourceFile(decl.path);
-    if (declFile === undefined)
-      throw new Unmappable(`cannot locate the declaration of ${symbol.name}`);
-    const fromPackage = packageImportOf(gen, symbol);
-    if (fromPackage !== undefined) {
-      gen.imports.add(fromPackage.spec, fromPackage.imported, local, typeOnly);
-      (typeOnly ? gen.typeAliases : gen.aliases).set(symbol.id, local);
-      return local;
-    }
-    if (declFile.fileName.includes(`${path.sep}node_modules${path.sep}`))
-      throw new Unmappable(
-        `${symbol.name} is not exported by its package (no import path reaches it): import it in the router module`,
-      );
-    if (gen.side === 'client' && declFile.fileName === gen.routerFile.fileName)
-      throw new Unmappable(
-        `${symbol.name} is declared in the router module: move it to a module the client can import`,
-      );
-    const fileSymbol = gen.ctx.checker.getSymbolAtLocation(declFile);
-    const exported =
-      fileSymbol !== undefined &&
-      gen.ctx.checker.getExportsOfModule(fileSymbol).some((s) => s.name === symbol.name);
-    if (!exported)
-      throw new Unmappable(
-        `${symbol.name} is not exported from ${path.relative(gen.ctx.cwd, declFile.fileName)}`,
-      );
-    gen.imports.add(
-      relativeSpec(gen.outDir, declFile.fileName, gen.ext),
-      symbol.name,
-      local,
-      typeOnly,
-    );
-  }
-  (typeOnly ? gen.typeAliases : gen.aliases).set(symbol.id, local);
-  return local;
-};
 
 /** Members of a union -> schema (`boolean` collapsed, `null` / `undefined` as `NullOr` / `UndefinedOr`). */
 const unionSchema = (gen: ModuleGen, members: ReadonlyArray<Type>): string => {
@@ -591,7 +754,7 @@ const toSchema = (gen: ModuleGen, type: Type): string => {
   if (f & TypeFlags.Object) {
     const symbol = type.getSymbol();
     if (symbol !== undefined && isSchemaClass(gen.ctx, symbol))
-      return importSymbol(gen, symbol, false);
+      return gen.refs.symbol(symbol, false);
     const collection = symbol === undefined ? undefined : GLOBAL_COLLECTIONS[symbol.name];
     const isGlobal =
       symbol !== undefined &&
@@ -672,7 +835,7 @@ const typeText = (gen: ModuleGen, type: Type): string => {
   const name =
     declFile !== undefined && program.isSourceFileDefaultLibrary(declFile)
       ? named.name
-      : importSymbol(gen, named, true);
+      : gen.refs.symbol(named, true);
   const args =
     alias !== undefined
       ? type.getAliasTypeArguments()
@@ -695,7 +858,7 @@ const objectSchema = (gen: ModuleGen, type: Type): string => {
   const named = type.getAliasSymbol() ?? type.getSymbol();
   const canName = named !== undefined && named.name !== '__type' && named.name !== '__object';
   const entry = {
-    name: `__r${gen.counter.next++}`,
+    name: gen.refs.name('__r'),
     used: false,
     // Only resolved if the type turns out to be recursive (see below).
     typeRef: '',
@@ -809,7 +972,7 @@ const inferProcedure = (
     const symbol = member.getSymbol();
     if (symbol !== undefined && fromMiddleware.has(symbol.id)) continue;
     if (symbol !== undefined && isSchemaClass(gen.ctx, symbol))
-      typed.push(importSymbol(gen, symbol, false));
+      typed.push(gen.refs.symbol(symbol, false));
     else defects.push(checker.typeToString(member));
   }
   const error =
@@ -1016,134 +1179,6 @@ const findRouters = (ctx: Ctx, sf: SourceFile, errors: Array<string>): Array<Fou
   return found;
 };
 
-// --- Copying schema expressions for the client module -------------------------------------
-
-/** Copies an expression of the router module into the client module, with what it references. */
-const copyExpression = (
-  gen: ModuleGen,
-  expr: Node,
-  copied: Map<string, { readonly pos: number; readonly text: string }>,
-): string => {
-  const { checker } = gen.ctx;
-  const sf = expr.getSourceFile();
-  const start = expr.getStart(sf);
-  const end = expr.end;
-  const renames: Array<readonly [number, number, string]> = [];
-  /** The local name of a binding (`key`): its own, unless a different binding already has it. */
-  const bind = (key: string, identifier: Node & { readonly text: string }): string => {
-    let name = gen.bindings.get(key);
-    if (name === undefined) {
-      const taken = new Set(gen.bindings.values());
-      name = identifier.text;
-      for (let n = 2; taken.has(name); n++) name = `${identifier.text}_${n}`;
-      gen.bindings.set(key, name);
-    }
-    if (name !== identifier.text) renames.push([identifier.getStart(sf), identifier.end, name]);
-    return name;
-  };
-  const visit = (node: Node): void => {
-    if (isPropertyAccessExpression(node)) {
-      visit(node.expression);
-      return;
-    }
-    if (isPropertyAssignment(node)) {
-      visit(node.initializer);
-      return;
-    }
-    if (isIdentifier(node)) {
-      resolveIdentifier(node);
-      return;
-    }
-    node.forEachChild((child) => {
-      visit(child);
-    });
-  };
-  const resolveIdentifier = (identifier: Node & { readonly text: string }): void => {
-    const symbol = checker.getSymbolAtLocation(identifier);
-    if (symbol === undefined) return;
-    const decl = symbol.declarations[0]?.resolve(gen.ctx.project);
-    if (decl === undefined) return;
-    const declSf = decl.getSourceFile();
-    if (
-      gen.ctx.program.isSourceFileDefaultLibrary(declSf) ||
-      gen.ctx.program.isSourceFileFromExternalLibrary(declSf)
-    ) {
-      if (!(symbol.flags & SymbolFlags.Alias)) return;
-    }
-    // Declared inside the copied expression (a parameter, a local): nothing to bring along.
-    if (declSf.fileName === sf.fileName && decl.pos >= start && decl.end <= end) return;
-    if (isInMake(decl))
-      throw new Unmappable(
-        `${identifier.text} is declared in make: schemas must not depend on values declared in make (declare the schema at module level)`,
-      );
-    if (isImportSpecifier(decl) || isImportClause(decl) || isNamespaceImport(decl)) {
-      let importDecl: Node = decl;
-      while (!isImportDeclaration(importDecl)) importDecl = importDecl.parent;
-      if (!isStringLiteral(importDecl.moduleSpecifier)) return;
-      const spec0 = importDecl.moduleSpecifier.text;
-      const spec = spec0.startsWith('.')
-        ? relativeSpec(
-            gen.outDir,
-            path.resolve(path.dirname(declSf.fileName), spec0),
-            spec0.match(/\.[cm]?[jt]sx?$/)?.[0] ?? '',
-          )
-        : spec0;
-      const routerSpecs = new Set([gen.routerFile.fileName]);
-      if (
-        spec0.startsWith('.') &&
-        routerSpecs.has(
-          path.resolve(path.dirname(declSf.fileName), spec0).replace(/\.[cm]?[jt]sx?$/, '.ts'),
-        )
-      )
-        throw new Unmappable(
-          `${identifier.text} comes from the router module: move it to a module the client can import`,
-        );
-      if (isNamespaceImport(decl))
-        gen.imports.addNamespace(spec, bind(`${spec} * ${identifier.text}`, identifier));
-      else if (isImportClause(decl))
-        gen.imports.addDefault(spec, bind(`${spec} default ${identifier.text}`, identifier));
-      else {
-        const imported =
-          decl.propertyName !== undefined &&
-          (isIdentifier(decl.propertyName) || isStringLiteral(decl.propertyName))
-            ? decl.propertyName.text
-            : decl.name.text;
-        gen.imports.add(
-          spec,
-          imported,
-          bind(`${spec} {${imported}} ${identifier.text}`, identifier),
-        );
-      }
-      return;
-    }
-    if (
-      isVariableDeclaration(decl) &&
-      isVariableStatement(decl.parent.parent) &&
-      decl.initializer !== undefined
-    ) {
-      const name = bind(`${declSf.fileName}:${decl.pos}`, identifier);
-      if (copied.has(name)) return;
-      copied.set(name, { pos: decl.pos, text: '' }); // reserve (cycles)
-      const text = copyExpression(gen, decl.initializer, copied);
-      copied.set(name, { pos: decl.pos, text: `const ${name} = ${text};` });
-      return;
-    }
-    if (isClassDeclaration(decl))
-      throw new Unmappable(
-        `${identifier.text} is a class declared next to the router: move it to a module the client can import`,
-      );
-    throw new Unmappable(`cannot copy ${identifier.text} into the client module`);
-  };
-  visit(expr);
-  let text = '';
-  let at = start;
-  for (const [from, to, name] of renames) {
-    text += sf.text.slice(at, from) + name;
-    at = to;
-  }
-  return text + sf.text.slice(at, end);
-};
-
 // --- Emitting -----------------------------------------------------------------------------
 
 const HEADER = (source: string): string =>
@@ -1166,7 +1201,6 @@ const emitModules = (
   const server = newModule(ctx, sf, 'server');
   const client = newModule(ctx, sf, 'client');
   const reports: Array<ProcedureReport> = [];
-  const copied = new Map<string, { readonly pos: number; readonly text: string }>();
   const startErrors = errors.length;
 
   const fail = (node: Node, error: unknown): void => {
@@ -1242,8 +1276,8 @@ const emitModules = (
     switch (entry.kind) {
       case 'legacy':
         return (
-          copyExpression(client, entry.call, copied) +
-          entry.middlewares.map((m) => `.middleware(${copyExpression(client, m, copied)})`).join('')
+          client.refs.copy(entry.call) +
+          entry.middlewares.map((m) => `.middleware(${client.refs.copy(m)})`).join('')
         );
       case 'record':
         return clientRecord(entry, routerMiddlewares, depth + 1);
@@ -1253,24 +1287,21 @@ const emitModules = (
           [...routerMiddlewares, ...entry.middlewares],
           depth + 1,
         );
-        const mws = entry.middlewares
-          .map((m) => `.middleware(${copyExpression(client, m, copied)})`)
-          .join('');
+        const mws = entry.middlewares.map((m) => `.middleware(${client.refs.copy(m)})`).join('');
         return mws === '' ? record : `__Router.make(${record})${mws}`;
       }
       case 'proc': {
         const inferred = entry.inferred
           ? inferProcedure(client, entry, routerMiddlewares)
           : undefined;
-        const payload =
-          entry.input === undefined ? undefined : copyExpression(client, entry.input, copied);
+        const payload = entry.input === undefined ? undefined : client.refs.copy(entry.input);
         const success =
           entry.output !== undefined
-            ? copyExpression(client, entry.output, copied)
+            ? client.refs.copy(entry.output)
             : (inferred?.output ?? inferredOutputOf(entry));
         const error =
           entry.error !== undefined
-            ? copyExpression(client, entry.error, copied)
+            ? client.refs.copy(entry.error)
             : (inferred?.error ?? inferredErrorOf(entry));
         if (entry.terminal === 'subscription' && success === undefined)
           throw new Unmappable(
@@ -1281,12 +1312,8 @@ const emitModules = (
           success === undefined ? undefined : `success: ${success}`,
           error === undefined ? undefined : `error: ${error}`,
         ].filter((p) => p !== undefined);
-        client.imports.add('@rpc-effect/core', entry.terminal, `__${entry.terminal}`);
-        const call = `__${entry.terminal}(${options.length === 0 ? '' : `{ ${options.join(', ')} }`})`;
-        return (
-          call +
-          entry.middlewares.map((m) => `.middleware(${copyExpression(client, m, copied)})`).join('')
-        );
+        const call = `${client.refs.core(entry.terminal)}(${options.length === 0 ? '' : `{ ${options.join(', ')} }`})`;
+        return call + entry.middlewares.map((m) => `.middleware(${client.refs.copy(m)})`).join('');
       }
     }
     throw new Unmappable('unsupported router entry');
@@ -1306,7 +1333,7 @@ const emitModules = (
       if (literal === undefined || !isObjectLiteralExpression(literal)) return undefined;
       for (const prop of literal.properties)
         if (isPropertyAssignment(prop) && keyOf(prop.name) === field)
-          return copyExpression(client, prop.initializer, copied);
+          return client.refs.copy(prop.initializer);
       return undefined;
     }
     return undefined;
@@ -1316,60 +1343,37 @@ const emitModules = (
 
   const serverExports: Array<string> = [];
   const clientExports: Array<string> = [];
-  const sourceSpec = relativeSpec(server.outDir, sf.fileName, server.ext);
   for (const router of routers) {
     const tree = schemaTree(router.root.record, router.root.middlewares, '', 1) ?? '{}';
-    server.imports.add(sourceSpec, router.name, `__source_${router.name}`);
     serverExports.push(
-      `export const ${router.name} = __Router.withSchemas(__source_${router.name}, ${tree});`,
+      `export const ${router.name} = __Router.withSchemas(${server.refs.source(router.name)}, ${tree});`,
     );
     const record = clientRecord(router.root.record, router.root.middlewares, 1);
-    const mws = router.root.middlewares
-      .map((m) => `.middleware(${copyExpression(client, m, copied)})`)
-      .join('');
+    const mws = router.root.middlewares.map((m) => `.middleware(${client.refs.copy(m)})`).join('');
     clientExports.push(`export const ${router.name} = __Router.make(${record})${mws};`);
   }
   if (errors.length > startErrors) return undefined;
 
   const base = path.basename(sf.fileName).replace(/\.[cm]?tsx?$/, '');
-  const serverSpec = `./${base}.gen${server.ext}`;
-  for (const gen of [server, client]) {
-    gen.imports.add('@rpc-effect/core', 'Router', '__Router');
-    gen.imports.add('effect', 'Schema', S);
-  }
-  for (const router of routers)
-    client.imports.add(serverSpec, router.name, `__Server_${router.name}`, true);
   const contract = [
     'type __Equals<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;',
     ...routers.map(
       (r) =>
-        `/** Compile-time check: the client contract of \`${r.name}\` matches the server router. */\nexport const __contract_${r.name}: __Equals<__Router.Rpcs<typeof ${r.name}>, __Router.Rpcs<typeof __Server_${r.name}>> extends true\n  ? 'up to date'\n  : '${base}.client.gen.ts is out of date: run effect-trpc-codegen' = 'up to date';`,
+        `/** Compile-time check: the client contract of \`${r.name}\` matches the server router. */\nexport const __contract_${r.name}: __Equals<__Router.Rpcs<typeof ${r.name}>, __Router.Rpcs<typeof ${client.refs.serverType(r.name)}>> extends true\n  ? 'up to date'\n  : '${base}.client.gen.ts is out of date: run effect-trpc-codegen' = 'up to date';`,
     ),
   ];
   const source = `./${path.basename(sf.fileName)}`;
   const serverText = [
     HEADER(source) +
       '// The server router: serve this one (router services with `Handlers.fromService`); it imports the router module once, no copy.',
-    server.imports.render(),
-    '',
-    ...server.hoisted,
-    ...(server.hoisted.length > 0 ? [''] : []),
+    ...server.refs.render(server.hoisted),
     ...serverExports,
     '',
   ].join('\n');
   const clientText = [
     HEADER(source) +
       '// The client contract: schemas only, no handlers and no import of the router module.',
-    client.imports.render(),
-    '',
-    // The router module's order, which its checker accepted: each declaration follows what it
-    // reads when it is created (a cycle reads lazily, through `Schema.suspend`).
-    ...[...copied.values()]
-      .filter((v) => v.text !== '')
-      .toSorted((a, b) => a.pos - b.pos)
-      .map((v) => v.text),
-    ...client.hoisted,
-    ...(copied.size + client.hoisted.length > 0 ? [''] : []),
+    ...client.refs.render(client.hoisted),
     ...clientExports,
     '',
     ...contract,
