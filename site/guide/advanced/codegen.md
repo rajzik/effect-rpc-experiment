@@ -96,6 +96,7 @@ Commit both (and run `--check` in CI), or ignore `*.gen.ts` and generate them be
 | `void`                                        | none (`Schema.Void`)                                                 |
 | `Date`                                        | `Schema.Date`                                                        |
 | `T[]`, `ReadonlyArray<T>`, tuples             | `Schema.mutable(Schema.Array(T))`, `Schema.Array(T)`, `Schema.Tuple` |
+| tuples with `B?` / `...B[]` elements          | `Schema.optional(B)` elements, `Schema.TupleWithRest`                |
 | `Map`, `Set`                                  | `Schema.ReadonlyMap`, `Schema.ReadonlySet`                           |
 | `Record<string, T>`                           | `Schema.Record(Schema.String, T)`                                    |
 | object types and interfaces                   | `Schema.Struct`                                                      |

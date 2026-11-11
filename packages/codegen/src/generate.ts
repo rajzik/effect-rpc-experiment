@@ -25,6 +25,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   API,
+  ElementFlags,
   NodeBuilderFlags,
   ObjectFlags,
   SignatureKind,
@@ -601,11 +602,27 @@ const toSchema = (gen: ModuleGen, type: Type): string => {
       return collection(
         (isReference(type) ? checker.getTypeArguments(type) : []).map((t) => toSchema(gen, t)),
       );
-    if (isReference(type) && checker.isTupleType(type))
-      return `${S}.Tuple([${checker
-        .getTypeArguments(type)
-        .map((t) => toSchema(gen, t))
-        .join(', ')}])`;
+    if (isReference(type) && checker.isTupleType(type)) {
+      // The type arguments are the element types; the flags say which are optional or the rest.
+      const target = type.getTarget();
+      const flags = target.isTupleType() ? target.elementFlags : [];
+      const elements = checker.getTypeArguments(type).map((t, i) =>
+        // `[A, B?]`: like an optional property, `?` already allows `undefined`.
+        (flags[i] ?? 0) & ElementFlags.Optional
+          ? `${S}.optional(${unionSchema(
+              gen,
+              membersOf(t).filter((m) => (m.flags & TypeFlags.Undefined) === 0),
+            )})`
+          : toSchema(gen, t),
+      );
+      // `[A, ...B[], C]`: the elements after the rest are required (the checker normalizes so).
+      const rest = flags.findIndex((flag) => (flag & ElementFlags.Rest) !== 0);
+      return rest === -1
+        ? `${S}.Tuple([${elements.join(', ')}])`
+        : `${S}.TupleWithRest(${S}.Tuple([${elements.slice(0, rest).join(', ')}]), [${elements
+            .slice(rest)
+            .join(', ')}])`;
+    }
     if (isReference(type) && checker.isArrayType(type)) {
       const element = checker.getTypeArguments(type)[0];
       if (element === undefined) throw new Unmappable(`array ${checker.typeToString(type)}`);
