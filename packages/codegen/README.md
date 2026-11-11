@@ -95,6 +95,7 @@ build.
 | `void` (and `never`)                          | none (the default `Schema.Void`)                                      |
 | `Date`                                        | `Schema.Date`                                                         |
 | `T[]` / `ReadonlyArray<T>`, tuples            | `Schema.mutable(Schema.Array(T))` / `Schema.Array(T)`, `Schema.Tuple` |
+| tuples with `B?` / `...B[]` elements          | `Schema.optional(B)` elements, `Schema.TupleWithRest`                 |
 | `Map<K, V>` / `Set<T>` (and readonly)         | `Schema.ReadonlyMap`, `Schema.ReadonlySet`                            |
 | `Record<string, T>` (index signature)         | `Schema.Record(Schema.String, T)`                                     |
 | plain object types, interfaces                | `Schema.Struct` (optional properties: `Schema.optional`)              |
