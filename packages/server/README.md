@@ -180,7 +180,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 - Every HTTP endpoint is `protocol: "http"` (websocket only via `layerHttp({ protocol: 'websocket' })`) with `disableFatalDefects: true`; one defect never breaks later calls.
 - Default serialization is `"ndjson"` for both protocols (the same default as `httpLink` / `wsLink`); if you override it, clients must use the same one.
 - The server layer must provide `Handlers.Requirements<R>`: every handler plus every middleware implementation (`Layer.mergeAll(HandlersLive, AuthLive)`).
-- Promise caller rejections are `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; Effect caller calls fail with exactly `E`.
+- Promise caller rejections are `ClientError<E> = E | RpcDefect | RpcTransportError | RpcInterrupted`; Effect caller calls fail with exactly `E`. A caller defect fails only its own call (`disableFatalDefects: true`), never concurrent calls or subscriptions.
 - Every function taking a `router` takes a `Router.Input` (a router or a router service class) and calls `Router.from` once; types are computed with `Router.Of<X>`, so a service and the equivalent `Router.make` router infer the same caller / handler types. Type helpers (`Caller<R>`, `Handlers.Requirements<R>`, ...) take a router type: `Router.Of<typeof AppRouter>`.
 - `toWebHandler` / `runServer` build the handler layer eagerly (the promise rejects on failure); `createCaller` builds it on the first call.
 - `makeLazyWebHandler(build)` owns the lazy lifecycle of the Next and Start adapters: nothing runs until `get()`, concurrent calls share one build, a failed build is retried by the next `get()`, and `dispose()` closes it at once (`isDisposed()`, `get()` rejects, no build ever again), waits for a pending build and disposes its result once. Fix adapter lifecycle bugs there, not in the adapters.
@@ -216,7 +216,7 @@ for auth see [Middleware and auth context](#middleware-and-auth-context).
 
 **Where to look**
 
-- `test/readme.test.ts` (this README's example), `test/handlers.test.ts` / `test/handlers.test-d.ts` (`Handlers`), `test/routerService.test.ts` / `test/routerService.test-d.ts` (`Handlers.fromService` / `fromProcedures`, fixtures in `test/service-fixtures.ts`), `test/routerServiceEffectful.test.ts` / `.test-d.ts` (a `make` that reads services), `test/web-handler.test.ts` (`toWebHandler`: errors, defects, NDJSON, path, dispose → 503), `test/lazy-web-handler.test.ts` (`makeLazyWebHandler`: shared build, retry, dispose before / during builds, dispose failure), `test/node.test.ts` (`runServer`, `layerHttp` in an Effect app), `test/caller.test.ts` / `test/caller.test-d.ts` (`createCaller`, abort, dispose), `test/middlewares.test.ts` (ordering, provided services, middleware errors), `test/context.test.ts` / `test/context.test-d.ts` (`Handlers.withContext` and its types), `test/onError.test.ts` (`onError`), `test/httpContext.test.ts` (`HttpContext` over HTTP, WebSocket and the caller), `test/annotate.test.ts` (annotations read by middleware), `test/procedure-errors.test.ts` (typed errors vs defects), `test/streaming.test.ts`, `test/validation.test.ts`, `test/PARITY.md`.
+- `test/readme.test.ts` (this README's example), `test/handlers.test.ts` / `test/handlers.test-d.ts` (`Handlers`), `test/routerService.test.ts` / `test/routerService.test-d.ts` (`Handlers.fromService` / `fromProcedures`, fixtures in `test/service-fixtures.ts`), `test/routerServiceEffectful.test.ts` / `.test-d.ts` (a `make` that reads services), `test/web-handler.test.ts` (`toWebHandler`: errors, defects, NDJSON, path, dispose → 503), `test/lazy-web-handler.test.ts` (`makeLazyWebHandler`: shared build, retry, dispose before / during builds, dispose failure), `test/node.test.ts` (`runServer`, `layerHttp` in an Effect app), `test/caller.test.ts` / `test/caller.test-d.ts` (`createCaller`, abort, dispose), `test/caller-defect-isolation.test.ts` (a caller defect next to concurrent calls and subscriptions), `test/middlewares.test.ts` (ordering, provided services, middleware errors), `test/context.test.ts` / `test/context.test-d.ts` (`Handlers.withContext` and its types), `test/onError.test.ts` (`onError`), `test/httpContext.test.ts` (`HttpContext` over HTTP, WebSocket and the caller), `test/annotate.test.ts` (annotations read by middleware), `test/procedure-errors.test.ts` (typed errors vs defects), `test/streaming.test.ts`, `test/validation.test.ts`, `test/PARITY.md`.
 - JSDoc on every export (`src/*.ts`) follows `docs/jsdoc-style.md`.
 
 **Verify**
@@ -534,8 +534,8 @@ this subpath; the main entry stays platform-neutral.
 | `caller.$promise.user.list(input, { signal? })`           | `AsyncIterable<User>`, throws `ClientError<E>`        |
 
 Calls go through `RpcTest.makeClient` — no serialization, but middleware runs and headers reach
-it. Aborting a `signal` interrupts the handler and rejects with `RpcInterrupted`; defects reject
-with `RpcDefect`. Calling a path that is not a procedure throws. `caller.dispose()` interrupts
+it. Aborting a `signal` interrupts the handler and rejects with `RpcInterrupted`; a defect rejects
+only its own call with `RpcDefect`. Calling a path that is not a procedure throws. `caller.dispose()` interrupts
 in-flight calls and releases the handler layer; later calls fail with `RpcInterrupted`.
 `caller.$router` is the router. The keys `$promise`, `$router` and `dispose` are reserved on the
 caller root, so avoid them as top-level router keys.
