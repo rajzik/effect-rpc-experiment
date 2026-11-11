@@ -164,6 +164,9 @@ export function PostTitle({ id }: { id: number }) {
   overrides })`.
 - Don't expect `tracked()`, `lastEventId` or automatic reconnects for subscriptions. Call
   `sub.reset()` to retry.
+- Don't rely on `enabled: false` to stop a manual `subscriptionOptions(...).subscribe(...)`. Only
+  `useSubscription` reads `enabled`; check `options.enabled` yourself or pass `skipToken`, which
+  makes `subscribe` a no-op.
 
 **Where to look**
 
@@ -177,6 +180,7 @@ export function PostTitle({ id }: { id: number }) {
 | Infinite queries                                        | `test/infiniteQueryOptions.test.tsx`                     |
 | `skipToken`                                             | `test/skipToken.test.tsx`                                |
 | Subscriptions                                           | `test/useSubscription.test.tsx`                          |
+| Manual `subscribe` with `enabled: false` / `skipToken`  | `test/subscriptionEnabled.test.ts`                       |
 | SSR hydration                                           | `test/hydration.test.tsx`                                |
 | Key prefixes with several routers                       | `test/multipleRpcProviders.test.tsx`                     |
 | Provider, `useRpcClient`, proxy memoization             | `test/client.test.tsx`                                   |
@@ -381,7 +385,9 @@ The subscription restarts when its input changes or when `enabled` flips. It is 
 restart and on unmount, which interrupts the server stream. `sub.reset()` starts it again. Pass
 `skipToken` or `enabled: false` to keep it `idle`. Callbacks: `onStarted`, `onData`, `onError`,
 `onComplete`, `onConnectionStateChange`. Outside React, `subscriptionOptions(...).subscribe({
-onData, signal })` returns an unsubscribe function.
+onData, signal })` returns an unsubscribe function. Only `useSubscription` reads `enabled`:
+`subscribe` starts the stream even when it is `false`, as in tRPC. With a `skipToken` input,
+`subscribe` sends nothing and calls no callback.
 
 ## 7. SSR hydration with class instances
 
@@ -433,5 +439,6 @@ dehydrated `RpcDefect` keeps its message but drops its server-side `cause`.
 - `error` is `ClientError<E>`, not a `TRPCClientError`. There is no error formatter or shape.
 - Subscriptions are `pending` once the request has been handed to the transport. Links don't
   reconnect, so there is no `connecting` state after an error. `tracked()` / `lastEventId` are not
-  supported.
+  supported. A manual `subscribe` with a `skipToken` input is a no-op; tRPC starts it with an
+  `undefined` input.
 - Async-iterable _query_ results (streamed queries) are not supported. Use a subscription.

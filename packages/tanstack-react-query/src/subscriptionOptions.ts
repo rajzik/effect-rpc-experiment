@@ -77,7 +77,11 @@ export interface RpcSubscriptionOptionsIn<TOutput, TError> extends RpcSubscripti
   TOutput,
   TError
 > {
-  /** Set to `false` to not subscribe. Defaults to `true` unless the input is `skipToken`. */
+  /**
+   * Set to `false` to keep `useSubscription` from subscribing. Defaults to `true` unless the input
+   * is `skipToken`. Only `useSubscription` reads it: calling `subscribe` yourself starts the
+   * stream even when it is `false` (as in tRPC).
+   */
   enabled?: boolean;
   /** Request options (headers). */
   rpc?: RpcRequestOptions;
@@ -122,7 +126,8 @@ export interface RpcSubscriptionOptionsOut<TOutput, TError, TFeatureFlags extend
   readonly client: object;
   /**
    * Starts the subscription and returns a function that stops it (aborting the underlying
-   * request, which interrupts the server stream).
+   * request, which interrupts the server stream). It ignores `enabled` (check it first if you
+   * need to); with a `skipToken` input it does nothing and returns a no-op.
    */
   subscribe: (innerOpts: RpcSubscribeOptions<TOutput, TError>) => () => void;
 }
@@ -142,7 +147,9 @@ export interface RpcSubscriptionOptionsOut<TOutput, TError, TFeatureFlags extend
  * - Elements are decoded with the procedure's success schema (class instances), errors are
  *   `ClientError<E>`.
  * - `subscribe(callbacks)` starts the stream and returns a function that stops it; aborting
- *   `callbacks.signal` stops it too. Stopping interrupts the server stream.
+ *   `callbacks.signal` stops it too. Stopping interrupts the server stream. It starts the stream
+ *   even when `enabled` is `false`; with a `skipToken` input it sends nothing and calls no
+ *   callback.
  *
  * **Gotchas**
  *
@@ -203,6 +210,8 @@ export const rpcSubscriptionOptions = (args: {
   const enabled = opts.enabled === undefined ? input !== skipToken : opts.enabled;
 
   const subscribe = (inner: RpcSubscribeOptions<unknown, unknown>): (() => void) => {
+    // `skipToken` has no input to send: never start a request. `enabled` is ignored, as in tRPC.
+    if (input === skipToken) return noop;
     const controller = new AbortController();
     const { signal } = controller;
     const abort = (): void => controller.abort();
@@ -216,11 +225,7 @@ export const rpcSubscriptionOptions = (args: {
       let finished = false;
       try {
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the Promise client returns an `AsyncIterable` for subscription procedures (the only ones routed here)
-        const iterable = call(
-          path,
-          input === skipToken ? undefined : input,
-          callOptions(signal, opts.rpc),
-        ) as AsyncIterable<unknown>;
+        const iterable = call(path, input, callOptions(signal, opts.rpc)) as AsyncIterable<unknown>;
         iterator = iterable[Symbol.asyncIterator]();
         let next = iterator.next();
         // Avoid an unhandled rejection if a callback below throws before `next` is awaited.
