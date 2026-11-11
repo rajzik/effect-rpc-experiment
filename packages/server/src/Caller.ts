@@ -263,7 +263,8 @@ const createCallerFor = <R extends Router.Any, LE = never>(
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Router.Any` erases the group's rpcs on purpose; `Caller<R>` restores the per-procedure types at the public API
   const hooks = withHooks(router.group as RpcGroup.RpcGroup<Rpc.AnyWithProps>, {});
   // `RpcTest.makeClient` wires an in-memory RpcServer to an RpcClient: no serialization.
-  const makeClient = RpcTest.makeClient(hooks.group, { flatten: true });
+  // `disableFatalDefects` keeps a defect on its own call instead of failing every in-flight call.
+  const makeClient = RpcTest.makeClient(hooks.group, { flatten: true, disableFatalDefects: true });
   const clientLayer = Layer.effect(CallerClient)(
     Effect.map(makeClient, (flat) => {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the flat client of `Rpc.AnyWithProps` types its payload as `never`; tags and payloads come from the router (`lookup`) and are typed by `Caller<R>`
@@ -435,6 +436,7 @@ const createCallerFromInput = (
  *   `dispose()`. Layer construction failures surface as defects (`RpcDefect` for promises).
  * - Values are passed by reference: a `Schema.Class` result is the very instance the handler
  *   returned. Input is still decoded with the payload schema, so invalid input is a defect.
+ * - A defect fails only its own call; concurrent calls and subscriptions keep running.
  * - `dispose()` interrupts in-flight calls and runs the layer's finalizers; later calls are
  *   interrupted (`RpcInterrupted` for promises) instead of hanging.
  *
