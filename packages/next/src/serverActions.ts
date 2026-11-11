@@ -18,7 +18,6 @@ import {
   RpcTransportError,
   type ClientError,
   type inferError,
-  type inferInput,
   type inferOutput,
   type ProcedureDef,
   type ProcedureInfo,
@@ -28,7 +27,15 @@ import { createCaller, type Caller } from '@rpc-effect/server';
 import { Cause, Effect, Exit, Schema } from 'effect';
 import type { Layer } from 'effect';
 import type { Headers } from 'effect/http';
-import type { ActionPath, ErrorAt, InputArgs, InputAt, OutputAt, RecordOf } from './types.js';
+import type {
+  ActionPath,
+  ErrorAt,
+  InputArgs,
+  InputAt,
+  OutputAt,
+  PayloadEncoded,
+  RecordOf,
+} from './types.js';
 
 /**
  * One reason of an encoded `Cause` (see `Codecs.exit`): a typed failure (`Fail`, encoded with
@@ -96,14 +103,15 @@ export type EncodedActionResult<A, E> = EncodedExit & {
  * A server action calling one procedure: `(input) => Promise<EncodedActionResult<A, E>>`. It never
  * rejects with a typed error — failures (typed errors, defects, interruption, invalid input) are
  * encoded into the result, because errors thrown by a server action lose their class and fields
- * on the way to the client (and their message in production).
+ * on the way to the client (and their message in production). Its input is the payload's
+ * encoded form (see `InputAt`), which Next can send to the server.
  *
  * @see {@link createServerActionCaller}
  * @category models
  * @since 0.1.0
  */
 export type ServerAction<D extends ProcedureDef.Any> = (
-  ...args: InputArgs<inferInput<D>>
+  ...args: InputArgs<PayloadEncoded<D>>
 ) => Promise<EncodedActionResult<inferOutput<D>, inferError<D>>>;
 
 /**
@@ -375,9 +383,11 @@ const createServerActionCallerFromInput = (
  *   the server → client boundary as JSON.
  * - The client decodes it with `useServerAction`, `unwrapActionResult` or
  *   `decodeActionResult`, getting class instances and `ClientError<E>`.
+ * - An action takes the payload's encoded form (`InputAt`), which Next's Flight serializer can
+ *   send: a `Schema.Class` payload is passed as a plain object and decoded to the class (methods
+ *   included) on the server. `Date`s stay `Date`s.
  * - The input comes from the network, so it is validated with the procedure's payload schema
- *   (the decoded type or its encoded JSON form are accepted); invalid input resolves with a
- *   defect.
+ *   (the decoded type or its encoded form are accepted); invalid input resolves with a defect.
  * - Defects keep only their message (no stack, no `cause`). A result that cannot be encoded
  *   becomes a defect too.
  * - `actions(path)` and `actions.nested.a.b` return the same memoized function. The handler layer

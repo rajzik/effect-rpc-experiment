@@ -9,6 +9,7 @@
  * @since 0.1.0
  */
 import type { Codecs, ProcedureDef, Router } from '@rpc-effect/core';
+import type { Schema } from 'effect';
 import type { Rpc, RpcSchema } from 'effect/rpc';
 
 type RecordOf<R> = R extends Router<infer Rec> ? Rec : R;
@@ -65,19 +66,26 @@ export type ActionPath<R extends Router.Any> = UnaryTag<Router.Rpcs<R>>;
  */
 export type RpcAt<R extends Router.Any, P extends string> = Rpc.ExtractTag<Router.Rpcs<R>, P>;
 
+/** The encoded side of a procedure's or rpc's payload schema. */
+type PayloadEncoded<X> = X extends { readonly payloadSchema: infer S extends Schema.Top }
+  ? S['Encoded']
+  : never;
+
 /**
- * The decoded input of the procedure at path `P`: what a server action wrapper accepts.
+ * The input of the procedure at path `P`: what a server action and its wrapper accept.
  *
  * **Details**
  *
- * - This is the Schema **type** side (e.g. `Date`, class instances), not the JSON form.
+ * - This is the payload schema's **encoded** side, what Next's Flight serializer can send
+ *   (plain objects, `Date`s, ...): a `Schema.Class` payload is its plain fields object, which
+ *   the server decodes back to the class. It is not the JSON form.
  *
  * @see {@link OutputAt}
  * @see {@link ErrorAt}
  * @category type-level
  * @since 0.1.0
  */
-export type InputAt<R extends Router.Any, P extends string> = Codecs.PayloadType<RpcAt<R, P>>;
+export type InputAt<R extends Router.Any, P extends string> = PayloadEncoded<RpcAt<R, P>>;
 
 /**
  * The decoded output of the procedure at path `P` (class instances, `Date`s, ...).
@@ -110,4 +118,4 @@ export type ErrorAt<R extends Router.Any, P extends string> = Codecs.ErrorType<R
  */
 export type InputArgs<Input> = undefined extends Input ? [input?: Input] : [input: Input];
 
-export type { RecordOf };
+export type { PayloadEncoded, RecordOf };
