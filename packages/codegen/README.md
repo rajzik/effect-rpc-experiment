@@ -157,6 +157,8 @@ Do not use it for routers whose procedures all have `.output(...)` (nothing to i
   router: serve it with `Handlers.fromProcedures`.
 - The client module imports only what its copied schema expressions reference (resolved through
   the router module's imports; top-level `const` schemas of the router module are copied).
+  Same-named bindings from different modules (two local `Input` schemas) stay distinct: the
+  later one is renamed `Input_2` in the client module.
 - `__contract_<Router>` in the client module is a compile error (`router.client.gen.ts is out of
   date: run effect-trpc-codegen`) when the client contract no longer matches the server router.
 - Errors declared by a procedure's middleware (or a nested router's `.middleware(...)`) are not

@@ -424,6 +424,8 @@ interface ModuleGen {
   readonly hoistedNames: Map<number, string>;
   /** Type-only imports already added (symbol id -> local name). */
   readonly typeAliases: Map<number, string>;
+  /** Bindings of copied expressions (declaration or import -> local name); names are unique. */
+  readonly bindings: Map<string, string>;
 }
 
 const newModule = (ctx: Ctx, routerFile: SourceFile, side: 'server' | 'client'): ModuleGen => ({
@@ -439,6 +441,7 @@ const newModule = (ctx: Ctx, routerFile: SourceFile, side: 'server' | 'client'):
   recursion: new Map(),
   hoistedNames: new Map(),
   typeAliases: new Map(),
+  bindings: new Map(),
 });
 
 /**
@@ -1025,6 +1028,19 @@ const copyExpression = (
   const sf = expr.getSourceFile();
   const start = expr.getStart(sf);
   const end = expr.end;
+  const renames: Array<readonly [number, number, string]> = [];
+  /** The local name of a binding (`key`): its own, unless a different binding already has it. */
+  const bind = (key: string, identifier: Node & { readonly text: string }): string => {
+    let name = gen.bindings.get(key);
+    if (name === undefined) {
+      const taken = new Set(gen.bindings.values());
+      name = identifier.text;
+      for (let n = 2; taken.has(name); n++) name = `${identifier.text}_${n}`;
+      gen.bindings.set(key, name);
+    }
+    if (name !== identifier.text) renames.push([identifier.getStart(sf), identifier.end, name]);
+    return name;
+  };
   const visit = (node: Node): void => {
     if (isPropertyAccessExpression(node)) {
       visit(node.expression);
@@ -1082,15 +1098,21 @@ const copyExpression = (
         throw new Unmappable(
           `${identifier.text} comes from the router module: move it to a module the client can import`,
         );
-      if (isNamespaceImport(decl)) gen.imports.addNamespace(spec, identifier.text);
-      else if (isImportClause(decl)) gen.imports.addDefault(spec, identifier.text);
+      if (isNamespaceImport(decl))
+        gen.imports.addNamespace(spec, bind(`${spec} * ${identifier.text}`, identifier));
+      else if (isImportClause(decl))
+        gen.imports.addDefault(spec, bind(`${spec} default ${identifier.text}`, identifier));
       else {
         const imported =
           decl.propertyName !== undefined &&
           (isIdentifier(decl.propertyName) || isStringLiteral(decl.propertyName))
             ? decl.propertyName.text
             : decl.name.text;
-        gen.imports.add(spec, imported, identifier.text);
+        gen.imports.add(
+          spec,
+          imported,
+          bind(`${spec} {${imported}} ${identifier.text}`, identifier),
+        );
       }
       return;
     }
@@ -1099,10 +1121,11 @@ const copyExpression = (
       isVariableStatement(decl.parent.parent) &&
       decl.initializer !== undefined
     ) {
-      if (copied.has(identifier.text)) return;
-      copied.set(identifier.text, { pos: decl.pos, text: '' }); // reserve (cycles)
+      const name = bind(`${declSf.fileName}:${decl.pos}`, identifier);
+      if (copied.has(name)) return;
+      copied.set(name, { pos: decl.pos, text: '' }); // reserve (cycles)
       const text = copyExpression(gen, decl.initializer, copied);
-      copied.set(identifier.text, { pos: decl.pos, text: `const ${identifier.text} = ${text};` });
+      copied.set(name, { pos: decl.pos, text: `const ${name} = ${text};` });
       return;
     }
     if (isClassDeclaration(decl))
@@ -1112,7 +1135,13 @@ const copyExpression = (
     throw new Unmappable(`cannot copy ${identifier.text} into the client module`);
   };
   visit(expr);
-  return sf.text.slice(start, end);
+  let text = '';
+  let at = start;
+  for (const [from, to, name] of renames) {
+    text += sf.text.slice(at, from) + name;
+    at = to;
+  }
+  return text + sf.text.slice(at, end);
 };
 
 // --- Emitting -----------------------------------------------------------------------------
