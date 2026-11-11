@@ -641,6 +641,44 @@ const toSchema = (gen: ModuleGen, type: Type): string => {
   throw new Unmappable(`type ${checker.typeToString(type)} has no schema mapping`);
 };
 
+/**
+ * A type as a type expression of the generated module (the annotation of a hoisted recursive
+ * schema): named types are imported with their type arguments (`Tree<Label>`), global ones are
+ * used by name.
+ */
+const typeText = (gen: ModuleGen, type: Type): string => {
+  const { checker, program } = gen.ctx;
+  if (type.flags & TypeFlags.TypeParameter)
+    throw new Unmappable(
+      `the type parameter ${checker.typeToString(type)} has no schema (make the handler concrete)`,
+    );
+  if (type.isUnionType())
+    return type
+      .getTypes()
+      .map((t) => typeText(gen, t))
+      .join(' | ');
+  if ((type.flags & TypeFlags.Object) === 0) return checker.typeToString(type);
+  const alias = type.getAliasSymbol();
+  const named = alias ?? type.getSymbol();
+  if (named === undefined || named.name === '__type' || named.name === '__object')
+    throw new Unmappable(
+      `the type argument ${checker.typeToString(type)} of a recursive type needs a name: declare it as an exported interface or type`,
+    );
+  const decl = named.valueDeclaration ?? named.declarations[0];
+  const declFile = decl === undefined ? undefined : program.getSourceFile(decl.path);
+  const name =
+    declFile !== undefined && program.isSourceFileDefaultLibrary(declFile)
+      ? named.name
+      : importSymbol(gen, named, true);
+  const args =
+    alias !== undefined
+      ? type.getAliasTypeArguments()
+      : isReference(type)
+        ? checker.getTypeArguments(type)
+        : [];
+  return args.length === 0 ? name : `${name}<${args.map((t) => typeText(gen, t)).join(', ')}>`;
+};
+
 /** A plain object type: `Struct`, `Record`, or a hoisted recursive declaration. */
 const objectSchema = (gen: ModuleGen, type: Type): string => {
   const { checker } = gen.ctx;
@@ -693,10 +731,10 @@ const objectSchema = (gen: ModuleGen, type: Type): string => {
       throw new Unmappable(
         `the recursive type ${checker.typeToString(type)} needs a name: declare it as an exported interface or type`,
       );
-    const typeLocal = importSymbol(gen, named, true);
+    const typeLocal = typeText(gen, type);
     const finalSchema = schema.replaceAll(
       `${S}.Codec<__T${type.id}, unknown>`,
-      `${S}.Codec<${typeLocal}, unknown>`,
+      () => `${S}.Codec<${typeLocal}, unknown>`,
     );
     gen.hoisted.push(`const ${entry.name}: ${S}.Codec<${typeLocal}, unknown> = ${finalSchema};`);
     gen.hoistedNames.set(type.id, entry.name);
