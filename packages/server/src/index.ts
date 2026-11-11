@@ -12,10 +12,12 @@
 export { Handlers } from './Handlers.js';
 export {
   layerHttp,
+  makeLazyWebHandler,
   serializationLayer,
   toHttpLayer,
   toWebHandler,
   type LayerHttpOptions,
+  type LazyWebHandler,
   type OnErrorInfo,
   type Serialization,
   type ServerOptions,

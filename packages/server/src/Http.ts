@@ -1,6 +1,6 @@
 /**
- * Serves a router over HTTP: as a fetch handler (`toWebHandler`) or as an Effect `HttpRouter`
- * layer (`layerHttp`).
+ * Serves a router over HTTP: as a fetch handler (`toWebHandler`, built lazily by
+ * `makeLazyWebHandler`) or as an Effect `HttpRouter` layer (`layerHttp`).
  *
  * Both are thin wrappers over `effect/rpc`'s `RpcServer.layerHttp` that always set
  * `disableFatalDefects: true` and default to `protocol: "http"` with NDJSON serialization, which
@@ -447,3 +447,107 @@ export const toWebHandler: {
 } =
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both overloads normalise the input with `Router.from` and continue with that router, which is what the implementation does; checking the overloads against it structurally instantiates `Router.Of<Router.Input>`, which is too deep
   toWebHandlerFromInput as unknown as typeof toWebHandler;
+
+/**
+ * A {@link WebHandler} built on first use and shared after that, returned by
+ * {@link makeLazyWebHandler}.
+ *
+ * @see {@link makeLazyWebHandler}
+ * @category models
+ * @since 0.1.0
+ */
+export interface LazyWebHandler {
+  /** `true` once `dispose()` has been called, even while that disposal is still running. */
+  readonly isDisposed: () => boolean;
+  /**
+   * Resolves the shared {@link WebHandler}, building it on the first call. Concurrent calls share
+   * one build; a failed build rejects its callers and the next call builds again. Rejects after
+   * `dispose()`.
+   */
+  readonly get: () => Promise<WebHandler>;
+  /**
+   * Closes the owner (no build ever starts again), waits for a pending build and disposes the
+   * built handler once. Idempotent: every call returns the same promise.
+   */
+  readonly dispose: () => Promise<void>;
+  readonly [Symbol.asyncDispose]: () => Promise<void>;
+}
+
+/**
+ * Wraps a {@link toWebHandler} build in a lazy, shared, disposable owner: the lifecycle behind
+ * framework adapters (`createRouteHandler` in `@rpc-effect/next`, `createStartHandler` in
+ * `@rpc-effect/start`).
+ *
+ * **When to use**
+ *
+ * Use when writing an adapter for a runtime that loads the route module before it serves
+ * requests and should not build the handler layer at import time. Prefer {@link toWebHandler}
+ * directly when building eagerly at startup is fine.
+ *
+ * **Details**
+ *
+ * - Creating the owner calls nothing; `get()` calls `build` once and every caller shares that
+ *   attempt and, after it succeeds, its result.
+ * - A failed build rejects the callers waiting for it and is not cached: the next `get()` while
+ *   the owner is open builds again.
+ * - `dispose()` closes the owner synchronously (`isDisposed()` turns `true` and `get()` rejects),
+ *   then waits for a pending build and disposes its result exactly once. Before the first `get()`
+ *   it builds nothing. It rejects with the built handler's disposal error, on every call.
+ *
+ * **Gotchas**
+ *
+ * - Check `isDisposed()` before `get()` to answer requests after `dispose()` (for example
+ *   with `503`): `get()` rejects then. Callers that received the handler before `dispose()` keep
+ *   using it; the disposed `WebHandler` answers them with `503`.
+ *
+ * **Example** (A fetch adapter that builds the server on the first request)
+ *
+ * ```ts
+ * import { Effect, Schema } from 'effect';
+ * import { query, Router } from '@rpc-effect/core';
+ * import { Handlers, makeLazyWebHandler, toWebHandler } from '@rpc-effect/server';
+ *
+ * const appRouter = Router.make({ health: query({ success: Schema.String }) });
+ * const HandlersLive = Handlers.make(appRouter, { health: () => Effect.succeed('ok') });
+ *
+ * const web = makeLazyWebHandler(() => toWebHandler(appRouter, { handlers: HandlersLive }));
+ *
+ * export const fetchHandler = async (request: Request): Promise<Response> => {
+ *   if (web.isDisposed()) return new Response('Server disposed', { status: 503 });
+ *   const { handler } = await web.get();
+ *   return handler(request);
+ * };
+ * export const dispose = web.dispose;
+ * ```
+ *
+ * @see {@link toWebHandler}
+ * @see {@link LazyWebHandler}
+ * @category adapters
+ * @since 0.1.0
+ */
+export const makeLazyWebHandler = (build: () => Promise<WebHandler>): LazyWebHandler => {
+  let web: Promise<WebHandler> | undefined;
+  let disposed: Promise<void> | undefined;
+
+  const get = (): Promise<WebHandler> => {
+    if (disposed !== undefined) return Promise.reject(new Error('Web handler disposed'));
+    web ??= build().catch((error: unknown) => {
+      // Let the next call retry instead of caching the failure forever.
+      web = undefined;
+      throw error;
+    });
+    return web;
+  };
+
+  const dispose = (): Promise<void> => {
+    disposed ??= (async () => {
+      const pending = web;
+      if (pending === undefined) return;
+      const built = await pending.catch(() => undefined);
+      await built?.dispose();
+    })();
+    return disposed;
+  };
+
+  return { isDisposed: () => disposed !== undefined, get, dispose, [Symbol.asyncDispose]: dispose };
+};

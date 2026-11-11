@@ -9,8 +9,8 @@
  * @since 0.1.0
  */
 import { Router } from '@rpc-effect/core';
-import { toWebHandler } from '@rpc-effect/server';
-import type { WebHandler, WebHandlerOptions } from '@rpc-effect/server';
+import { makeLazyWebHandler, toWebHandler } from '@rpc-effect/server';
+import type { WebHandlerOptions } from '@rpc-effect/server';
 
 /**
  * The default rpc path of a TanStack Start app: `"/api/rpc"` (`src/routes/api/rpc.$.ts`).
@@ -123,19 +123,10 @@ const createStartHandlerFor = <R extends Router.Any, LE = never>(
   options: StartHandlerOptions<R, LE>,
 ): StartHandler => {
   const path = normalizePath(options.path ?? defaultStartPath);
-  let web: Promise<WebHandler> | undefined;
-  let disposed: Promise<void> | undefined;
-
-  const build = (): Promise<WebHandler> => {
-    web ??= toWebHandler(router, { ...options, path }).catch((error: unknown) => {
-      web = undefined;
-      throw error;
-    });
-    return web;
-  };
+  const web = makeLazyWebHandler(() => toWebHandler(router, { ...options, path }));
 
   const handle = async ({ request }: StartHandlerContext): Promise<Response> => {
-    if (disposed !== undefined) return new Response('Server disposed', { status: 503 });
+    if (web.isDisposed()) return new Response('Server disposed', { status: 503 });
     if (request.method !== 'POST') {
       return jsonResponse(
         405,
@@ -153,21 +144,11 @@ const createStartHandlerFor = <R extends Router.Any, LE = never>(
         message: `No effect-trpc endpoint at ${new URL(request.url).pathname} (mounted on ${path})`,
       });
     }
-    const { handler } = await build();
+    const { handler } = await web.get();
     return handler(rewritten);
   };
 
-  const dispose = (): Promise<void> => {
-    disposed ??= (async () => {
-      const pending = web;
-      if (pending === undefined) return;
-      const built = await pending.catch(() => undefined);
-      await built?.dispose();
-    })();
-    return disposed;
-  };
-
-  return Object.assign(handle, { dispose, [Symbol.asyncDispose]: dispose });
+  return Object.assign(handle, { dispose: web.dispose, [Symbol.asyncDispose]: web.dispose });
 };
 
 /** `createStartHandler` for a router or a router service: normalises the input with `Router.from`. */

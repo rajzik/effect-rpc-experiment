@@ -116,7 +116,9 @@ that read the cache, and server actions that keep typed errors.
 **Where to look**
 
 - Route handler (POST/GET/404/basePath/lazy build/dispose, `Handlers.withContext` and `onError`):
-  `test/routeHandler.test.ts`; the `withContext` types: `test/types.test-d.tsx`.
+  `test/routeHandler.test.ts`; the `withContext` types: `test/types.test-d.tsx`. The lazy build,
+  retry and dispose rules live in `makeLazyWebHandler` (`@rpc-effect/server`,
+  `packages/server/test/lazy-web-handler.test.ts`).
 - RSC helpers (per-request client, in-process prefetch, Schema dehydration, `caller`, headers,
   `keyPrefix`, remote client): `test/rsc.test.tsx`.
 - Server actions (encoding, typed errors, defects, invalid input, headers, `dispose`):
@@ -219,6 +221,7 @@ export const { GET, POST } = createRouteHandler(appRouter, { handlers: HandlersL
   `basePath`, pass it as `basePath`.
 - The handler layer is built **lazily on the first request**, then shared. If it fails to build,
   that request rejects (Next answers 500) and the next request retries. `dispose()` releases it.
+  This lifecycle is `makeLazyWebHandler` from `@rpc-effect/server`, shared with `@rpc-effect/start`.
 - `serialization` (`"ndjson"` default, or `"json"`) must match the client.
 - `Handlers.withContext(handlers, context)` (tRPC's `createContext`: an `Effect` of services
   evaluated per call, before middleware and the handler) and `onError({ path, cause, headers })`, an
