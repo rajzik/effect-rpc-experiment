@@ -96,7 +96,7 @@ const trimMountPath = (path: `/${string}`): `/${string}` =>
   path.length > 1 && path.endsWith('/') ? `/${path.slice(1, -1)}` : path;
 
 const isAtOrBelow = (pathname: string, prefix: string): boolean =>
-  pathname === prefix || pathname.startsWith(`${prefix}/`);
+  pathname === prefix || pathname.startsWith(prefix === '/' ? prefix : `${prefix}/`);
 
 /** effect-trpc clients only send `POST`s. */
 const methodNotAllowed: NextRouteHandlerFn = (request) =>
