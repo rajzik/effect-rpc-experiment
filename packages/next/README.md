@@ -99,6 +99,8 @@ that read the cache, and server actions that keep typed errors.
   exported by your `'use client'` module.
 - Don't `throw` procedure errors from a server action or export `actions` from a `'use server'`
   file → `return actions('post.create')(input)` inside an exported `async function`.
+- Don't pass a `Schema.Class` instance to a server action (Next's Flight serializer rejects class
+  instances) → pass its plain fields object, the `InputAt` type; the server decodes it to the class.
 - Don't rely on typed errors from an un-awaited `prefetch` that fails while streaming (it arrives
   as a plain `Error`) → `await getQueryClient().prefetchQuery(…)` on pages that need them.
 - Don't pass a relative `url` to a hand-made `httpLink` on the server, or rely on the
@@ -122,7 +124,9 @@ that read the cache, and server actions that keep typed errors.
 - RSC helpers (per-request client, in-process prefetch, Schema dehydration, `caller`, headers,
   `keyPrefix`, remote client): `test/rsc.test.tsx`.
 - Server actions (encoding, typed errors, defects, invalid input, headers, `dispose`):
-  `test/serverActions.test.ts`; hook + provider + hydration in jsdom: `test/client.test.tsx`.
+  `test/serverActions.test.ts`; hook + provider + hydration in jsdom: `test/client.test.tsx`;
+  `Schema.Class` input through Next's Flight serializer: `test/serverActionFlight.test.tsx` /
+  `test/serverActionFlight.test-d.ts`.
 - Router services (`typeof AppRouter`) in every helper: `test/routerService.test.tsx` /
   `test/routerService.test-d.tsx`.
 - This README end to end: `test/readme.test.tsx`; types (`ClientError` narrowing, `NextRequest`
@@ -392,6 +396,9 @@ export function NewPost() {
 - `actions(path)` (or `actions.nested.post.create`) returns `(input) => Promise<EncodedActionResult<A, E>>`.
   Each action is created once per path and runs the procedure in-process through `createCaller`,
   so middleware runs. Subscriptions are not actions.
+- An action takes the payload's **encoded** form (`InputAt`), which Next's Flight serializer can
+  send. A `Schema.Class` payload is passed as a plain object and decoded to the class (methods
+  included) on the server. `Date`s stay `Date`s.
 - The input comes from the network, so it is **validated with the payload schema**. Invalid input
   resolves with a defect. Defects only keep their message (no stack, no `cause`).
 - `decodeActionResult(router, path, encoded)` → `Exit<A, ClientError<E>>` of class instances.
