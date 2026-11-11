@@ -407,8 +407,8 @@ export declare namespace RouterService {
 
   /**
    * What `Router.withSchemas(source, schemas)` returns for a router service `X`: a service with
-   * `X`'s key and `make` (so its value is `X`'s) whose router has the given schemas
-   * ({@link Router.WithSchemas}). Pure when `X` is pure.
+   * `X`'s key and `make` (so its value is `X`'s) whose router has `X`'s schemas, then the given
+   * ones ({@link Router.WithSchemas}). Pure when `X` is pure.
    *
    * @since 0.1.0
    */
@@ -417,7 +417,7 @@ export declare namespace RouterService {
     Context.Service.Shape<X>
   > & {
     readonly make: X['make'];
-    readonly [SchemasTypeId]: S;
+    readonly [SchemasTypeId]: readonly [...Overlays<X>, S];
   };
 }
 
@@ -445,10 +445,18 @@ type Nested<Rec> = string extends keyof Rec
 
 /** The record of the router built from a router service (nested services resolved, schemas set). */
 type ServiceRecord<S> = S extends { readonly make: Effect.Effect<infer Rec, infer _E, infer _R> }
-  ? S extends { readonly [SchemasTypeId]: infer Schemas }
-    ? Router.WithSchemas<Resolve<Rec>, Schemas>
-    : Resolve<Rec>
+  ? ApplyOverlays<Resolve<Rec>, Overlays<S>>
   : never;
+
+/** The schemas of each `Router.withSchemas` call that made `S`, oldest first (none for a class). */
+type Overlays<S> = S extends { readonly [SchemasTypeId]: infer L extends ReadonlyArray<unknown> }
+  ? L
+  : [];
+
+/** `Rec` with each overlay applied in order, as chained `Router.withSchemas` calls on a router. */
+type ApplyOverlays<Rec, L> = L extends readonly [infer S, ...infer Rest]
+  ? ApplyOverlays<Router.WithSchemas<Rec, S>, Rest>
+  : Rec;
 
 /**
  * The record type `Router.make` stores: router services (at any depth of plain records) replaced
@@ -758,10 +766,10 @@ const sync: Builder = {
   make: (svc) => Effect.sync(() => runMake(svc)),
 };
 
-/** The schemas `Router.withSchemas` set on `svc`, if it made `svc`. */
-const schemasOf = (svc: RouterService.Any): { readonly [key: string]: unknown } | undefined =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- only `withSchemas` sets the key, to its schemas record
-  Predicate.hasProperty(svc, SchemasTypeId) ? (svc[SchemasTypeId] as never) : undefined;
+/** The schemas of each `Router.withSchemas` call that made `svc`, oldest first. */
+const schemasOf = (svc: RouterService.Any): ReadonlyArray<{ readonly [key: string]: unknown }> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- only `withSchemas` sets the key, to its list of schemas records
+  Predicate.hasProperty(svc, SchemasTypeId) ? (svc[SchemasTypeId] as never) : [];
 
 /** Builds the router of `svc`: runs its `make`, resolves nested services and sets its schemas. */
 const buildIn = (svc: RouterService.Any, builder: Builder): Effect.Effect<Built> =>
@@ -778,10 +786,14 @@ const buildIn = (svc: RouterService.Any, builder: Builder): Effect.Effect<Built>
       const made = yield* builder.make(svc);
       const value = yield* Effect.sync(() => checkRecord(svc, made));
       const record = yield* resolve(value, builder);
-      const router = yield* Effect.sync(() => {
-        const schemas = schemasOf(svc);
-        return compile(schemas === undefined ? record : patchRecord(record, schemas, []));
-      });
+      const router = yield* Effect.sync(() =>
+        compile(
+          schemasOf(svc).reduce<Router.Shape>(
+            (rec, schemas) => patchRecord(rec, schemas, []),
+            record,
+          ),
+        ),
+      );
       const built: Built = { router, value };
       builder.memo.set(svc, built);
       return built;
@@ -1202,6 +1214,8 @@ const patchRecord = (
  *   or {@link buildService}); nothing runs at the call, and the router module is imported once.
  * - Nested routers (and nested services) are patched recursively and keep router-level
  *   middleware. Procedures not named in `schemas` are kept as they are.
+ * - Chained calls compose over a router service as over a router: a later call replaces only the
+ *   `output` / `error` it gives and keeps the earlier calls' other schemas.
  *
  * **Gotchas**
  *
@@ -1252,10 +1266,10 @@ const withSchemas: {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `patchRecord` replaces exactly the entries `WithSchemas` describes
     return compile(patchRecord(source.record, schemas, [])) as never;
   }
-  // `buildIn` sets the schemas when it builds the router (see `schemasOf`).
+  // `buildIn` applies the source's schemas, then these, when it builds the router (see `schemasOf`).
   const service = Context.Service<any, any>()(source.key, { make: makeOf(source) });
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a key with `source`'s key string and `make` is what `RouterService.WithSchemas` describes
-  return Object.assign(service, { [SchemasTypeId]: schemas }) as never;
+  return Object.assign(service, { [SchemasTypeId]: [...schemasOf(source), schemas] }) as never;
 };
 
 /**
