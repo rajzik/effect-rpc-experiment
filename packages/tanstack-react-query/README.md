@@ -122,6 +122,10 @@ export function PostTitle({ id }: { id: number }) {
 - Query keys are `[path, { input?, type: 'query' | 'infinite' }]` with `path` a string array
   (`[['post', 'byId'], { input: { id: 1 }, type: 'query' }]`); path keys are `[path]`; the root
   key is `[]`.
+- `input` in keys and filters is the input encoded with the procedure's JSON payload codec
+  (`Set` / `Map` → arrays, `bigint` → string, `Date` → ISO string), so structured inputs get
+  distinct, JSON-safe keys. A partial filter input is encoded field by field the same way. The
+  procedure call still gets the input as given.
 - Mutation keys are `[path]`. With a key prefix, every key starts with `[prefix]`.
 - Infinite keys drop `cursor` (and `direction`) from the input; `infiniteQueryOptions` exists only
   for inputs with a `cursor` key.
@@ -176,6 +180,7 @@ export function PostTitle({ id }: { id: number }) {
 | `queryOptions`, `select`, `initialData`, headers, abort | `test/queryOptions.test.tsx`                             |
 | Typed errors and defects as class instances             | `test/procedureErrors.test.tsx`, `test/types.test-d.tsx` |
 | Keys, filters, invalidation by path, wrong-kind errors  | `test/queryKeyable.test.tsx`, `test/utils.test.ts`       |
+| `Set` / `Map` / `bigint` inputs in keys and hydration   | `test/keyEncoding.test.ts`                               |
 | Mutations, mutation defaults, `overrides`               | `test/mutationOptions.test.tsx`                          |
 | Infinite queries                                        | `test/infiniteQueryOptions.test.tsx`                     |
 | `skipToken`                                             | `test/skipToken.test.tsx`                                |

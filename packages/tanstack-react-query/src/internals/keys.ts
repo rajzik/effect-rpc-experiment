@@ -9,6 +9,8 @@
  * @since 0.1.0
  */
 import { skipToken } from '@tanstack/react-query';
+import { Schema, Struct } from 'effect';
+import type { Rpc } from 'effect/rpc';
 import type {
   AnyRpcMutationKey,
   AnyRpcQueryKey,
@@ -102,7 +104,9 @@ export const parseQueryKey = (
  * split.
  *
  * Prefer the proxy helpers (`rpc.post.byId.queryKey(input)`), which are data-tagged; use this
- * only when you have a path but no proxy.
+ * only when you have a path but no proxy. `input` is used as given, while the proxy helpers put
+ * the input encoded with the procedure's JSON payload codec in the key (`Set` → array, `bigint`
+ * → string): encode a structured input with `Codecs.encodePayloadSync` to match their keys.
  *
  * @category utils
  * @since 0.1.0
@@ -137,6 +141,41 @@ export const getQueryKeyInternal = (opts: {
     return [[opts.prefix], ...key] as RpcQueryKeyWithPrefix;
   }
   return key;
+};
+
+const keyEncoders = new WeakMap<Rpc.AnyWithProps, (input: unknown) => unknown>();
+
+const keyEncoderOf = (rpc: Rpc.AnyWithProps): ((input: unknown) => unknown) => {
+  let encode = keyEncoders.get(rpc);
+  if (encode === undefined) {
+    const schema = rpc.payloadSchema;
+    const keySchema =
+      'fields' in schema
+        ? // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a schema with `fields` is a `Schema.Struct` or `Schema.Class`
+          Schema.Struct(Struct.map(schema.fields as Schema.Struct.Fields, Schema.optionalKey))
+        : schema;
+    encode = Schema.encodeUnknownSync(
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erased to the untyped JSON codec of the input
+      Schema.toCodecJson(keySchema) as unknown as Schema.Codec<unknown>,
+    );
+    keyEncoders.set(rpc, encode);
+  }
+  return encode;
+};
+
+/**
+ * @internal The input as it appears in query keys: encoded with the procedure's JSON payload
+ * codec, so that TanStack's JSON hashing tells `Set` / `Map` inputs apart, accepts `bigint`s and
+ * keys survive dehydration. Struct fields are optional, so that the partial inputs of filters
+ * encode like full ones. An input the codec rejects is kept as given.
+ */
+export const encodeKeyInput = (rpc: Rpc.AnyWithProps | undefined, input: unknown): unknown => {
+  if (rpc === undefined || input === undefined || input === skipToken) return input;
+  try {
+    return keyEncoderOf(rpc)(input);
+  } catch {
+    return input;
+  }
 };
 
 /**

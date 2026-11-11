@@ -21,4 +21,5 @@ tests that port their behaviour. `trpc` → `rpc`, `useTRPC` → `useRpc`, `TRPC
 
 Additional local suites: `hydration.test.tsx` (Schema-aware `dehydrate` / `hydrate` /
 `HydrationBoundary`), `http.test.tsx` (everything over a real HTTP server), `readme.test.tsx`
-(README examples), `types.test-d.tsx` (type-level guarantees).
+(README examples), `types.test-d.tsx` (type-level guarantees), `keyEncoding.test.ts` (`Set` /
+`Map` / `bigint` inputs in keys, filters, subscriptions and hydration).

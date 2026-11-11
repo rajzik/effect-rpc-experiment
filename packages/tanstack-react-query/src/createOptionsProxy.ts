@@ -16,7 +16,12 @@ import type { ProcedureDef, ProcedureKind } from '@rpc-effect/core';
 import type { DataTag, QueryClient, QueryFilters } from '@tanstack/react-query';
 import { rpcInfiniteQueryOptions, type RpcInfiniteQueryOptions } from './infiniteQueryOptions.js';
 import type { ProcedureCaller } from './internals/call.js';
-import { getMutationKeyInternal, getQueryKeyInternal, unwrapLazyArg } from './internals/keys.js';
+import {
+  encodeKeyInput,
+  getMutationKeyInternal,
+  getQueryKeyInternal,
+  unwrapLazyArg,
+} from './internals/keys.js';
 import type {
   DefaultFeatureFlags,
   FeatureFlags,
@@ -125,6 +130,8 @@ export interface DecorateInfiniteQueryProcedure<TDef extends ResolverDef> extend
  *
  * - `queryKey(input?)` is `[path, { input?, type: "query" }]` and is data-tagged, so
  *   `queryClient.getQueryData(rpc.post.byId.queryKey({ id: 1 }))` is typed as the output.
+ * - Keys and filters hold the input encoded with the procedure's JSON payload codec (`Set` /
+ *   `Map` → arrays, `bigint` → string), so structured inputs get distinct, JSON-safe keys.
  * - `queryKey()` / `queryFilter()` without input match every input of the procedure (TanStack
  *   matches keys by prefix); `input` may be `Partial`.
  *
@@ -564,6 +571,9 @@ export const createRpcOptionsProxy = <
     const [arg1, arg2] = args as ReadonlyArray<any>;
     const kind = util === undefined ? undefined : procedureUtils[util];
     if (util !== undefined && kind !== undefined) assertKind(path, util, kind);
+    // Keys hold the JSON encoding of the input; the call itself gets the input as given.
+    const keyInput = (): unknown =>
+      encodeKeyInput(router.procedures.get(path.join('.'))?.rpc, arg1);
     switch (util) {
       case 'pathKey':
         return getQueryKeyInternal({ path, type: 'any', prefix });
@@ -575,14 +585,14 @@ export const createRpcOptionsProxy = <
           opts: arg2,
           path,
           call,
-          queryKey: getQueryKeyInternal({ path, input: arg1, type: 'query', prefix }),
+          queryKey: getQueryKeyInternal({ path, input: keyInput(), type: 'query', prefix }),
         });
       case 'queryKey':
-        return getQueryKeyInternal({ path, input: arg1, type: 'query', prefix });
+        return getQueryKeyInternal({ path, input: keyInput(), type: 'query', prefix });
       case 'queryFilter':
         return {
           ...arg2,
-          queryKey: getQueryKeyInternal({ path, input: arg1, type: 'query', prefix }),
+          queryKey: getQueryKeyInternal({ path, input: keyInput(), type: 'query', prefix }),
         };
       case 'infiniteQueryOptions':
         return rpcInfiniteQueryOptions({
@@ -590,14 +600,14 @@ export const createRpcOptionsProxy = <
           opts: arg2,
           path,
           call,
-          queryKey: getQueryKeyInternal({ path, input: arg1, type: 'infinite', prefix }),
+          queryKey: getQueryKeyInternal({ path, input: keyInput(), type: 'infinite', prefix }),
         });
       case 'infiniteQueryKey':
-        return getQueryKeyInternal({ path, input: arg1, type: 'infinite', prefix });
+        return getQueryKeyInternal({ path, input: keyInput(), type: 'infinite', prefix });
       case 'infiniteQueryFilter':
         return {
           ...arg2,
-          queryKey: getQueryKeyInternal({ path, input: arg1, type: 'infinite', prefix }),
+          queryKey: getQueryKeyInternal({ path, input: keyInput(), type: 'infinite', prefix }),
         };
       case 'mutationOptions':
         return rpcMutationOptions({
@@ -617,7 +627,7 @@ export const createRpcOptionsProxy = <
           path,
           input: arg1,
           call,
-          queryKey: getQueryKeyInternal({ path, input: arg1, type: 'any', prefix }),
+          queryKey: getQueryKeyInternal({ path, input: keyInput(), type: 'any', prefix }),
         });
       default:
         throw new Error(
