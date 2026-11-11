@@ -34,7 +34,7 @@ type ReservedOptions = 'queryKey' | 'queryFn' | 'queryHashFn' | 'queryHash' | 'i
 
 /** Extra input options of `infiniteQueryOptions`. */
 interface CursorOptions<TInput> {
-  /** The cursor of the first page. Defaults to the `cursor` of the input. */
+  /** The cursor of the first page, `null` included. When omitted, the `cursor` of the input. */
   initialCursor?: RpcPageParam<TInput>;
 }
 
@@ -420,7 +420,7 @@ export const rpcInfiniteQueryOptions = (args: {
       >),
       queryKey,
       queryFn: input === skipToken ? skipToken : queryFn,
-      initialPageParam: initialCursor ?? cursorOf(input),
+      initialPageParam: initialCursor === undefined ? cursorOf(input) : initialCursor,
     }),
     { rpc: createRpcOptionsResult(path) },
   );
