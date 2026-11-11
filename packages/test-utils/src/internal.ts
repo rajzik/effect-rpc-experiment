@@ -137,3 +137,21 @@ export const onceDispose = (
   };
   return () => (done ??= run());
 };
+
+/**
+ * Runs `make`; if it throws, awaits `release` and rethrows the original error (a failure of
+ * `release` is dropped). Guards constructions that follow an acquisition.
+ *
+ * @internal
+ */
+export const releaseOnThrow = async <A>(
+  make: () => A,
+  release: () => Promise<void>,
+): Promise<A> => {
+  try {
+    return make();
+  } catch (error) {
+    await Promise.allSettled([release()]);
+    throw error;
+  }
+};
