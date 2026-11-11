@@ -53,9 +53,10 @@ export interface StartHydration {
   ) => void;
   /**
    * The TanStack Router `dehydrate` / `hydrate` options for a `QueryClient`, to spread into
-   * `createRouter({ ... })`: on the server the router dehydrates the query cache (Schema-encoded,
-   * as a JSON string so it passes the router's serializability check) after the loaders ran; in
-   * the browser it hydrates the same `QueryClient` before rendering.
+   * `createRouter({ ... })`: on the server the router dehydrates the query cache after the loaders
+   * ran (the router's queries Schema-encoded as a JSON string, the other queries as they are for
+   * the router's own serializer); in the browser it hydrates the same `QueryClient` before
+   * rendering.
    */
   readonly routerOptions: (queryClient: QueryClient) => StartRouterHydrationOptions;
 }
@@ -67,8 +68,14 @@ export interface StartHydration {
  * @since 0.1.0
  */
 export interface StartDehydratedQueries {
-  /** `JSON.stringify` of the Schema-encoded `DehydratedState`. */
+  /** `JSON.stringify` of the router's Schema-encoded queries (`{ queries }`). */
   readonly queryState: string;
+  /**
+   * The other queries and the mutations: a `DehydratedState` as TanStack dehydrates it, for the
+   * router's own serializer (`Date`, `bigint`, ... survive). Typed `any` because its data is
+   * `unknown`, which `createRouter`'s serializability check rejects.
+   */
+  readonly otherState: any;
 }
 
 /**
@@ -103,7 +110,8 @@ export interface StartRouterHydrationOptions {
  * - `hydrate(queryClient, state)` decodes it back to instances: methods work, `Date` fields are
  *   `Date`s, a failed query's error is the `TaggedError`.
  * - `routerOptions(queryClient)` returns `createRouter`'s `dehydrate` / `hydrate` options; the
- *   payload is a JSON string (`{ queryState }`) so it passes the router's serializability check.
+ *   payload is `{ queryState, otherState }`: the rpc queries Schema-encoded as a JSON string, the
+ *   other queries and mutations unchanged for Start's serializer (`Date`, `bigint`, ... survive).
  * - `options.keyPrefix` must equal the options proxy's `keyPrefix`; only queries with it are
  *   dehydrated and hydrated.
  *
@@ -156,14 +164,29 @@ export const createStartHydration = (
     dehydrate,
     hydrate,
     routerOptions: (queryClient) => ({
-      dehydrate: () => ({ queryState: JSON.stringify(dehydrate(queryClient)) }),
-      hydrate: ({ queryState }) => {
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `queryState` is the JSON.stringify of this router's own `dehydrate` output (see `dehydrate` above)
-        hydrate(queryClient, JSON.parse(queryState) as DehydratedState);
+      dehydrate: () => {
+        const { queries, mutations } = dehydrate(queryClient);
+        return {
+          queryState: JSON.stringify({ queries: queries.filter(isSchemaEncoded) }),
+          otherState: { queries: queries.filter((query) => !isSchemaEncoded(query)), mutations },
+        };
+      },
+      hydrate: ({ queryState, otherState }) => {
+        const other: DehydratedState = otherState;
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `queryState` is the JSON.stringify of the Schema-encoded queries of this router's own `dehydrate` output (see `dehydrate` above)
+        const encoded = JSON.parse(queryState) as Pick<DehydratedState, 'queries'>;
+        hydrate(queryClient, { ...other, queries: [...other.queries, ...encoded.queries] });
       },
     }),
   };
 };
+
+/**
+ * Whether `dehydrate` of `@rpc-effect/tanstack-react-query` encoded the query with its procedure's
+ * schemas: it marks such queries with an `effectTrpc` field, which its `hydrate` decodes.
+ */
+const isSchemaEncoded = (query: DehydratedState['queries'][number]): boolean =>
+  'effectTrpc' in query;
 
 /**
  * Options of {@link createStartHelpers}: the `client` (required) and, with the
