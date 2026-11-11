@@ -735,8 +735,9 @@ const inferProcedure = (
   const failures = args.map((a) => a[1]).filter((t) => t !== undefined);
   const voidLike = TypeFlags.Void | TypeFlags.Undefined | TypeFlags.Never;
   const valued = successes.filter((t) => (t.flags & voidLike) === 0);
+  // Keep the void-like branches next to a valued one: they still succeed with `undefined`.
   const output =
-    proc.output === undefined && valued.length > 0 ? unionSchema(gen, valued) : undefined;
+    proc.output === undefined && valued.length > 0 ? unionSchema(gen, successes) : undefined;
   if (proc.error !== undefined) return { output, defects: [] };
   const fromMiddleware = middlewareErrorSymbols(gen.ctx, [
     ...proc.middlewares,
