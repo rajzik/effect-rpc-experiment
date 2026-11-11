@@ -1041,18 +1041,19 @@ const applyMiddleware = (
   record: AnyServiceShape,
   middleware: RpcMiddleware.AnyService,
 ): Router.Shape => {
-  const out: { [key: string]: ProcedureDef.Any | Router.Any | Router.Shape } = {};
+  // Entries, not assignments into `{}`: assigning `__proto__` would set the prototype and drop it.
+  const out: Array<[string, ProcedureDef.Any | Router.Any | Router.Shape]> = [];
   for (const key of Object.keys(record)) {
     const value: unknown = record[key];
     if (isProcedureDef(value)) {
-      out[key] = addDefMiddleware(value, middleware);
+      out.push([key, addDefMiddleware(value, middleware)]);
     } else if (isRouter(value)) {
-      out[key] = compile(applyMiddleware(value.record, middleware));
+      out.push([key, compile(applyMiddleware(value.record, middleware))]);
     } else if (isPlainRecord(value)) {
-      out[key] = applyMiddleware(value, middleware);
+      out.push([key, applyMiddleware(value, middleware)]);
     }
   }
-  return out;
+  return Object.fromEntries(out);
 };
 
 /** Compiles a resolved record into a router (untyped core of `make`). */
